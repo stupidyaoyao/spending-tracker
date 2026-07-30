@@ -1660,7 +1660,19 @@ function render() {
   const isDayMode = groupMode === 'day';
   let html = '';
   order.forEach(key => {
-    const groupTotal = groups[key].reduce((s, t) => s + spendAmount(t), 0);
+    // On the "All categories" view, keep Transfer/Income out of each group's
+    // total too — same rule renderTotals()/statsFor() already apply to the
+    // Expense/Income/Balance cards above, and what calendarDayTotal() already
+    // does for the Calendar page. Before this fix, a day's total here could
+    // include a big account-to-account transfer while the Calendar's total
+    // for that same date didn't — two different-looking numbers for "the
+    // same day" that didn't actually agree. Selecting a specific category
+    // (including Transfer itself) still shows that category's own real
+    // total, unaffected by this.
+    const groupSpendTxns = activeFilter === 'All'
+      ? groups[key].filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
+      : groups[key];
+    const groupTotal = groupSpendTxns.reduce((s, t) => s + spendAmount(t), 0);
     const expanded = !isDayMode || expandedDayGroups.has(key);
     const headerClass = isDayMode ? ' collapsible' + (expanded ? '' : ' collapsed') : '';
     html += `<div class="day-group">
