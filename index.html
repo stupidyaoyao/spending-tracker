@@ -70,6 +70,20 @@
   .cal-day-panel .cal-day-panel-head span:first-child { font-size: 15px; font-weight: 500; }
   .cal-day-panel .cal-day-panel-head span:last-child { font-size: 15px; font-weight: 500; color: var(--accent); }
 
+  .trend-group-toggle { display: flex; gap: 8px; margin: 4px 0 14px; }
+  .trend-group-btn {
+    flex: 1; text-align: center; padding: 8px 0; border-radius: 10px;
+    background: var(--card); color: var(--muted); font-size: 13px; border: none;
+  }
+  .trend-group-btn.active { background: #1e1e22; color: var(--text); }
+  .trend-card { background: var(--card); border-radius: 14px; padding: 14px; }
+  .trend-card-label { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+  .trend-card-value { font-size: 20px; font-weight: 600; margin-bottom: 14px; }
+  .trend-delta { font-size: 12px; font-weight: 400; margin-left: 6px; }
+  .trend-delta.up { color: var(--car); }
+  .trend-delta.down { color: var(--income); }
+  .trend-chart-wrap { position: relative; height: 180px; }
+
   .history-list { display: flex; flex-direction: column; gap: 8px; }
   .history-entry { background: var(--card); border-radius: 12px; padding: 10px 14px; }
   .history-entry .history-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -255,6 +269,7 @@
     <div class="page-tabs" id="pageTabs">
       <button class="page-tab active" data-page="main">Main</button>
       <button class="page-tab" data-page="calendar">Calendar</button>
+      <button class="page-tab" data-page="trends">Trends</button>
       <button class="page-tab" data-page="history">History</button>
     </div>
   </header>
@@ -317,6 +332,20 @@
     </div>
     <div class="cal-grid" id="calGrid"></div>
     <div id="calDayPanel"></div>
+  </div>
+
+  <div id="trendsPage" style="display:none;">
+    <div class="filters" id="trendFilters"></div>
+    <div class="filters subfilters" id="trendSubFilters"></div>
+    <div class="trend-group-toggle" id="trendGroupToggle">
+      <button class="trend-group-btn active" data-group="month">By month</button>
+      <button class="trend-group-btn" data-group="week">By week</button>
+    </div>
+    <div class="trend-card">
+      <div class="trend-card-label" id="trendLabel"></div>
+      <div class="trend-card-value" id="trendValue"></div>
+      <div class="trend-chart-wrap"><canvas id="trendsChart"></canvas></div>
+    </div>
   </div>
 
   <div id="historyPage" style="display:none;">
@@ -665,6 +694,13 @@ let selectedCalendarDay = null;
 // Audit trail loaded from the ActivityLog sheet — see getActivityLog() in
 // Code.gs. Newest first, capped server-side to the most recent 300 entries.
 let activityLog = [];
+
+// Trends page state — independent of the Main page's own category/subtag
+// filters (activeFilter/activeSubFilter) since you might want to compare
+// Car spend over time while still browsing all-category totals on Main.
+let trendCategory = 'All';
+let trendSubTag = 'All';
+let trendGroup = 'month'; // 'month' or 'week' — which the comparison bars are bucketed by
 // Keyed by canvas id — the big combined pie (id="chart") plus up to 3 mini
 // per-account pies (id="miniChart-TNG" etc). A plain map instead of one
 // singleton since multiple pies are now on screen at once.
@@ -712,6 +748,7 @@ async function loadData() {
 function renderApp() {
   render();
   if (activePage === 'calendar') renderCalendar();
+  if (activePage === 'trends') renderTrends();
   if (activePage === 'history') renderHistory();
 }
 
@@ -720,8 +757,10 @@ function switchPage(page) {
   document.querySelectorAll('.page-tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   document.getElementById('mainPage').style.display = page === 'main' ? '' : 'none';
   document.getElementById('calendarPage').style.display = page === 'calendar' ? '' : 'none';
+  document.getElementById('trendsPage').style.display = page === 'trends' ? '' : 'none';
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
   if (page === 'calendar') renderCalendar();
+  if (page === 'trends') renderTrends();
   if (page === 'history') renderHistory();
 }
 document.querySelectorAll('.page-tab').forEach(el => {
@@ -816,6 +855,149 @@ document.getElementById('calNext').onclick = () => {
   selectedCalendarDay = null;
   renderCalendar();
 };
+
+// Trends page — bar-chart comparison of spend across recent periods for a
+// chosen category/subtag, e.g. "Car · Toll, last 6 months". Bars (not a
+// candlestick — there's no open/high/low/close for spending, so a bar per
+// period is the honest analog) with the most recent period highlighted, plus
+// a %-change readout vs the period before it.
+
+// 'YYYY-MM' for month grouping, or the Monday-of-that-week date ('YYYY-MM-DD')
+// for week grouping — the bucket a given transaction date falls into.
+function trendBucketKey(dateStr, group) {
+  if (group === 'month') return dateStr.slice(0, 7);
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day; // shift back to that week's Monday
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+function trendBucketLabel(key, group) {
+  if (group === 'month') {
+    const [y, m] = key.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short' });
+  }
+  const d = new Date(key + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+// Same present-in-data-only chip pattern as renderFilters()/renderSubFilters()
+// on the Main page, kept as a separate copy since Trends has its own
+// independent category/subtag selection (trendCategory/trendSubTag).
+function renderTrendFilters() {
+  const spendTxns = allTxns.filter(t => !NON_SPEND_CATEGORIES.includes(t.category));
+  const present = new Set(spendTxns.map(t => t.category));
+  if (trendCategory !== 'All' && !present.has(trendCategory)) {
+    trendCategory = 'All';
+    trendSubTag = 'All';
+  }
+  const cats = ['All'].concat(ALL_CATEGORIES.filter(c => !NON_SPEND_CATEGORIES.includes(c) && present.has(c)));
+  document.getElementById('trendFilters').innerHTML = cats.map(c =>
+    `<div class="filter-chip ${c === trendCategory ? 'active' : ''}" data-cat="${c}">${c}</div>`
+  ).join('');
+  document.querySelectorAll('#trendFilters .filter-chip').forEach(el => {
+    el.onclick = () => { trendCategory = el.dataset.cat; trendSubTag = 'All'; renderTrends(); };
+  });
+}
+function renderTrendSubFilters() {
+  const el = document.getElementById('trendSubFilters');
+  const possible = SUBTAGS_BY_CATEGORY[trendCategory];
+  if (!possible || !possible.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const categoryTxns = allTxns.filter(t => t.category === trendCategory);
+  const present = new Set(categoryTxns.map(t => t.subTag).filter(Boolean));
+  categoryTxns.forEach(t => { if (t.extraTag) present.add(t.extraTag); });
+  const subtags = possible.filter(s => present.has(s));
+  if (!subtags.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  if (trendSubTag !== 'All' && !present.has(trendSubTag)) trendSubTag = 'All';
+  el.style.display = 'flex';
+  const opts = ['All'].concat(subtags);
+  el.innerHTML = opts.map(s =>
+    `<div class="filter-chip ${s === trendSubTag ? 'active' : ''}" data-sub="${s}">${s}</div>`
+  ).join('');
+  el.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.onclick = () => { trendSubTag = chip.dataset.sub; renderTrends(); };
+  });
+}
+function trendFilteredTxns() {
+  let txns = allTxns.filter(t => !NON_SPEND_CATEGORIES.includes(t.category));
+  if (trendCategory !== 'All') txns = txns.filter(t => t.category === trendCategory);
+  if (trendCategory !== 'All' && trendSubTag !== 'All') {
+    txns = txns.filter(t => (t.subTag || '') === trendSubTag || t.extraTag === trendSubTag);
+  }
+  return txns;
+}
+
+function renderTrends() {
+  renderTrendFilters();
+  renderTrendSubFilters();
+
+  const txns = trendFilteredTxns();
+  const buckets = {};
+  txns.forEach(t => {
+    const key = trendBucketKey(t.date, trendGroup);
+    buckets[key] = (buckets[key] || 0) + spendAmount(t);
+  });
+  const sortedKeys = Object.keys(buckets).sort();
+  const windowSize = trendGroup === 'month' ? 6 : 8;
+  const keys = sortedKeys.slice(-windowSize);
+  const labels = keys.map(k => trendBucketLabel(k, trendGroup));
+  const values = keys.map(k => Math.round(buckets[k] * 100) / 100);
+
+  const label = trendCategory === 'All'
+    ? 'All spending'
+    : (trendSubTag !== 'All' ? trendCategory + ' · ' + trendSubTag : trendCategory);
+  document.getElementById('trendLabel').textContent = label;
+
+  const current = values.length ? values[values.length - 1] : 0;
+  const prev = values.length > 1 ? values[values.length - 2] : undefined;
+  let deltaHtml = '';
+  if (prev !== undefined && prev !== 0) {
+    const pct = Math.round(((current - prev) / prev) * 100);
+    const cls = pct > 0 ? 'up' : (pct < 0 ? 'down' : '');
+    const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '–');
+    const periodWord = trendGroup === 'month' ? 'last month' : 'last week';
+    deltaHtml = `<span class="trend-delta ${cls}">${arrow} ${Math.abs(pct)}% vs ${periodWord}</span>`;
+  }
+  document.getElementById('trendValue').innerHTML = `RM${current.toFixed(2)}${deltaHtml}`;
+
+  const canvas = document.getElementById('trendsChart');
+  const chartData = {
+    labels,
+    datasets: [{
+      data: values,
+      backgroundColor: values.map((v, i) => i === values.length - 1 ? '#f5a623' : '#3a3a3d'),
+      borderRadius: 6,
+      maxBarThickness: 40
+    }]
+  };
+  if (chartInstances['trendsChart']) {
+    chartInstances['trendsChart'].data = chartData;
+    chartInstances['trendsChart'].update();
+  } else if (window.Chart) {
+    chartInstances['trendsChart'] = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: chartData,
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => 'RM' + Number(c.parsed.y).toFixed(2) } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#8e8e93', font: { size: 10 } } },
+          y: { display: false, grid: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+document.querySelectorAll('.trend-group-btn').forEach(btn => {
+  btn.onclick = () => {
+    trendGroup = btn.dataset.group;
+    document.querySelectorAll('.trend-group-btn').forEach(b => b.classList.toggle('active', b === btn));
+    renderTrends();
+  };
+});
 
 // History page — a reverse-chronological audit trail of real edits (see
 // ACTIVITY_LOG_SHEET in Code.gs). Only starts from when this feature was
