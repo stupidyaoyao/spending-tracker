@@ -145,7 +145,14 @@
 
   .list { display: flex; flex-direction: column; gap: 8px; }
   .day-group { margin-top: 10px; }
-  .day-header { font-size: 13px; color: var(--muted); margin: 10px 2px 6px; display: flex; justify-content: space-between; }
+  .day-header {
+    font-size: 13px; color: var(--muted); margin: 10px 2px 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .day-header.collapsible { cursor: pointer; }
+  .day-header-left { display: flex; align-items: center; gap: 6px; }
+  .day-chevron { display: inline-block; font-size: 9px; transition: transform 0.15s; transform: rotate(0deg); }
+  .day-header.collapsed .day-chevron { transform: rotate(-90deg); }
   .txn {
     background: var(--card); border-radius: 14px; padding: 12px 14px;
     display: flex; align-items: center; gap: 12px;
@@ -674,6 +681,12 @@ let activeSubFilter = 'All';
 let searchQuery = '';
 let groupMode = 'day';
 let sortMode = 'date_desc';
+// Which day-group headers (groupMode === 'day' only) are currently expanded
+// to show their individual transactions — collapsed by default so the list
+// opens as a scannable "date + total" overview, since a single day's total
+// is often what you're checking (e.g. auditing why a month's Expense looks
+// high) without needing every row visible at once.
+let expandedDayGroups = new Set();
 
 // Which top-level page is showing — Main (the classic list+pie view),
 // Calendar (month heatmap + full day detail), or History (the audit trail
@@ -844,7 +857,7 @@ function renderCalendar() {
     const selectedClass = dateStr === selectedCalendarDay ? 'selected' : '';
     html += `<button class="cal-day ${selectedClass}" data-date="${dateStr}"${styleAttr}>
       <span class="cal-day-num"${numStyle}>${d}</span>
-      ${total > 0 ? `<span class="cal-day-amt"${amtStyle}>RM${total.toFixed(0)}</span>` : ''}
+      ${total !== 0 ? `<span class="cal-day-amt"${amtStyle}>${formatSignedRM(total, 0)}</span>` : ''}
     </button>`;
   }
   document.getElementById('calGrid').innerHTML = html;
@@ -871,7 +884,7 @@ function renderCalDayPanel() {
   const dateObj = new Date(selectedCalendarDay + 'T00:00:00');
   const label = dateObj.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-  let html = `<div class="cal-day-panel"><div class="cal-day-panel-head"><span>${label}</span><span>RM${total.toFixed(2)}</span></div>`;
+  let html = `<div class="cal-day-panel"><div class="cal-day-panel-head"><span>${label}</span><span>${formatSignedRM(total)}</span></div>`;
   html += dayTxns.length ? dayTxns.map(t => renderTxnRow(t)).join('') : '<div class="empty">No transactions.</div>';
   html += '</div>';
   panelEl.innerHTML = html;
@@ -1041,7 +1054,7 @@ function renderTrends() {
       const periodWord = trendGroup === 'month' ? 'last month' : 'last week';
       deltaHtml = `<span class="trend-delta ${cls}">${arrow} ${Math.abs(pct)}% vs ${periodWord}</span>`;
     }
-    valueEl.innerHTML = `RM${current.toFixed(2)}${deltaHtml}`;
+    valueEl.innerHTML = `${formatSignedRM(current)}${deltaHtml}`;
 
     const chartData = {
       labels,
@@ -1641,14 +1654,36 @@ function render() {
     groups[key].push(t);
   });
 
+  // Day groups (only) are collapsible — tap the header to reveal that day's
+  // rows. Category/merchant grouping stays always-expanded, since those
+  // groups are usually what you're already narrowing down to on purpose.
+  const isDayMode = groupMode === 'day';
   let html = '';
   order.forEach(key => {
     const groupTotal = groups[key].reduce((s, t) => s + spendAmount(t), 0);
-    html += `<div class="day-group"><div class="day-header"><span>${key}</span><span>RM${groupTotal.toFixed(2)}</span></div>`;
-    groups[key].forEach(t => { html += renderTxnRow(t); });
+    const expanded = !isDayMode || expandedDayGroups.has(key);
+    const headerClass = isDayMode ? ' collapsible' + (expanded ? '' : ' collapsed') : '';
+    html += `<div class="day-group">
+      <div class="day-header${headerClass}" data-key="${escapeHtml(key)}">
+        <span class="day-header-left">${isDayMode ? '<span class="day-chevron">&#9662;</span>' : ''}<span>${key}</span></span>
+        <span>${formatSignedRM(groupTotal)}</span>
+      </div>`;
+    if (expanded) {
+      groups[key].forEach(t => { html += renderTxnRow(t); });
+    }
     html += `</div>`;
   });
   document.getElementById('list').innerHTML = html;
+  if (isDayMode) {
+    document.querySelectorAll('.day-header.collapsible').forEach(el => {
+      el.onclick = () => {
+        const key = el.dataset.key;
+        if (expandedDayGroups.has(key)) expandedDayGroups.delete(key);
+        else expandedDayGroups.add(key);
+        render();
+      };
+    });
+  }
   attachCatSelectHandlers();
   attachExtraTagHandlers();
   attachRemarkHandlers();
@@ -1703,6 +1738,18 @@ function spendAmount(t) {
   const amt = Number(t.amount || 0);
   if (NON_SPEND_CATEGORIES.includes(t.category)) return amt;
   return txnFlow(t) === 'in' ? -amt : amt;
+}
+
+// "-RM45.00" for a negative rollup, plain "RM45.00" for zero/positive — used
+// anywhere a group/day/period TOTAL is displayed (day-group headers, Calendar
+// cells + day panel, Trends readout). These totals are usually positive (net
+// spend), but a day/period with more reimbursements than spend nets negative
+// (see spendAmount() above), and plain toFixed() alone would render that as
+// the confusing "RM-45.00" — sign in the wrong place — instead of "-RM45.00".
+function formatSignedRM(amount, decimals) {
+  const d = decimals === undefined ? 2 : decimals;
+  const abs = Math.abs(amount).toFixed(d);
+  return (amount < 0 ? '-RM' : 'RM') + abs;
 }
 
 // Sign + CSS class for the amount text. Real spend = red minus. Money
