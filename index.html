@@ -199,14 +199,15 @@
   .preview-row .preview-remember input { width: auto; }
   .preview-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 
-  .mini-charts { display: flex; gap: 10px; margin-bottom: 14px; }
+  .mini-charts { display: flex; gap: 12px; margin-bottom: 14px; }
   .mini-charts.zoomed { flex-direction: column; }
-  .mini-chart-card { flex: 1; min-width: 0; background: var(--card); border-radius: 14px; padding: 10px; }
+  .mini-chart-card { flex: 1; min-width: 0; background: var(--card); border-radius: 16px; padding: 16px; }
   .mini-charts.zoomed .mini-chart-card { flex: none; }
-  .mini-chart-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
-  .mini-chart-wrap { position: relative; height: 90px; }
-  .mini-charts.zoomed .mini-chart-wrap { height: 200px; }
-  .mini-chart-truebalance { text-align: center; font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .mini-chart-head { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .mini-chart-wrap { position: relative; height: 110px; }
+  .mini-charts.zoomed .mini-chart-wrap { height: 220px; }
+  .mini-chart-truebalance { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; font-weight: 500; }
+  .mini-chart-updated { text-align: center; font-size: 11px; color: var(--muted); opacity: 0.7; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -528,6 +529,17 @@ function trueBalanceFor(account) {
   return anchor.asOfBalance + delta;
 }
 
+// "Updated 30 Jul 2026" — the date you last told the tracker this account's
+// real balance, shown under each true-balance line so it's clear how fresh
+// (or stale) that anchor is, separate from the running total computed on
+// top of it.
+function formatAnchorDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  return 'Updated ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 function categorize(description, type) {
   if (EXCLUDE_TYPES.includes(type)) return null;
 
@@ -801,10 +813,13 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
     chartInstances[canvasId].update();
   } else if (window.Chart) {
     chartInstances[canvasId] = new Chart(ctx, {
-      type: 'doughnut',
+      // The big combined "Overall" chart renders as a full pie (opts.pie) —
+      // the per-account mini charts stay doughnuts so their center hole
+      // still has room for the RM total text overlay.
+      type: opts.pie ? 'pie' : 'doughnut',
       data,
       options: {
-        responsive: true, maintainAspectRatio: false, cutout: '65%',
+        responsive: true, maintainAspectRatio: false, cutout: opts.pie ? '0%' : '65%',
         plugins: {
           legend: opts.legend
             ? { position: 'bottom', labels: { color: '#f5f5f7', boxWidth: 10, font: { size: 11 } } }
@@ -826,7 +841,7 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
 // month/all-time) via chartTxnsFor()/statsFor().
 function renderCharts() {
   renderChartOn('chart', chartTxnsFor(allTxns), activeSubFilter, {
-    titleEl: 'chartTitle', totalEl: 'chartTotal', legend: true
+    titleEl: 'chartTitle', totalEl: 'chartTotal', legend: true, pie: true
   });
   updateBigStats(allTxns);
   document.getElementById('chartLoading').classList.remove('show');
@@ -867,7 +882,8 @@ function renderCharts() {
         <div class="chart-loading"><div class="spinner"></div></div>
       </div>
       <div class="mini-chart-truebalance" id="miniTrue-${cssSafe(a)}"></div>
-      ${a === 'TNG' ? `<div class="mini-chart-truebalance" id="miniCardTrue-TNG"></div>` : ''}
+      <div class="mini-chart-updated" id="miniTrueUpdated-${cssSafe(a)}"></div>
+      ${a === 'TNG' ? `<div class="mini-chart-truebalance" id="miniCardTrue-TNG"></div><div class="mini-chart-updated" id="miniCardTrueUpdated-TNG"></div>` : ''}
     </div>
   `).join('');
 
@@ -898,6 +914,11 @@ function renderCharts() {
       const tb = trueBalanceFor(a);
       trueEl.textContent = tb === null ? '' : 'Balance: RM' + tb.toFixed(2);
     }
+    const trueUpdatedEl = document.getElementById('miniTrueUpdated-' + cssSafe(a));
+    if (trueUpdatedEl) {
+      const anchor = accountBalances.find(b => b.account === a);
+      trueUpdatedEl.textContent = anchor ? formatAnchorDate(anchor.asOfDate) : '';
+    }
     // TNG's physical Card balance (separate pseudo-account) shows as a
     // second line right under the eWallet Balance line — see the
     // "TNG Card Top-up" note on CATEGORY_OPTIONS.
@@ -906,6 +927,11 @@ function renderCharts() {
       if (cardEl) {
         const cardBal = trueBalanceFor('TNG Card');
         cardEl.textContent = cardBal === null ? '' : 'Card: RM' + cardBal.toFixed(2);
+      }
+      const cardUpdatedEl = document.getElementById('miniCardTrueUpdated-TNG');
+      if (cardUpdatedEl) {
+        const cardAnchor = accountBalances.find(b => b.account === 'TNG Card');
+        cardUpdatedEl.textContent = cardAnchor ? formatAnchorDate(cardAnchor.asOfDate) : '';
       }
     }
   });
