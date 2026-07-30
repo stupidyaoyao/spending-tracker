@@ -790,29 +790,28 @@ function calendarDayTotal(dateStr) {
   return dayTxns.reduce((s, t) => s + spendAmount(t), 0);
 }
 
-// Continuous light-yellow -> orange -> red heat scale for the calendar grid
-// (ratio 0..1 = this day's spend vs the month's heaviest day), instead of 3
-// discrete dark tiers — reuses the same yellow/orange/red already used
-// elsewhere for Entertainment/Shopping/Car so the palette stays consistent.
-const HEAT_YELLOW = [255, 214, 10];
-const HEAT_ORANGE = [255, 159, 10];
+// Continuous heat scale for the calendar grid, on a fixed RM scale (not
+// relative to the month's heaviest day, so a given amount always looks the
+// same color regardless of which month you're viewing): RM0-300 fades light
+// yellow to red, RM300-1000 fades red into brown, RM1000+ stays brown.
+const HEAT_LIGHT_YELLOW = [255, 235, 130];
 const HEAT_RED = [255, 69, 58];
+const HEAT_BROWN = [139, 69, 19];
 function lerpChannel(a, b, t) { return Math.round(a + (b - a) * t); }
-function heatColorForRatio(ratio) {
-  const r = Math.max(0, Math.min(1, ratio));
-  if (r <= 0.5) {
-    const t = r / 0.5;
+function heatColorForAmount(amount) {
+  if (amount <= 300) {
+    const t = Math.max(0, amount) / 300;
     return [
-      lerpChannel(HEAT_YELLOW[0], HEAT_ORANGE[0], t),
-      lerpChannel(HEAT_YELLOW[1], HEAT_ORANGE[1], t),
-      lerpChannel(HEAT_YELLOW[2], HEAT_ORANGE[2], t)
+      lerpChannel(HEAT_LIGHT_YELLOW[0], HEAT_RED[0], t),
+      lerpChannel(HEAT_LIGHT_YELLOW[1], HEAT_RED[1], t),
+      lerpChannel(HEAT_LIGHT_YELLOW[2], HEAT_RED[2], t)
     ];
   }
-  const t = (r - 0.5) / 0.5;
+  const t = Math.min(1, (amount - 300) / 700);
   return [
-    lerpChannel(HEAT_ORANGE[0], HEAT_RED[0], t),
-    lerpChannel(HEAT_ORANGE[1], HEAT_RED[1], t),
-    lerpChannel(HEAT_ORANGE[2], HEAT_RED[2], t)
+    lerpChannel(HEAT_RED[0], HEAT_BROWN[0], t),
+    lerpChannel(HEAT_RED[1], HEAT_BROWN[1], t),
+    lerpChannel(HEAT_RED[2], HEAT_BROWN[2], t)
   ];
 }
 // Picks readable text (near-black vs near-white) against whatever heat color
@@ -831,16 +830,10 @@ function renderCalendar() {
   const startWeekday = new Date(year, month, 1).getDay(); // 0 = Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // Heat-color the day cells relative to the heaviest spend day THIS month,
-  // rather than a fixed RM threshold, so the heatmap stays meaningful
-  // whether you're a big spender or a light one.
-  let maxTotal = 0;
   const totalsByDay = {};
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-    const total = calendarDayTotal(dateStr);
-    totalsByDay[dateStr] = total;
-    if (total > maxTotal) maxTotal = total;
+    totalsByDay[dateStr] = calendarDayTotal(dateStr);
   }
 
   let html = '';
@@ -851,8 +844,8 @@ function renderCalendar() {
     let styleAttr = '';
     let numStyle = '';
     let amtStyle = '';
-    if (total > 0 && maxTotal > 0) {
-      const rgb = heatColorForRatio(total / maxTotal);
+    if (total > 0) {
+      const rgb = heatColorForAmount(total);
       const txt = heatTextColor(rgb);
       styleAttr = ` style="background:rgb(${rgb[0]},${rgb[1]},${rgb[2]});"`;
       numStyle = ` style="color:${txt};opacity:0.8;"`;
@@ -1776,16 +1769,19 @@ function spendAmount(t) {
   return txnFlow(t) === 'in' ? -amt : amt;
 }
 
-// "-RM45.00" for a negative rollup, plain "RM45.00" for zero/positive — used
-// anywhere a group/day/period TOTAL is displayed (day-group headers, Calendar
-// cells + day panel, Trends readout). These totals are usually positive (net
-// spend), but a day/period with more reimbursements than spend nets negative
-// (see spendAmount() above), and plain toFixed() alone would render that as
-// the confusing "RM-45.00" — sign in the wrong place — instead of "-RM45.00".
+// Used anywhere a group/day/period TOTAL built from spendAmount() sums is
+// displayed (day-group headers, Calendar cells/day panel/account subtotals,
+// Trends readout). In that sum, positive = net money spent that
+// day/period — so it displays as "-RM50.00" (an expense), matching how every
+// individual transaction row already shows spend as "-RMxx.xx". A negative
+// sum (reimbursements outweighing spend) is a net credit, so it flips to
+// "+RM20.00" instead.
 function formatSignedRM(amount, decimals) {
   const d = decimals === undefined ? 2 : decimals;
   const abs = Math.abs(amount).toFixed(d);
-  return (amount < 0 ? '-RM' : 'RM') + abs;
+  if (amount > 0) return '-RM' + abs;
+  if (amount < 0) return '+RM' + abs;
+  return 'RM' + abs;
 }
 
 // Sign + CSS class for the amount text. Real spend = red minus. Money
