@@ -450,6 +450,14 @@ const CATEGORY_OPTIONS = [
   { category: 'Other', subTag: 'Invest', label: 'Other · Invest' },
   { category: 'Other', subTag: '', label: 'Other · Uncategorized' },
   { category: 'Transfer', subTag: 'Card Reload', label: 'Transfer · Card Reload' },
+  // The physical TNG Card (Enhanced/NFC card) has its OWN balance, separate
+  // from the eWallet — RFID toll only ever deducts the eWallet, while
+  // parking/non-PayDirect tolls deduct this card. A top-up of this card
+  // shows up in TNG's own history looking just like an eWallet reload, so
+  // these get told apart by elimination: whichever "Reload"-type rows don't
+  // match an HL Bank "Wallet Reload" leg (see Code.gs renameCardTopUps())
+  // are re-tagged here instead of staying under Card Reload.
+  { category: 'Transfer', subTag: 'TNG Card Top-up', label: 'Transfer · TNG Card Top-up' },
   { category: 'Transfer', subTag: 'To Others', label: 'Transfer · To Others' },
   { category: 'Transfer', subTag: 'From Others', label: 'Transfer · From Others' },
   // Any movement between your own accounts (TNG/Bank A/Bank B), either
@@ -470,7 +478,7 @@ function optionValue(o) { return o.category + '|' + o.subTag; }
 function categoryOptionsHtml(selectedCategory, selectedSubTag, account) {
   const isCurrent = (o) => o.category === selectedCategory && o.subTag === (selectedSubTag || '');
   return CATEGORY_OPTIONS.filter(o => {
-    const isCardReload = o.category === 'Transfer' && o.subTag === 'Card Reload';
+    const isCardReload = o.category === 'Transfer' && (o.subTag === 'Card Reload' || o.subTag === 'TNG Card Top-up');
     if (isCardReload && account && account !== 'TNG' && !isCurrent(o)) return false;
     return true;
   }).map(o => {
@@ -501,7 +509,21 @@ let accountBalances = [];
 function trueBalanceFor(account) {
   const anchor = accountBalances.find(b => b.account === account);
   if (!anchor) return null;
-  const after = allTxns.filter(t => t.account === account && t.date > anchor.asOfDate);
+  let relevant;
+  if (account === 'TNG Card') {
+    // Pseudo-account: the physical TNG Card's own balance (separate from the
+    // eWallet — see the CATEGORY_OPTIONS note on "TNG Card Top-up"). It has
+    // no Account column of its own; it's funded purely by TNG rows tagged
+    // with that subtag.
+    relevant = allTxns.filter(t => t.account === 'TNG' && t.subTag === 'TNG Card Top-up');
+  } else if (account === 'TNG') {
+    // Card top-ups never touch the eWallet, so they're excluded here too —
+    // otherwise this would double as both the eWallet AND the card balance.
+    relevant = allTxns.filter(t => t.account === 'TNG' && t.subTag !== 'TNG Card Top-up');
+  } else {
+    relevant = allTxns.filter(t => t.account === account);
+  }
+  const after = relevant.filter(t => t.date > anchor.asOfDate);
   const delta = after.reduce((s, t) => s + (txnFlow(t) === 'in' ? Number(t.amount || 0) : -Number(t.amount || 0)), 0);
   return anchor.asOfBalance + delta;
 }
@@ -676,7 +698,7 @@ const SUBTAG_COLORS = {
   Subscription: '#ff6482',
   Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
   Unsure: '#ff453a',
-  'Card Reload': '#a1a1a6', 'To Others': '#8e8e93', 'From Others': '#636366', 'Internal': '#48484a',
+  'Card Reload': '#a1a1a6', 'TNG Card Top-up': '#6e6e73', 'To Others': '#8e8e93', 'From Others': '#636366', 'Internal': '#48484a',
   Salary: '#30d158', Interest: '#64d2ff'
 };
 function colorForSub(key) { return SUBTAG_COLORS[key] || '#8e8e93'; }
@@ -845,6 +867,7 @@ function renderCharts() {
         <div class="chart-loading"><div class="spinner"></div></div>
       </div>
       <div class="mini-chart-truebalance" id="miniTrue-${cssSafe(a)}"></div>
+      ${a === 'TNG' ? `<div class="mini-chart-truebalance" id="miniCardTrue-TNG"></div>` : ''}
     </div>
   `).join('');
 
@@ -874,6 +897,16 @@ function renderCharts() {
     if (trueEl) {
       const tb = trueBalanceFor(a);
       trueEl.textContent = tb === null ? '' : 'Balance: RM' + tb.toFixed(2);
+    }
+    // TNG's physical Card balance (separate pseudo-account) shows as a
+    // second line right under the eWallet Balance line — see the
+    // "TNG Card Top-up" note on CATEGORY_OPTIONS.
+    if (a === 'TNG') {
+      const cardEl = document.getElementById('miniCardTrue-TNG');
+      if (cardEl) {
+        const cardBal = trueBalanceFor('TNG Card');
+        cardEl.textContent = cardBal === null ? '' : 'Card: RM' + cardBal.toFixed(2);
+      }
     }
   });
 }
