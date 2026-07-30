@@ -40,6 +40,41 @@
   #app { max-width: 480px; margin: 0 auto; padding: env(safe-area-inset-top) 16px 100px; }
   header { padding: 18px 0 8px; }
   header h1 { font-size: 28px; margin: 0; font-weight: 700; }
+  .page-tabs { display: flex; gap: 8px; margin-top: 14px; }
+  .page-tab {
+    padding: 8px 16px; border-radius: 999px; background: var(--card); color: var(--text);
+    font-size: 13px; font-weight: 500; border: 1px solid transparent;
+  }
+  .page-tab.active { background: #0a84ff; color: #fff; }
+
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 14px; }
+  .cal-nav-btn { background: var(--card); color: var(--text); font-size: 18px; width: 36px; height: 36px; border-radius: 10px; border: none; }
+  #calMonthLabel { font-size: 15px; font-weight: 500; }
+  .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+  .cal-weekdays span { text-align: center; font-size: 11px; color: var(--muted); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 16px; }
+  .cal-day {
+    background: var(--card); border-radius: 10px; padding: 6px; min-height: 52px;
+    border: 2px solid transparent; text-align: left;
+  }
+  .cal-day.empty-cell { background: none; }
+  .cal-day .cal-day-num { font-size: 12px; color: var(--muted); display: block; }
+  .cal-day .cal-day-amt { font-size: 11px; font-weight: 500; margin-top: 12px; display: block; }
+  .cal-day.selected { border-color: var(--accent); }
+  .cal-day.spend-light { background: #241c14; }
+  .cal-day.spend-medium { background: #33231a; }
+  .cal-day.spend-heavy { background: #43241c; }
+  .cal-day-panel { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  .cal-day-panel .cal-day-panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .cal-day-panel .cal-day-panel-head span:first-child { font-size: 15px; font-weight: 500; }
+  .cal-day-panel .cal-day-panel-head span:last-child { font-size: 15px; font-weight: 500; color: var(--accent); }
+
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-entry { background: var(--card); border-radius: 12px; padding: 10px 14px; }
+  .history-entry .history-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .history-entry .history-action { font-size: 12px; color: var(--accent); font-weight: 500; }
+  .history-entry .history-time { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .history-entry .history-details { font-size: 14px; margin-top: 4px; }
   .totals { display: flex; gap: 10px; margin: 14px 0; }
   .total-card { flex: 1; background: var(--card); border-radius: 14px; padding: 12px; }
   .total-card .label { font-size: 12px; color: var(--muted); }
@@ -216,52 +251,76 @@
 <div id="app">
   <header>
     <h1>Spending</h1>
+    <div class="page-tabs" id="pageTabs">
+      <button class="page-tab active" data-page="main">Main</button>
+      <button class="page-tab" data-page="calendar">Calendar</button>
+      <button class="page-tab" data-page="history">History</button>
+    </div>
   </header>
 
-  <div class="totals" id="totals"></div>
+  <div id="mainPage">
+    <div class="totals" id="totals"></div>
 
-  <div class="chart-card">
-    <div class="chart-head">
-      <span id="chartTitle">Overall</span>
-      <span id="chartTotal"></span>
+    <div class="chart-card">
+      <div class="chart-head">
+        <span id="chartTitle">Overall</span>
+        <span id="chartTotal"></span>
+      </div>
+      <div class="chart-stats" id="chartStats" style="display:none;">
+        <div class="stat"><span class="stat-label">Expense</span><span class="stat-value expense" id="statExpense"></span></div>
+        <div class="stat"><span class="stat-label">Income</span><span class="stat-value income" id="statIncome"></span></div>
+        <div class="stat"><span class="stat-label">Balance</span><span class="stat-value" id="statBalance"></span></div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+        <div class="chart-loading show" id="chartLoading"><div class="spinner"></div></div>
+      </div>
     </div>
-    <div class="chart-stats" id="chartStats" style="display:none;">
-      <div class="stat"><span class="stat-label">Expense</span><span class="stat-value expense" id="statExpense"></span></div>
-      <div class="stat"><span class="stat-label">Income</span><span class="stat-value income" id="statIncome"></span></div>
-      <div class="stat"><span class="stat-label">Balance</span><span class="stat-value" id="statBalance"></span></div>
+
+    <div class="mini-charts" id="miniCharts"></div>
+
+    <div class="filters accountfilters" id="accountfilters"></div>
+    <div class="filters" id="filters"></div>
+    <div class="filters subfilters" id="subfilters"></div>
+
+    <div class="search-row">
+      <input type="search" id="searchBox" placeholder="Search merchant, notes, remark…">
     </div>
-    <div class="chart-wrap">
-      <canvas id="chart"></canvas>
-      <div class="chart-loading show" id="chartLoading"><div class="spinner"></div></div>
+
+    <div class="toolbar">
+      <select id="groupBy">
+        <option value="day">Group by: Day</option>
+        <option value="category">Group by: Category</option>
+        <option value="merchant">Group by: Merchant</option>
+        <option value="none">Group by: None</option>
+      </select>
+      <select id="sortBy">
+        <option value="date_desc">Sort: Newest first</option>
+        <option value="date_asc">Sort: Oldest first</option>
+        <option value="amount_desc">Sort: Amount high-low</option>
+        <option value="amount_asc">Sort: Amount low-high</option>
+      </select>
     </div>
+
+    <div class="list" id="list"><div class="empty">Loading…</div></div>
   </div>
 
-  <div class="mini-charts" id="miniCharts"></div>
-
-  <div class="filters accountfilters" id="accountfilters"></div>
-  <div class="filters" id="filters"></div>
-  <div class="filters subfilters" id="subfilters"></div>
-
-  <div class="search-row">
-    <input type="search" id="searchBox" placeholder="Search merchant, notes, remark…">
+  <div id="calendarPage" style="display:none;">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" id="calPrev">&lsaquo;</button>
+      <span id="calMonthLabel"></span>
+      <button class="cal-nav-btn" id="calNext">&rsaquo;</button>
+    </div>
+    <div class="cal-weekdays">
+      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="calDayPanel"></div>
   </div>
 
-  <div class="toolbar">
-    <select id="groupBy">
-      <option value="day">Group by: Day</option>
-      <option value="category">Group by: Category</option>
-      <option value="merchant">Group by: Merchant</option>
-      <option value="none">Group by: None</option>
-    </select>
-    <select id="sortBy">
-      <option value="date_desc">Sort: Newest first</option>
-      <option value="date_asc">Sort: Oldest first</option>
-      <option value="amount_desc">Sort: Amount high-low</option>
-      <option value="amount_asc">Sort: Amount low-high</option>
-    </select>
+  <div id="historyPage" style="display:none;">
+    <div class="history-list" id="historyList"><div class="empty">Loading…</div></div>
   </div>
-
-  <div class="list" id="list"><div class="empty">Loading…</div></div>
 </div>
 
 <div class="fab-row">
@@ -589,6 +648,22 @@ let activeSubFilter = 'All';
 let searchQuery = '';
 let groupMode = 'day';
 let sortMode = 'date_desc';
+
+// Which top-level page is showing — Main (the classic list+pie view),
+// Calendar (month heatmap + full day detail), or History (the audit trail
+// of edits — see ACTIVITY_LOG_SHEET in Code.gs). Only one is visible at a
+// time; switching pages doesn't reset any of the Main page's own filters.
+let activePage = 'main';
+// First-of-month Date driving the Calendar page's grid — mutated by the
+// prev/next buttons, never read as "today" after the first render.
+let calendarMonth = new Date();
+calendarMonth.setDate(1);
+// 'YYYY-MM-DD' of the currently expanded calendar day, or null if none is
+// expanded. Tapping the same day again collapses it.
+let selectedCalendarDay = null;
+// Audit trail loaded from the ActivityLog sheet — see getActivityLog() in
+// Code.gs. Newest first, capped server-side to the most recent 300 entries.
+let activityLog = [];
 // Keyed by canvas id — the big combined pie (id="chart") plus up to 3 mini
 // per-account pies (id="miniChart-TNG" etc). A plain map instead of one
 // singleton since multiple pies are now on screen at once.
@@ -619,11 +694,147 @@ async function loadData() {
     allTxns = data.transactions || [];
     merchantRules = data.merchantRules || [];
     accountBalances = data.accountBalances || [];
+    activityLog = data.activityLog || [];
   } catch (err) {
     document.getElementById('list').innerHTML = '<div class="empty">Error loading data. Check your connection.</div>';
     return;
   }
+  renderApp();
+}
+
+// Keeps whichever page(s) show live data in sync after any real mutation
+// (add/import/edit/balance update) — the Main list, plus the Calendar day
+// panel/grid totals and the History log if you happen to be on those pages.
+// Pure view-state changes (switching a filter chip, sort order, search
+// text) call render() directly instead, since those never touch Calendar
+// or History.
+function renderApp() {
   render();
+  if (activePage === 'calendar') renderCalendar();
+  if (activePage === 'history') renderHistory();
+}
+
+function switchPage(page) {
+  activePage = page;
+  document.querySelectorAll('.page-tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  document.getElementById('mainPage').style.display = page === 'main' ? '' : 'none';
+  document.getElementById('calendarPage').style.display = page === 'calendar' ? '' : 'none';
+  document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
+  if (page === 'calendar') renderCalendar();
+  if (page === 'history') renderHistory();
+}
+document.querySelectorAll('.page-tab').forEach(el => {
+  el.onclick = () => switchPage(el.dataset.page);
+});
+
+// Total real spend (same definition as the Today/Week/Month stat cards —
+// Transfer/Income excluded) for one calendar day, across every account.
+function calendarDayTotal(dateStr) {
+  const dayTxns = allTxns.filter(t => t.date === dateStr && !NON_SPEND_CATEGORIES.includes(t.category));
+  return dayTxns.reduce((s, t) => s + spendAmount(t), 0);
+}
+
+function renderCalendar() {
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  document.getElementById('calMonthLabel').textContent =
+    calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+  const startWeekday = new Date(year, month, 1).getDay(); // 0 = Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Heat-color the day cells relative to the heaviest spend day THIS month,
+  // rather than a fixed RM threshold, so the heatmap stays meaningful
+  // whether you're a big spender or a light one.
+  let maxTotal = 0;
+  const totalsByDay = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const total = calendarDayTotal(dateStr);
+    totalsByDay[dateStr] = total;
+    if (total > maxTotal) maxTotal = total;
+  }
+
+  let html = '';
+  for (let i = 0; i < startWeekday; i++) html += '<div class="cal-day empty-cell"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const total = totalsByDay[dateStr];
+    let heatClass = '';
+    if (total > 0 && maxTotal > 0) {
+      const ratio = total / maxTotal;
+      heatClass = ratio > 0.66 ? 'spend-heavy' : ratio > 0.33 ? 'spend-medium' : 'spend-light';
+    }
+    const selectedClass = dateStr === selectedCalendarDay ? 'selected' : '';
+    html += `<button class="cal-day ${heatClass} ${selectedClass}" data-date="${dateStr}">
+      <span class="cal-day-num">${d}</span>
+      ${total > 0 ? `<span class="cal-day-amt">RM${total.toFixed(0)}</span>` : ''}
+    </button>`;
+  }
+  document.getElementById('calGrid').innerHTML = html;
+  document.querySelectorAll('.cal-day[data-date]').forEach(el => {
+    el.onclick = () => {
+      selectedCalendarDay = (selectedCalendarDay === el.dataset.date) ? null : el.dataset.date;
+      renderCalendar();
+    };
+  });
+
+  renderCalDayPanel();
+}
+
+// The full-size day detail panel underneath the grid — reuses renderTxnRow()
+// and the same attach*Handlers() so a transaction can be edited (category,
+// remark, extra tag) from right here, exactly like the Main list.
+function renderCalDayPanel() {
+  const panelEl = document.getElementById('calDayPanel');
+  if (!selectedCalendarDay) { panelEl.innerHTML = ''; return; }
+  const dayTxns = sortTxns(allTxns.filter(t => t.date === selectedCalendarDay));
+  const total = dayTxns
+    .filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
+    .reduce((s, t) => s + spendAmount(t), 0);
+  const dateObj = new Date(selectedCalendarDay + 'T00:00:00');
+  const label = dateObj.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+  let html = `<div class="cal-day-panel"><div class="cal-day-panel-head"><span>${label}</span><span>RM${total.toFixed(2)}</span></div>`;
+  html += dayTxns.length ? dayTxns.map(t => renderTxnRow(t)).join('') : '<div class="empty">No transactions.</div>';
+  html += '</div>';
+  panelEl.innerHTML = html;
+  attachCatSelectHandlers();
+  attachExtraTagHandlers();
+  attachRemarkHandlers();
+  attachLinkHandlers();
+}
+
+document.getElementById('calPrev').onclick = () => {
+  calendarMonth.setMonth(calendarMonth.getMonth() - 1);
+  selectedCalendarDay = null;
+  renderCalendar();
+};
+document.getElementById('calNext').onclick = () => {
+  calendarMonth.setMonth(calendarMonth.getMonth() + 1);
+  selectedCalendarDay = null;
+  renderCalendar();
+};
+
+// History page — a reverse-chronological audit trail of real edits (see
+// ACTIVITY_LOG_SHEET in Code.gs). Only starts from when this feature was
+// added, so it won't show anything from before today.
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (!activityLog.length) {
+    el.innerHTML = '<div class="empty">No history yet — new edits will show up here.</div>';
+    return;
+  }
+  el.innerHTML = activityLog.map(h => {
+    const d = new Date(h.timestamp);
+    const when = isNaN(d.getTime())
+      ? h.timestamp
+      : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return `<div class="history-entry">
+      <div class="history-top"><span class="history-action">${escapeHtml(h.action)}</span><span class="history-time">${when}</span></div>
+      <div class="history-details">${escapeHtml(h.details)}</div>
+    </div>`;
+  }).join('');
 }
 
 function isSameDay(d, ref) {
@@ -1296,7 +1507,7 @@ function attachCatSelectHandlers() {
       el.disabled = true;
       await callApi('updateCategory', { row, category, subTag });
       if (hadExtraTag) await callApi('updateExtraTag', { row, extraTag: '' });
-      render();
+      renderApp();
     };
   });
 }
@@ -1317,7 +1528,7 @@ function attachExtraTagHandlers() {
       if (t) t.extraTag = extraTag;
       el.disabled = true;
       await callApi('updateExtraTag', { row, extraTag });
-      render();
+      renderApp();
     };
   });
 }
@@ -1335,7 +1546,7 @@ function attachRemarkHandlers() {
       if (val === null) return; // cancelled
       if (t) t.remark = val;
       await callApi('updateRemark', { row, remark: val });
-      render();
+      renderApp();
     };
   });
 }
@@ -1352,6 +1563,7 @@ function attachRemarkHandlers() {
 // so nothing hides the rest of the group.
 function groupByRemark(remark) {
   if (!remark) return;
+  switchPage('main');
   searchQuery = remark;
   document.getElementById('searchBox').value = remark;
   activeAccountFilter = 'All';
