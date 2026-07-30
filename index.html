@@ -206,6 +206,7 @@
   .mini-chart-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
   .mini-chart-wrap { position: relative; height: 90px; }
   .mini-charts.zoomed .mini-chart-wrap { height: 200px; }
+  .mini-chart-truebalance { text-align: center; font-size: 11px; color: var(--muted); margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -484,6 +485,27 @@ function categoryOptionsHtml(selectedCategory, selectedSubTag, account) {
 // same priority order as Code.gs's categorize_().
 let merchantRules = [];
 
+// "True balance" anchors — [{ account, asOfDate, asOfBalance }, ...] loaded
+// from the AccountBalances sheet. Accounts with no entry here (e.g. Cash,
+// whose real on-hand cash is hard to pin down) just don't show a true
+// balance. See trueBalanceFor() below for how this combines with allTxns.
+let accountBalances = [];
+
+// Real running balance for one account: the anchor you gave (asOfBalance,
+// as of asOfDate) plus every transaction on that account dated AFTER the
+// anchor, summed by its REAL flow direction across every category — unlike
+// the Income-Expense "Balance" stat (which deliberately excludes Transfer
+// so wallet top-ups/sends don't inflate spend totals), this is meant to
+// track your actual account balance, so nothing is excluded here. Returns
+// null if this account has no anchor set yet.
+function trueBalanceFor(account) {
+  const anchor = accountBalances.find(b => b.account === account);
+  if (!anchor) return null;
+  const after = allTxns.filter(t => t.account === account && t.date > anchor.asOfDate);
+  const delta = after.reduce((s, t) => s + (txnFlow(t) === 'in' ? Number(t.amount || 0) : -Number(t.amount || 0)), 0);
+  return anchor.asOfBalance + delta;
+}
+
 function categorize(description, type) {
   if (EXCLUDE_TYPES.includes(type)) return null;
 
@@ -561,6 +583,7 @@ async function loadData() {
     const data = await res.json();
     allTxns = data.transactions || [];
     merchantRules = data.merchantRules || [];
+    accountBalances = data.accountBalances || [];
   } catch (err) {
     document.getElementById('list').innerHTML = '<div class="empty">Error loading data. Check your connection.</div>';
     return;
@@ -821,6 +844,7 @@ function renderCharts() {
         <canvas id="miniChart-${cssSafe(a)}"></canvas>
         <div class="chart-loading"><div class="spinner"></div></div>
       </div>
+      <div class="mini-chart-truebalance" id="miniTrue-${cssSafe(a)}"></div>
     </div>
   `).join('');
 
@@ -841,6 +865,15 @@ function renderCharts() {
         el.textContent = (balance < 0 ? '-RM' : '+RM') + Math.abs(balance).toFixed(2);
         el.className = balance < 0 ? 'negative' : 'positive';
       }
+    }
+    // True running balance — the real account balance (anchor + every
+    // transaction since), not the Income-Expense "Balance" stat above.
+    // Only shows for accounts with an anchor set (see trueBalanceFor()) —
+    // Cash intentionally has none, so it just shows nothing here.
+    const trueEl = document.getElementById('miniTrue-' + cssSafe(a));
+    if (trueEl) {
+      const tb = trueBalanceFor(a);
+      trueEl.textContent = tb === null ? '' : 'Balance: RM' + tb.toFixed(2);
     }
   });
 }
