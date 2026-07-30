@@ -950,8 +950,13 @@ function renderTrends() {
 
   const current = values.length ? values[values.length - 1] : 0;
   const prev = values.length > 1 ? values[values.length - 2] : undefined;
+  // Below this, the prior bucket is basically a sliver of real data (e.g. the
+  // very first month/week your tracker has, which only covers a couple of
+  // days) — comparing against it produces a technically-correct but useless
+  // number like "18929%". Skip the delta entirely rather than show that.
+  const MIN_MEANINGFUL_PREV = 20;
   let deltaHtml = '';
-  if (prev !== undefined && prev !== 0) {
+  if (prev !== undefined && prev >= MIN_MEANINGFUL_PREV) {
     const pct = Math.round(((current - prev) / prev) * 100);
     const cls = pct > 0 ? 'up' : (pct < 0 ? 'down' : '');
     const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '–');
