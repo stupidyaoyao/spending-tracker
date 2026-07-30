@@ -1,0 +1,2041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spending">
+<title>Daily Spending Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0b0d;
+    --card: #17171b;
+    --accent: #f5a623;
+    --text: #f5f5f7;
+    --muted: #8e8e93;
+    /* Semantic palette: categories that are always spending (Car/Food/
+       Shopping/Entertainment/Housing) get warm red/orange tones; Transfer
+       stays neutral grey since money can move either direction; Other stays
+       purple as a "needs review" flag since it holds the Unsure subtag. */
+    --car: #ff453a;
+    --shopping: #ff9f0a;
+    --food: #ff6b35;
+    --entertainment: #ffd60a;
+    --housing: #ff7a9c;
+    --other: #bf5af2;
+    --transfer: #8e8e93;
+    --income: #30d158;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    height: 100%; overscroll-behavior: none;
+  }
+  #app { max-width: 480px; margin: 0 auto; padding: env(safe-area-inset-top) 16px 100px; }
+  header { padding: 18px 0 8px; }
+  header h1 { font-size: 28px; margin: 0; font-weight: 700; }
+  .totals { display: flex; gap: 10px; margin: 14px 0; }
+  .total-card { flex: 1; background: var(--card); border-radius: 14px; padding: 12px; }
+  .total-card .label { font-size: 12px; color: var(--muted); }
+  .total-card .value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  .total-card { cursor: pointer; border: 1px solid transparent; }
+  .total-card.active { border-color: var(--accent); background: #241c0f; }
+  .filters { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; }
+  .filter-chip {
+    flex-shrink: 0; padding: 8px 14px; border-radius: 999px; background: var(--card);
+    color: var(--text); font-size: 14px; border: 1px solid transparent;
+  }
+  .filter-chip.active { background: var(--accent); color: #1a1a1a; font-weight: 600; }
+  .subfilters { display: none; gap: 6px; overflow-x: auto; padding: 0 0 12px; margin-top: -6px; }
+  .subfilters .filter-chip { padding: 6px 12px; font-size: 12px; }
+  .accountfilters .filter-chip { padding: 6px 12px; font-size: 12px; border: 1px solid #2c2c2e; }
+  .accountfilters .filter-chip.active { background: #0a84ff; color: #fff; }
+
+  .chart-card {
+    background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 14px;
+  }
+  .chart-card .chart-head {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+  }
+  .chart-card .chart-head span { font-size: 13px; color: var(--muted); }
+  .chart-wrap { position: relative; height: 180px; }
+  .chart-stats { display: flex; gap: 10px; margin-bottom: 10px; }
+  .chart-stats .stat { flex: 1; text-align: center; }
+  .chart-stats .stat-label { display: block; font-size: 11px; color: var(--muted); }
+  .chart-stats .stat-value { display: block; font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .chart-stats .stat-value.expense { color: #ff453a; }
+  .chart-stats .stat-value.income { color: #30d158; }
+  .chart-stats .stat-value.positive { color: #30d158; }
+  .chart-stats .stat-value.negative { color: #ff453a; }
+  .chart-loading {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: var(--card); border-radius: 10px;
+  }
+  .chart-loading.show { display: flex; }
+  .spinner {
+    width: 28px; height: 28px; border-radius: 50%; border: 3px solid #2c2c2e;
+    border-top-color: var(--accent); animation: spin 0.8s linear infinite;
+  }
+  .mini-chart-wrap .spinner { width: 18px; height: 18px; border-width: 2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .search-row { margin-bottom: 10px; }
+  .search-row input {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: none;
+    background: var(--card); color: var(--text); font-size: 14px;
+  }
+  .search-row input::placeholder { color: var(--muted); }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .toolbar select {
+    flex: 1; padding: 9px 10px; border-radius: 10px; border: none; background: var(--card);
+    color: var(--text); font-size: 13px;
+  }
+
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .day-group { margin-top: 10px; }
+  .day-header { font-size: 13px; color: var(--muted); margin: 10px 2px 6px; display: flex; justify-content: space-between; }
+  .txn {
+    background: var(--card); border-radius: 14px; padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot.Car { background: var(--car); }
+  .dot.Shopping { background: var(--shopping); }
+  .dot.Food { background: var(--food); }
+  .dot.Entertainment { background: var(--entertainment); }
+  .dot.Housing { background: var(--housing); }
+  .dot.Other { background: var(--other); }
+  .dot.Transfer { background: var(--transfer); }
+  .dot.Income { background: var(--income); }
+  .dot.Custom { background: var(--muted); }
+  .txn .info { flex: 1; min-width: 0; }
+  .txn .merchant { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .txn .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .txn .amount { font-size: 15px; font-weight: 700; color: #ff453a; }
+  .txn .amount.in { color: #30d158; }
+  .txn .amount.internal { color: #ffd60a; }
+  .transfer-hint { font-size: 11px; color: #0a84ff; margin-top: 2px; }
+  .txn-cat-select {
+    margin-top: 5px; font-size: 11px; background: var(--bg); color: var(--muted);
+    border: 1px solid #2c2c2e; border-radius: 6px; padding: 3px 4px; max-width: 100%;
+  }
+  .txn-extratag-select {
+    margin-top: 5px; margin-left: 6px; font-size: 11px; background: var(--bg); color: var(--muted);
+    border: 1px dashed #3a3a3c; border-radius: 6px; padding: 3px 4px; max-width: 100%;
+  }
+  .txn-extratag-select.has-extra { color: var(--accent); border-color: var(--accent); }
+  .cat-select-row { display: flex; flex-wrap: wrap; }
+  .txn-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+  .remark-btn {
+    background: none; border: none; color: var(--muted); font-size: 15px; padding: 2px 2px;
+    cursor: pointer; line-height: 1;
+  }
+  .remark-btn.has-remark { color: var(--accent); }
+  .link-btn {
+    background: none; border: none; color: var(--muted); font-size: 15px; padding: 2px 2px;
+    cursor: pointer; line-height: 1;
+  }
+  .link-btn.has-link { color: #0a84ff; }
+  .txn .remark {
+    font-size: 12px; color: var(--muted); font-style: italic; margin-top: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    cursor: pointer;
+  }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px; }
+
+  .fab-row { position: fixed; bottom: 24px; right: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .fab {
+    width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #1a1a1a;
+    border: none; font-size: 26px; box-shadow: 0 6px 16px rgba(0,0,0,.4); display: flex;
+    align-items: center; justify-content: center;
+  }
+  .fab.secondary { background: var(--card); color: var(--text); width: 46px; height: 46px; font-size: 18px; }
+
+  .sheet-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none;
+    align-items: flex-end; justify-content: center; z-index: 20;
+  }
+  .sheet-backdrop.open { display: flex; }
+  .sheet {
+    background: #1c1c1e; width: 100%; max-width: 480px; border-radius: 20px 20px 0 0;
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+    max-height: 85vh; overflow-y: auto;
+  }
+  .sheet h2 { margin: 0 0 14px; font-size: 18px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%; padding: 12px; border-radius: 10px; border: none; background: #2c2c2e;
+    color: var(--text); font-size: 16px;
+  }
+  .row2 { display: flex; gap: 10px; }
+  .row2 > div { flex: 1; }
+  .btn {
+    width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--accent);
+    color: #1a1a1a; font-size: 16px; font-weight: 700; margin-top: 6px;
+  }
+  .btn.secondary { background: #2c2c2e; color: var(--text); }
+  .close-x { position: absolute; top: 14px; right: 16px; color: var(--muted); font-size: 22px; }
+  .sheet-inner { position: relative; }
+  .status-msg { text-align: center; font-size: 13px; color: var(--muted); margin: 8px 0; white-space: pre-wrap; }
+  .status-msg.debug { text-align: left; font-family: ui-monospace, monospace; font-size: 11px; background: #2c2c2e; padding: 10px; border-radius: 8px; max-height: 220px; overflow-y: auto; }
+  input[type=file] { color: var(--muted); }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .checkbox-row input { width: auto; }
+  .checkbox-row label { font-size: 13px; color: var(--muted); margin: 0; }
+
+  .preview-row { padding: 10px; flex-direction: column; align-items: stretch; gap: 6px; }
+  .preview-row .preview-top { display: flex; align-items: center; gap: 10px; }
+  .preview-row .info { flex: 1; min-width: 0; }
+  .preview-remove { font-size: 16px; color: var(--muted); padding: 0 4px; flex-shrink: 0; }
+  .preview-row select { width: 100%; padding: 8px; border-radius: 8px; border: none; background: #2c2c2e; color: var(--text); font-size: 13px; }
+  .preview-row .preview-remember { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .preview-row .preview-remember input { width: auto; }
+  .preview-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+
+  .mini-charts { display: flex; gap: 10px; margin-bottom: 14px; }
+  .mini-charts.zoomed { flex-direction: column; }
+  .mini-chart-card { flex: 1; min-width: 0; background: var(--card); border-radius: 14px; padding: 10px; }
+  .mini-charts.zoomed .mini-chart-card { flex: none; }
+  .mini-chart-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .mini-chart-wrap { position: relative; height: 90px; }
+  .mini-charts.zoomed .mini-chart-wrap { height: 200px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <h1>Spending</h1>
+  </header>
+
+  <div class="totals" id="totals"></div>
+
+  <div class="chart-card">
+    <div class="chart-head">
+      <span id="chartTitle">Overall</span>
+      <span id="chartTotal"></span>
+    </div>
+    <div class="chart-stats" id="chartStats" style="display:none;">
+      <div class="stat"><span class="stat-label">Expense</span><span class="stat-value expense" id="statExpense"></span></div>
+      <div class="stat"><span class="stat-label">Income</span><span class="stat-value income" id="statIncome"></span></div>
+      <div class="stat"><span class="stat-label">Balance</span><span class="stat-value" id="statBalance"></span></div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+      <div class="chart-loading show" id="chartLoading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <div class="mini-charts" id="miniCharts"></div>
+
+  <div class="filters accountfilters" id="accountfilters"></div>
+  <div class="filters" id="filters"></div>
+  <div class="filters subfilters" id="subfilters"></div>
+
+  <div class="search-row">
+    <input type="search" id="searchBox" placeholder="Search merchant, notes, remark…">
+  </div>
+
+  <div class="toolbar">
+    <select id="groupBy">
+      <option value="day">Group by: Day</option>
+      <option value="category">Group by: Category</option>
+      <option value="merchant">Group by: Merchant</option>
+      <option value="none">Group by: None</option>
+    </select>
+    <select id="sortBy">
+      <option value="date_desc">Sort: Newest first</option>
+      <option value="date_asc">Sort: Oldest first</option>
+      <option value="amount_desc">Sort: Amount high-low</option>
+      <option value="amount_asc">Sort: Amount low-high</option>
+    </select>
+  </div>
+
+  <div class="list" id="list"><div class="empty">Loading…</div></div>
+</div>
+
+<div class="fab-row">
+  <button class="fab secondary" id="importBtn" title="Import">⇪</button>
+  <button class="fab" id="addBtn" title="Add">+</button>
+</div>
+
+<!-- Add transaction sheet -->
+<div class="sheet-backdrop" id="addBackdrop">
+  <div class="sheet">
+    <div class="sheet-inner">
+      <span class="close-x" id="addClose">✕</span>
+      <h2>Add expense</h2>
+      <div class="row2">
+        <div class="field">
+          <label>Amount (RM)</label>
+          <input type="number" step="0.01" id="fAmount" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="fDate">
+        </div>
+      </div>
+      <div class="field">
+        <label>Time</label>
+        <input type="time" id="fTime">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Category</label>
+          <select id="fCategory"></select>
+        </div>
+        <div class="field">
+          <label>Account</label>
+          <select id="fAccount">
+            <option value="TNG">TNG</option>
+            <option value="HL Bank">HL Bank</option>
+            <option value="PBank">PBank</option>
+            <option value="Cash">Cash</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Merchant / Notes</label>
+        <input type="text" id="fMerchant" placeholder="e.g. Thong Kee, KESAS, Ooi KX">
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="fRemember">
+        <label for="fRemember">Always categorize this merchant/person the same way</label>
+      </div>
+      <button class="btn" id="fSubmit">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import sheet: PDF or CSV, with a review step before committing -->
+<div class="sheet-backdrop" id="importBackdrop">
+  <div class="sheet">
+    <div class="sheet-inner">
+      <span class="close-x" id="importClose">✕</span>
+      <h2>Import statement</h2>
+
+      <div class="field" id="importAccountField">
+        <label>Import from</label>
+        <select id="importAccount">
+          <option value="TNG">TNG eWallet (PDF or CSV)</option>
+          <option value="TNG-Screenshot">TNG eWallet (Screenshot)</option>
+          <option value="HL Bank">HL Bank (CSV)</option>
+          <option value="PBank">PBank (CSV)</option>
+        </select>
+      </div>
+
+      <div class="field" id="importPickField">
+        <label id="importPickLabel">Statement file</label>
+        <input type="file" id="fFile" accept=".pdf,.csv">
+      </div>
+
+      <div class="preview-list" id="importPreviewList" style="display:none;"></div>
+
+      <div class="status-msg" id="importStatus"></div>
+      <button class="btn" id="importSubmit">Read file</button>
+      <button class="btn secondary" id="importBack" style="display:none;">Choose a different file</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==========================================================================
+// This is a STANDALONE static page — it is NOT served by Apps Script.
+// Host it anywhere (Netlify, GitHub Pages, Firebase Hosting, etc). All
+// read/write calls hit the Apps Script /exec URL below as a plain JSON API
+// via fetch(), instead of google.script.run (which only works when the
+// page itself is served by HtmlService). This sidesteps the iOS Safari/
+// Chrome bug where navigating directly to a script.google.com URL can fail
+// with "Sorry, unable to open the file at present" (a known Apps Script +
+// iOS multi-account redirect/cookie issue) — here script.google.com is
+// only ever hit via background fetch() calls, never a full-page load.
+// ==========================================================================
+// NOTE: this project has (had) two separate Web App deployments of the same
+// Apps Script — this URL previously pointed at a second deployment that had
+// drifted to an old code version (stuck missing several fixes, including the
+// Transfer/Income categories). Consolidated onto the one deployment that's
+// consistently redeployed going forward, to remove that class of bug.
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby95kLVf8_mho2dIxQ4GsncTBLBNIVZ_azjhko5bRhMioXy-r-H6_a_Qv1YA1Si4uUzkA/exec';
+
+// POST helper. Uses Content-Type: text/plain so the request stays a CORS
+// "simple request" (no OPTIONS preflight) — Apps Script web apps can't
+// answer custom preflight requests.
+async function callApi(action, extra) {
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action }, extra))
+  });
+  return res.json();
+}
+
+// Category rules — mirrors Code.gs CATEGORY_RULES exactly. Used by manual
+// add fallback, CSV import, and PDF import to pre-guess a category before
+// the user reviews/confirms it.
+const CATEGORY_RULES = [
+  { category: 'Transfer', subTag: 'Card Reload', keywords: ['CARD RELOAD'] },
+  { category: 'Car', subTag: 'Toll', keywords: [
+    'SPE', 'KESAS', 'LDP', 'MEX', 'BESRAYA', 'SUKE', 'SMART',
+    'PLAZA LOKE YEW', 'AWAN BESAR', 'PUCHONG SELATAN', 'SG RAMAL',
+    'SALAK SELATAN', 'PETALING JAYA', 'ALAM DAMAI', 'BUKIT TERATAI',
+    'AMPANG', 'SUNWAY'
+  ] },
+  { category: 'Car', subTag: 'Parking', keywords: ['PARKING', 'CARPARK', 'CAR PARK'] },
+  { category: 'Car', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP'] },
+  { category: 'Car', subTag: 'Service', keywords: ['WORKSHOP', 'BENGKEL', 'TAYAR', 'SERVICE CENTRE', 'AUTO CARE', 'CAR WASH', 'CARWASH'] },
+  { category: 'Car', subTag: 'Ride', keywords: ['GRAB', 'MYCAR', 'INDRIVE'] },
+  // "Groceries" was renamed to "Shopping" to also cover online orders (see
+  // the new Online subtag below) — not just grocery runs.
+  { category: 'Shopping', subTag: 'Convenience Store', keywords: ['MYNEWS', '7-ELEVEN', 'KK MART'] },
+  // Dress-type merchants are folded into Hypermarket rather than their own
+  // subtag — the merchant name itself still shows which one it was.
+  { category: 'Shopping', subTag: 'Hypermarket', keywords: [
+    'AEON SMKT', 'SPEEDMART', 'TESCO', 'LOTUS', 'GIANT', 'JAYA GROCER',
+    'VILLAGE GROCER', 'ECONSAVE', 'PACIFIC', 'MR D.I.Y',
+    'AEON DEPT', 'FASHION', 'UNIQLO', 'PADINI', 'H&M'
+  ] },
+  { category: 'Shopping', subTag: 'Online', keywords: ['PINDUODUO', 'GWP', 'SHOPEE', 'LAZADA', 'TAOBAO'] },
+  { category: 'Shopping', keywords: ['GUARDIAN', 'WATSON'] },
+  { category: 'Food', keywords: [
+    'KOPITIAM', 'RESTORAN', 'RESTAURANT', 'MIXED RICE', 'KITCHEN',
+    'BURGER', 'RAMEN', 'CHAGEE', 'LAUK', 'BUN', 'THONG KEE', 'YCS',
+    'CAFE', 'MAKAN', 'CIKTA', 'SUSHI'
+  ] },
+  { category: 'Entertainment', keywords: ['CTRL PLAY', 'CINEMA', 'GSC', 'TGV', 'LIBRARY', 'PC BANG', 'CYBERCAFE', 'ZAIKO'] },
+  { category: 'Entertainment', subTag: 'Subscription', keywords: [
+    'APPLE SERVICES', 'NETFLIX', 'SPOTIFY', 'APP STORE', 'GOOGLE PLAY',
+    'ANTHROPIC', 'CLAUDE', 'EXITLAG'
+  ] },
+  { category: 'Housing', subTag: 'Rent', keywords: ['RENT'] },
+  { category: 'Housing', subTag: 'Water & Electric', keywords: ['TNB', 'SYABAS', 'AIR SELANGOR', 'INDAH WATER'] },
+  { category: 'Housing', subTag: 'WiFi', keywords: ['UNIFI', 'TIME FIBRE', 'MAXIS FIBRE'] },
+  { category: 'Housing', subTag: 'Carpark Rent', keywords: ['CARPARK RENT'] },
+  // "PMB..." reference codes are Public Bank Mutual (unit trust) transfers —
+  // money genuinely leaving to an external investment, not a tracked account
+  // and not everyday spending, so it gets its own subtag under Other.
+  { category: 'Other', subTag: 'Invest', keywords: ['PMB'] },
+];
+// No transaction types are excluded anymore — Reload / Receive from Wallet /
+// Cashback now import under "Transfer" (see categorize() below) instead of
+// being silently dropped or filed under a separate "Income" category.
+const EXCLUDE_TYPES = [];
+
+// Flattened category+subtag choices offered in dropdowns.
+const CATEGORY_OPTIONS = [
+  { category: 'Car', subTag: 'Toll', label: 'Car · Toll' },
+  { category: 'Car', subTag: 'Parking', label: 'Car · Parking' },
+  { category: 'Car', subTag: 'Fuel', label: 'Car · Fuel' },
+  { category: 'Car', subTag: 'Service', label: 'Car · Service' },
+  { category: 'Car', subTag: 'Ride', label: 'Car · Ride' },
+  { category: 'Shopping', subTag: 'Convenience Store', label: 'Shopping · Convenience Store' },
+  { category: 'Shopping', subTag: 'Hypermarket', label: 'Shopping · Hypermarket' },
+  { category: 'Shopping', subTag: 'Online', label: 'Shopping · Online' },
+  { category: 'Shopping', subTag: '', label: 'Shopping · Other' },
+  { category: 'Food', subTag: '', label: 'Food' },
+  { category: 'Entertainment', subTag: '', label: 'Entertainment' },
+  { category: 'Entertainment', subTag: 'Subscription', label: 'Entertainment · Subscription' },
+  { category: 'Housing', subTag: 'Rent', label: 'Housing · Rent' },
+  { category: 'Housing', subTag: 'Water & Electric', label: 'Housing · Water & Electric' },
+  { category: 'Housing', subTag: 'WiFi', label: 'Housing · WiFi' },
+  { category: 'Housing', subTag: 'Carpark Rent', label: 'Housing · Carpark Rent' },
+  { category: 'Other', subTag: 'Unsure', label: 'Other · Unsure' },
+  { category: 'Other', subTag: 'Invest', label: 'Other · Invest' },
+  { category: 'Other', subTag: '', label: 'Other · Uncategorized' },
+  { category: 'Transfer', subTag: 'Card Reload', label: 'Transfer · Card Reload' },
+  { category: 'Transfer', subTag: 'To Others', label: 'Transfer · To Others' },
+  { category: 'Transfer', subTag: 'From Others', label: 'Transfer · From Others' },
+  // Any movement between your own accounts (TNG/Bank A/Bank B), either
+  // direction — previously split into "To Bank B"/"From Bank A"/"To TNG" —
+  // is filed under this single subtag. The Merchant text still says which
+  // specific leg it was (e.g. "To Bank B"); see txnTitle()/transferHint().
+  { category: 'Transfer', subTag: 'Internal', label: 'Transfer · Internal' },
+  { category: 'Income', subTag: 'Salary', label: 'Income · Salary' },
+  { category: 'Income', subTag: 'Interest', label: 'Income · Interest' },
+  { category: 'Income', subTag: 'Other', label: 'Income · Other' },
+];
+function optionValue(o) { return o.category + '|' + o.subTag; }
+// "Card Reload" only makes sense for TNG (topping up the TNG eWallet from a
+// bank/credit card) — HL Bank and PBank never get reloaded that way, so the
+// option is hidden for them. The one exception: if a row already has Card
+// Reload set (e.g. old data), keep showing it for THAT row so the dropdown
+// doesn't silently drop its own current value.
+function categoryOptionsHtml(selectedCategory, selectedSubTag, account) {
+  const isCurrent = (o) => o.category === selectedCategory && o.subTag === (selectedSubTag || '');
+  return CATEGORY_OPTIONS.filter(o => {
+    const isCardReload = o.category === 'Transfer' && o.subTag === 'Card Reload';
+    if (isCardReload && account && account !== 'TNG' && !isCurrent(o)) return false;
+    return true;
+  }).map(o => {
+    const val = optionValue(o);
+    const sel = isCurrent(o) ? ' selected' : '';
+    return `<option value="${val}"${sel}>${o.label}</option>`;
+  }).join('');
+}
+
+// Learned per-merchant/per-person rules (e.g. "Ooi KX" -> Food), loaded
+// from the backend on startup. Checked BEFORE the built-in keyword rules,
+// same priority order as Code.gs's categorize_().
+let merchantRules = [];
+
+function categorize(description, type) {
+  if (EXCLUDE_TYPES.includes(type)) return null;
+
+  // Reload = card -> TNG wallet top-up, not spending. Filed under Transfer >
+  // Card Reload; can be re-categorized by hand later once you know what a
+  // specific reload was actually for.
+  if (type === 'Reload') return { category: 'Transfer', subTag: 'Card Reload' };
+
+  // Receive from Wallet (someone sent you money) / Cashback (rewards
+  // rebate) are money coming IN, not spending. Filed under Transfer > From
+  // Others — no separate "Income" category anymore.
+  if (type === 'Receive from Wallet' || type === 'Cashback') {
+    return { category: 'Transfer', subTag: 'From Others' };
+  }
+
+  const text = (description || '').toUpperCase();
+
+  for (const r of merchantRules) {
+    if (r.merchant && text.includes(r.merchant.toUpperCase())) {
+      return { category: r.category, subTag: r.subTag || '' };
+    }
+  }
+  for (const rule of CATEGORY_RULES) {
+    for (const kw of rule.keywords) {
+      if (text.includes(kw)) return { category: rule.category, subTag: rule.subTag || '' };
+    }
+  }
+
+  // Unresolved person-to-person send -> Transfer > To Others; anything else
+  // unmatched -> Other > Unsure.
+  if (type === 'Transfer to Wallet') return { category: 'Transfer', subTag: 'To Others' };
+  return { category: 'Other', subTag: 'Unsure' };
+}
+
+let allTxns = [];
+const ACCOUNTS = ['TNG', 'HL Bank', 'PBank', 'Cash'];
+// Cash is manually-tracked (no CSV/PDF import) and gets a filter chip like
+// any other account, but is deliberately left out of the default "All"
+// mini-pie grid so it doesn't clutter the main view — its own pie only
+// shows up once you click the Cash chip specifically (see accountsToShow in
+// renderCharts()).
+const MINI_PIE_ACCOUNTS = ['TNG', 'HL Bank', 'PBank'];
+let activeAccountFilter = 'All';
+let activeFilter = 'All';
+let activeSubFilter = 'All';
+let searchQuery = '';
+let groupMode = 'day';
+let sortMode = 'date_desc';
+// Keyed by canvas id — the big combined pie (id="chart") plus up to 3 mini
+// per-account pies (id="miniChart-TNG" etc). A plain map instead of one
+// singleton since multiple pies are now on screen at once.
+let chartInstances = {};
+
+// Derived from CATEGORY_OPTIONS: which subtags exist for each category, e.g.
+// Car -> [Toll, Parking, Fuel, Service, Ride]. Categories where every row has
+// an empty subTag (Food) are simply absent here, so no sub-filter row shows
+// for them.
+const SUBTAGS_BY_CATEGORY = {};
+CATEGORY_OPTIONS.forEach(o => {
+  if (o.subTag) {
+    (SUBTAGS_BY_CATEGORY[o.category] = SUBTAGS_BY_CATEGORY[o.category] || []).push(o.subTag);
+  }
+});
+
+// Minimal HTML-escaping for free-text remarks before they're dropped into
+// innerHTML, so a remark containing <, >, & etc. can't break the row markup.
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function loadData() {
+  document.getElementById('list').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + '?api=1');
+    const data = await res.json();
+    allTxns = data.transactions || [];
+    merchantRules = data.merchantRules || [];
+  } catch (err) {
+    document.getElementById('list').innerHTML = '<div class="empty">Error loading data. Check your connection.</div>';
+    return;
+  }
+  render();
+}
+
+function isSameDay(d, ref) {
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+}
+function startOfWeek(d) {
+  const r = new Date(d);
+  const day = (r.getDay() + 6) % 7; // Monday start
+  r.setDate(r.getDate() - day);
+  r.setHours(0,0,0,0);
+  return r;
+}
+
+// Which time window the pies (big + mini) are scoped to — null means all
+// time (no scoping). Set by tapping one of the Today/This week/This month
+// cards below; tapping the already-active one clears it back to all time.
+let activeTimeFilter = null; // null | 'today' | 'week' | 'month'
+
+function isInTimeFilter(t) {
+  if (!activeTimeFilter) return true;
+  const now = new Date();
+  const d = new Date(t.date);
+  if (activeTimeFilter === 'today') return isSameDay(d, now);
+  if (activeTimeFilter === 'week') return d >= startOfWeek(now);
+  if (activeTimeFilter === 'month') return d >= new Date(now.getFullYear(), now.getMonth(), 1);
+  return true;
+}
+
+function renderTotals(txns) {
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const sum = (filterFn) => txns.filter(filterFn).reduce((s, t) => s + spendAmount(t), 0);
+
+  const today = sum(t => isSameDay(new Date(t.date), now));
+  const week = sum(t => new Date(t.date) >= weekStart);
+  const month = sum(t => new Date(t.date) >= monthStart);
+
+  const cardActive = (scope) => activeTimeFilter === scope ? ' active' : '';
+  document.getElementById('totals').innerHTML = `
+    <div class="total-card${cardActive('today')}" data-scope="today"><div class="label">Today</div><div class="value">RM${today.toFixed(2)}</div></div>
+    <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">This week</div><div class="value">RM${week.toFixed(2)}</div></div>
+    <div class="total-card${cardActive('month')}" data-scope="month"><div class="label">This month</div><div class="value">RM${month.toFixed(2)}</div></div>
+  `;
+  // Tapping a card scopes the pies (big + mini, see renderCharts()) to that
+  // period; tapping the same card again clears back to all-time. This is
+  // purely a pie-scoping control — the totals cards themselves always show
+  // their own fixed period regardless, and the transaction list below isn't
+  // affected.
+  document.querySelectorAll('#totals .total-card').forEach(el => {
+    el.onclick = () => {
+      const scope = el.dataset.scope;
+      activeTimeFilter = activeTimeFilter === scope ? null : scope;
+      render();
+    };
+  });
+}
+
+// Semantic palette: categories that are always spending get warm red/orange
+// tones (Car/Food/Shopping/Entertainment/Housing), Transfer stays neutral
+// grey since money moves either direction, and Other stays purple as a
+// "needs review" flag since it holds the Unsure subtag.
+const CHART_COLORS = {
+  Car: '#ff453a', Shopping: '#ff9f0a', Food: '#ff6b35', Entertainment: '#ffd60a',
+  Housing: '#ff7a9c', Other: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
+};
+
+// Not real spending — Transfer covers wallet top-ups (Card Reload), P2P
+// sends (To Others), inter-account movement (To Bank B/From Bank A/To TNG/
+// Internal); Income covers real external money in (Salary, Interest, and
+// other bank credits) that TNG never had. Tracked and filterable like any
+// other category, but left out of the "All" totals/pie so none of this
+// inflates spend numbers.
+const NON_SPEND_CATEGORIES = ['Transfer', 'Income'];
+function colorFor(key) { return CHART_COLORS[key] || '#8e8e93'; }
+
+// Subtag palette used when a single category is selected (e.g. Car ->
+// Toll/Parking/Fuel/Service/Ride) so the donut breaks down further instead
+// of collapsing into one slice. Transfer's subtags are all grey shades since
+// the category itself is neutral regardless of which subtag.
+const SUBTAG_COLORS = {
+  Toll: '#0a84ff', Parking: '#64d2ff', Fuel: '#5e5ce6', Service: '#30d5ff', Ride: '#ff6961',
+  'Convenience Store': '#34c759', Hypermarket: '#30d158',
+  Subscription: '#ff6482',
+  Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
+  Unsure: '#ff453a',
+  'Card Reload': '#a1a1a6', 'To Others': '#8e8e93', 'From Others': '#636366', 'Internal': '#48484a',
+  Salary: '#30d158', Interest: '#64d2ff'
+};
+function colorForSub(key) { return SUBTAG_COLORS[key] || '#8e8e93'; }
+
+// Strips anything that isn't a letter/digit, for building a DOM-id-safe
+// suffix out of an account name (e.g. "Bank A" -> "BankA").
+function cssSafe(s) { return String(s).replace(/[^a-zA-Z0-9]/g, ''); }
+
+function searchFilter(txns) {
+  if (!searchQuery) return txns;
+  const q = searchQuery.toLowerCase();
+  return txns.filter(t =>
+    (t.merchant || '').toLowerCase().includes(q) ||
+    (t.notes || '').toLowerCase().includes(q) ||
+    (t.remark || '').toLowerCase().includes(q) ||
+    (t.subTag || '').toLowerCase().includes(q)
+  );
+}
+
+// Given a "base" pool of transactions (already scoped to whichever account
+// this particular pie represents — allTxns for the combined pie, or one
+// account's slice for a mini pie), applies the time/category/search
+// narrowing a pie should reflect. Mirrors the exact same category/All +
+// search rules the transaction list/totals use, just parametrized by base
+// so it can run once for the combined pie and once per mini pie.
+function chartTxnsFor(base) {
+  const scoped = base.filter(isInTimeFilter);
+  if (activeFilter === 'All') {
+    return searchFilter(scoped).filter(t => !NON_SPEND_CATEGORIES.includes(t.category));
+  }
+  return scoped.filter(t => t.category === activeFilter);
+}
+
+// Same idea, but for the Income category specifically — used alongside
+// chartTxnsFor (which deliberately excludes Income, same as spend totals)
+// to build the Expense/Income/Balance trio shown on the "Overall" pie.
+function incomeTxnsFor(base) {
+  return searchFilter(base.filter(isInTimeFilter)).filter(t => t.category === 'Income');
+}
+
+// Expense/Income/Balance for whichever base pool (allTxns for the combined
+// pie, or one account's slice for a mini pie) — Balance is simply Income
+// minus Expense for the currently selected time window (Today/This week/
+// This month/all-time), not a real running account balance.
+function statsFor(base) {
+  const expense = chartTxnsFor(base).reduce((s, t) => s + spendAmount(t), 0);
+  const income = incomeTxnsFor(base).reduce((s, t) => s + Number(t.amount || 0), 0);
+  return { expense, income, balance: income - expense };
+}
+
+// txns: rows to chart. highlightKey: when set to a specific subtag (not
+// 'All'), the pie still shows every subtag slice for the category — it does
+// NOT collapse down to just that one slice — but only the selected slice
+// keeps its real color; every other slice is greyed out. This way tapping a
+// sub-filter chip highlights where that subtag sits within the whole
+// category instead of hiding the rest of the picture.
+// opts: { titleEl, totalEl, legend } — titleEl/totalEl are optional element
+// ids to update with the "By category"/"By type" label and the RM total;
+// legend controls whether Chart.js draws its own bottom legend (only the
+// big combined pie has room for one — the mini pies are too small).
+function renderChartOn(canvasId, txns, highlightKey, opts) {
+  opts = opts || {};
+  // When viewing a single category, break the donut down by subTag instead
+  // of category (every row would otherwise share the same category label
+  // and collapse into a single slice).
+  const bySubTag = activeFilter !== 'All';
+  const totals = {};
+  txns.forEach(t => {
+    const key = bySubTag ? (t.subTag || 'Uncategorized') : t.category;
+    totals[key] = (totals[key] || 0) + spendAmount(t);
+  });
+  const labels = Object.keys(totals);
+  const values = labels.map(l => totals[l]);
+  const grand = values.reduce((a, b) => a + b, 0);
+  const colorFn = bySubTag ? colorForSub : colorFor;
+  const GREYED_OUT = '#3a3a3c';
+  const isHighlighting = bySubTag && highlightKey && highlightKey !== 'All';
+
+  if (opts.titleEl) document.getElementById(opts.titleEl).textContent = bySubTag ? 'By type' : 'Overall';
+  if (opts.totalEl) {
+    const totalEl = document.getElementById(opts.totalEl);
+    if (totalEl) totalEl.textContent = 'RM' + grand.toFixed(2);
+  }
+
+  const canvasEl = document.getElementById(canvasId);
+  if (!canvasEl) return;
+  const ctx = canvasEl.getContext('2d');
+  const data = {
+    labels: labels.length ? labels : ['No data'],
+    datasets: [{
+      data: labels.length ? values : [1],
+      backgroundColor: labels.length
+        ? labels.map(l => isHighlighting ? (l === highlightKey ? colorFn(l) : GREYED_OUT) : colorFn(l))
+        : ['#2c2c2e'],
+      borderWidth: 0
+    }]
+  };
+  if (chartInstances[canvasId]) {
+    chartInstances[canvasId].data = data;
+    chartInstances[canvasId].update();
+  } else if (window.Chart) {
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'doughnut',
+      data,
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '65%',
+        plugins: {
+          legend: opts.legend
+            ? { position: 'bottom', labels: { color: '#f5f5f7', boxWidth: 10, font: { size: 11 } } }
+            : { display: false }
+        }
+      }
+    });
+  }
+}
+
+// The big "Overall" pie always reflects ALL 3 accounts combined, regardless
+// of the Account filter chips — it's a constant whole-picture reference
+// point. Below it, a row of mini pies shows the per-account breakdown: one
+// each for TNG/HL Bank/PBank when the Account filter is "All", or just the
+// one selected account (bigger) when you've drilled into a specific account
+// — i.e. picking an account "zooms" the mini row down to that account
+// instead of touching the combined pie above it. Both the big pie and the
+// minis are further scoped by activeTimeFilter (Today/This week/This
+// month/all-time) via chartTxnsFor()/statsFor().
+function renderCharts() {
+  renderChartOn('chart', chartTxnsFor(allTxns), activeSubFilter, {
+    titleEl: 'chartTitle', totalEl: 'chartTotal', legend: true
+  });
+  updateBigStats(allTxns);
+  document.getElementById('chartLoading').classList.remove('show');
+
+  const container = document.getElementById('miniCharts');
+
+  // innerHTML replacement below destroys every existing canvas node (even
+  // ones for accounts still shown), so every mini Chart.js instance has to
+  // be torn down and rebuilt from scratch each render — otherwise Chart.js
+  // is left holding a reference to a canvas that's no longer in the DOM.
+  Object.keys(chartInstances).forEach(id => {
+    if (id.indexOf('miniChart-') === 0) {
+      chartInstances[id].destroy();
+      delete chartInstances[id];
+    }
+  });
+
+  // While a text search is active (including the remark-link "group by
+  // note" feature), the per-account mini pies would each get re-scoped down
+  // to just the 1-2 matching rows — mostly empty/meaningless rings. Simpler
+  // to just hide the whole mini-pie row until the search is cleared; the
+  // combined pie above still reflects the search results.
+  if (searchQuery) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  container.style.display = '';
+
+  const accountsToShow = activeAccountFilter === 'All' ? MINI_PIE_ACCOUNTS : [activeAccountFilter];
+  container.classList.toggle('zoomed', activeAccountFilter !== 'All');
+
+  container.innerHTML = accountsToShow.map(a => `
+    <div class="mini-chart-card">
+      <div class="mini-chart-head"><span>${a}</span><span id="miniTotal-${cssSafe(a)}"></span></div>
+      <div class="mini-chart-wrap">
+        <canvas id="miniChart-${cssSafe(a)}"></canvas>
+        <div class="chart-loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  `).join('');
+
+  accountsToShow.forEach(a => {
+    const acctTxns = allTxns.filter(t => t.account === a);
+    renderChartOn('miniChart-' + cssSafe(a), chartTxnsFor(acctTxns), activeSubFilter, {
+      totalEl: 'miniTotal-' + cssSafe(a), legend: false
+    });
+    // On the "All categories" view, the mini pie's number is its Balance
+    // (Income minus Expense) for that account, colored green/red by sign,
+    // instead of the plain Expense-only total renderChartOn just wrote —
+    // when a specific category is selected, leave that as-is (the
+    // category's own subtotal for this account is more useful there).
+    if (activeFilter === 'All') {
+      const { balance } = statsFor(acctTxns);
+      const el = document.getElementById('miniTotal-' + cssSafe(a));
+      if (el) {
+        el.textContent = (balance < 0 ? '-RM' : '+RM') + Math.abs(balance).toFixed(2);
+        el.className = balance < 0 ? 'negative' : 'positive';
+      }
+    }
+  });
+}
+
+// Fills in the Expense/Income/Balance trio (shown only on the "Overall" —
+// i.e. all-categories — view) and toggles it against the plain single RM
+// total renderChartOn already wrote for the "By type" (one category
+// selected) view.
+function updateBigStats(base) {
+  const statsEl = document.getElementById('chartStats');
+  const totalEl = document.getElementById('chartTotal');
+  if (activeFilter !== 'All') {
+    statsEl.style.display = 'none';
+    totalEl.style.display = '';
+    return;
+  }
+  totalEl.style.display = 'none';
+  statsEl.style.display = 'flex';
+  const { expense, income, balance } = statsFor(base);
+  document.getElementById('statExpense').textContent = 'RM' + expense.toFixed(2);
+  document.getElementById('statIncome').textContent = 'RM' + income.toFixed(2);
+  const balEl = document.getElementById('statBalance');
+  balEl.textContent = (balance < 0 ? '-RM' : '+RM') + Math.abs(balance).toFixed(2);
+  balEl.className = 'stat-value ' + (balance < 0 ? 'negative' : 'positive');
+}
+
+const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Housing', 'Other', 'Transfer', 'Income'];
+
+// Top-level "which real-world account" filter — All / TNG / HL Bank / PBank
+// — a separate dimension from the category filters below it. Which account
+// something belongs to is orthogonal to what it was spent on, so this is
+// its own chip row rather than folded into the category one.
+function renderAccountFilters() {
+  const accounts = ['All'].concat(ACCOUNTS);
+  document.getElementById('accountfilters').innerHTML = accounts.map(a =>
+    `<div class="filter-chip ${a === activeAccountFilter ? 'active' : ''}" data-acct="${a}">${a}</div>`
+  ).join('');
+  document.querySelectorAll('#accountfilters .filter-chip').forEach(el => {
+    el.onclick = () => { activeAccountFilter = el.dataset.acct; render(); };
+  });
+}
+
+// Only shows a category chip if the currently-selected account actually has
+// at least one transaction in it — e.g. PBank has no Shopping, so that
+// chip just doesn't appear while PBank is selected, instead of showing an
+// always-empty category. Recomputed every render() since it depends on
+// accountTxns (which changes whenever the Account filter changes).
+function renderFilters(accountTxns) {
+  const present = new Set(accountTxns.map(t => t.category));
+  // If the category you had selected isn't available for the account you
+  // just switched to, fall back to All rather than showing an empty list.
+  if (activeFilter !== 'All' && !present.has(activeFilter)) {
+    activeFilter = 'All';
+    activeSubFilter = 'All';
+  }
+  const cats = ['All'].concat(ALL_CATEGORIES.filter(c => present.has(c)));
+  document.getElementById('filters').innerHTML = cats.map(c =>
+    `<div class="filter-chip ${c === activeFilter ? 'active' : ''}" data-cat="${c}">${c}</div>`
+  ).join('');
+  document.querySelectorAll('#filters .filter-chip').forEach(el => {
+    el.onclick = () => { activeFilter = el.dataset.cat; activeSubFilter = 'All'; render(); };
+  });
+}
+
+// Second row of chips shown only when the active category has subtags (Car,
+// Housing, Other) — e.g. selecting Car reveals Toll/Parking/Fuel/Service/Ride
+// so you can drill into just one without leaving the category. Same idea as
+// renderFilters() hiding unused category chips per account: a subtag chip
+// only shows if the current account+category slice actually has a row with
+// it (e.g. PBank has no "Ride" rows, so that chip won't appear while PBank
+// is selected), rather than always showing every subtag the category could
+// ever have. categoryTxns is the account+category-filtered set from render()
+// (before any subtag filter is applied), so "present" reflects real data.
+function renderSubFilters(categoryTxns) {
+  const el = document.getElementById('subfilters');
+  const possible = SUBTAGS_BY_CATEGORY[activeFilter];
+  if (!possible || !possible.length) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  const present = new Set((categoryTxns || []).map(t => t.subTag).filter(Boolean));
+  (categoryTxns || []).forEach(t => { if (t.extraTag) present.add(t.extraTag); });
+  const subtags = possible.filter(s => present.has(s));
+  if (!subtags.length) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  // If the subtag you had selected isn't available anymore (e.g. you just
+  // switched account), fall back to "All" rather than showing an empty list.
+  if (activeSubFilter !== 'All' && !present.has(activeSubFilter)) {
+    activeSubFilter = 'All';
+  }
+  el.style.display = 'flex';
+  const opts = ['All'].concat(subtags);
+  el.innerHTML = opts.map(s =>
+    `<div class="filter-chip ${s === activeSubFilter ? 'active' : ''}" data-sub="${s}">${s}</div>`
+  ).join('');
+  el.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.onclick = () => { activeSubFilter = chip.dataset.sub; render(); };
+  });
+}
+
+// Combines date + time (when present) into one sortable timestamp, so
+// same-day transactions order correctly instead of tying on date alone.
+function txnTimestamp(t) {
+  return new Date(t.date + 'T' + (t.time || '00:00') + ':00').getTime();
+}
+
+function sortTxns(txns) {
+  const sorted = [...txns];
+  if (sortMode === 'date_desc') sorted.sort((a, b) => txnTimestamp(b) - txnTimestamp(a));
+  else if (sortMode === 'date_asc') sorted.sort((a, b) => txnTimestamp(a) - txnTimestamp(b));
+  else if (sortMode === 'amount_desc') sorted.sort((a, b) => Number(b.amount) - Number(a.amount));
+  else if (sortMode === 'amount_asc') sorted.sort((a, b) => Number(a.amount) - Number(b.amount));
+  return sorted;
+}
+
+function groupKeyFor(t) {
+  if (groupMode === 'day') return new Date(t.date).toDateString();
+  if (groupMode === 'category') return t.category + (t.subTag ? ' · ' + t.subTag : '');
+  if (groupMode === 'merchant') return t.merchant || t.notes || 'Unknown';
+  return '__all__';
+}
+
+function render() {
+  renderAccountFilters();
+  // Account filter (All/TNG/HL Bank/PBank) narrows the pool everything else
+  // below operates on, same as how the category filter narrows further.
+  const accountTxns = activeAccountFilter === 'All' ? allTxns : allTxns.filter(t => t.account === activeAccountFilter);
+  renderFilters(accountTxns);
+  const categoryTxns = activeFilter === 'All' ? accountTxns : accountTxns.filter(t => t.category === activeFilter);
+  renderSubFilters(categoryTxns);
+  let filtered = categoryTxns;
+  if (activeFilter !== 'All' && activeSubFilter !== 'All') {
+    // A row matches either its primary subTag or its secondary extraTag
+    // (see attachExtraTagHandlers()) — e.g. a Housing > Rent row also
+    // tagged "+ WiFi" shows up under both the Rent and WiFi chips, even
+    // though it's only counted once in totals/pie since subTag itself
+    // never changes.
+    filtered = filtered.filter(t => (t.subTag || '') === activeSubFilter || t.extraTag === activeSubFilter);
+  }
+  // Free-text search over merchant/notes/remark/subtag — narrows the list
+  // (and the totals below, same as the category filters do) to whatever
+  // matches, e.g. "grab" or "lunch with ali".
+  filtered = searchFilter(filtered);
+  // On the "All" view, keep Transfer out of the totals cards so wallet
+  // top-ups/sends/receipts don't inflate spend numbers. Selecting the
+  // Transfer chip directly still shows its own totals as normal, and the
+  // transaction list below always shows everything in `filtered` so those
+  // rows stay visible.
+  const summaryTxns = activeFilter === 'All'
+    ? filtered.filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
+    : filtered;
+  renderTotals(summaryTxns);
+  // The pies (combined + per-account) are computed independently from
+  // allTxns/each account's own slice — see renderCharts() — so the account
+  // filter chips never touch the combined pie, only which mini pie(s) show.
+  renderCharts();
+
+  if (!filtered.length) {
+    document.getElementById('list').innerHTML = '<div class="empty">No transactions yet.</div>';
+    return;
+  }
+
+  const sorted = sortTxns(filtered);
+
+  if (groupMode === 'none') {
+    let html = '<div class="day-group">';
+    sorted.forEach(t => { html += renderTxnRow(t); });
+    html += '</div>';
+    document.getElementById('list').innerHTML = html;
+    attachCatSelectHandlers();
+    attachExtraTagHandlers();
+    attachRemarkHandlers();
+    attachLinkHandlers();
+    return;
+  }
+
+  const groups = {};
+  const order = [];
+  sorted.forEach(t => {
+    const key = groupKeyFor(t);
+    if (!groups[key]) { groups[key] = []; order.push(key); }
+    groups[key].push(t);
+  });
+
+  let html = '';
+  order.forEach(key => {
+    const groupTotal = groups[key].reduce((s, t) => s + spendAmount(t), 0);
+    html += `<div class="day-group"><div class="day-header"><span>${key}</span><span>RM${groupTotal.toFixed(2)}</span></div>`;
+    groups[key].forEach(t => { html += renderTxnRow(t); });
+    html += `</div>`;
+  });
+  document.getElementById('list').innerHTML = html;
+  attachCatSelectHandlers();
+  attachExtraTagHandlers();
+  attachRemarkHandlers();
+  attachLinkHandlers();
+}
+
+// A "Transfer to Wallet" row's merchant field is either a real person's name
+// (TNG recorded who the money went to — e.g. "MUSRIYAH") or the generic
+// literal text "Fund Transfer" (no name available). When a real name is
+// present, show it in parens next to the category/subtag it landed in, e.g.
+// "Parking (MUSRIYAH)" or "To Others (SAW THAN ZAW OO)", so the row reads
+// clearly instead of just showing a bare name with no context. Rows with no
+// real name (or any other transaction type) fall back to the normal
+// merchant/notes title.
+function txnTitle(t) {
+  const merchant = (t.merchant || '').trim();
+  if (t.type === 'Transfer to Wallet' && merchant && merchant.toUpperCase() !== 'FUND TRANSFER') {
+    const label = t.subTag || t.category;
+    return `${label} (${merchant})`;
+  }
+  return t.merchant || t.notes || 'Unknown';
+}
+
+// Real direction of money for this row: 'in' or 'out'. Prefers an explicit
+// t.flow (set by the Bank A/B parsers, which know the real debit/credit
+// column at import time, and backfilled onto older rows by
+// ensureFlowColumn()). Falls back to a category/subtag default for rows
+// that somehow still have no flow value — real spend is always 'out',
+// Income/Card Reload/From Others are always 'in', To Others is always
+// 'out', and anything else defaults to 'in'.
+function txnFlow(t) {
+  if (t.flow === 'in' || t.flow === 'out') return t.flow;
+  if (t.category === 'Income') return 'in';
+  if (t.category === 'Transfer') {
+    if (t.subTag === 'To Others') return 'out';
+    return 'in';
+  }
+  return 'out';
+}
+
+// The amount to count toward a real-spend category's total. Normally just
+// the raw amount (money going out), but if a transaction was recategorized
+// INTO a spend category (e.g. Food) while its flow is still "in" — like a
+// friend's reimbursement tagged the same category as the expense it's
+// paying back, via the remark-link feature — it NETS OFF that category's
+// total instead of inflating it, so Food shows your true out-of-pocket cost
+// rather than double-counting both the spend and the refund. Only applies
+// to real spend categories; Transfer/Income keep the plain sum since
+// "in"/"out" already carries its own separate meaning there (e.g. Card
+// Reload in vs Internal out).
+function spendAmount(t) {
+  const amt = Number(t.amount || 0);
+  if (NON_SPEND_CATEGORIES.includes(t.category)) return amt;
+  return txnFlow(t) === 'in' ? -amt : amt;
+}
+
+// Sign + CSS class for the amount text. Real spend = red minus. Money
+// genuinely coming in (Card Reload, From Others, Income) = green plus.
+// To Others = red minus — it's leaving the account, even though "Transfer"
+// as a category isn't counted as spend. Internal (movement between your own
+// TNG/Bank A/Bank B accounts) is always yellow, with the sign following the
+// real direction of that specific row.
+function txnSignInfo(t) {
+  const flow = txnFlow(t);
+  const sign = flow === 'in' ? '+' : '-';
+  if (t.category === 'Transfer' && t.subTag === 'Internal') {
+    return { sign, cls: 'amount internal' };
+  }
+  return { sign, cls: flow === 'in' ? 'amount in' : 'amount' };
+}
+
+// Turns a name string into Title Case, e.g. "KHEK WEI KEAN" -> "Khek Wei
+// Kean" — used only for the small blue transfer-context hint so it reads
+// like a name instead of shouting in all caps.
+function titleCaseName(s) {
+  return (s || '').trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
+// If a row's category has been manually changed AWAY from Transfer (e.g. a
+// "To Others (KHEK WEI KEAN)" QR payment turned out to really be a Food
+// purchase, so you recategorized it), the original transfer context would
+// otherwise disappear from view once the category no longer says Transfer.
+// This pulls that context back out of the Merchant text — which doesn't
+// change when you recategorize — as a small hint like "(to Khek)", so you
+// don't lose track of where the money actually went/came from. Returns null
+// while the row is still shown as Transfer (no hint needed) or if the
+// merchant text doesn't match a known transfer pattern.
+function transferHint(t) {
+  if (t.category === 'Transfer') return null;
+  const m = (t.merchant || '').trim();
+  let match;
+  if ((match = m.match(/^To Others \((.+?)\)/i))) return 'to ' + titleCaseName(match[1]);
+  if ((match = m.match(/^From Others \((.+?)\)/i))) return 'from ' + titleCaseName(match[1]);
+  if (/^To HL Bank\b/i.test(m)) return 'to HL Bank';
+  if (/^From HL Bank\b/i.test(m)) return 'from HL Bank';
+  if (/^To PBank\b/i.test(m)) return 'to PBank';
+  if (/^From PBank\b/i.test(m)) return 'from PBank';
+  if (/^To TNG\b/i.test(m)) return 'to TNG';
+  if ((match = m.match(/^Internal Transfer(?:\s*\((.+?)\))?/i))) {
+    return match[1] ? ('internal · ' + titleCaseName(match[1])) : 'internal transfer';
+  }
+  return null;
+}
+
+// Options for the small secondary "+ tag" select next to the main category
+// dropdown — offers every OTHER subtag in the same category (excluding the
+// row's own primary subTag), so e.g. a Housing > Rent row can also be
+// tagged "+ WiFi" when one payment genuinely covers both. Returns '' if the
+// category doesn't have at least one other subtag to offer.
+function extraTagOptionsHtml(category, subTag, extraTag) {
+  const subtags = (SUBTAGS_BY_CATEGORY[category] || []).filter(s => s !== subTag);
+  if (!subtags.length) return '';
+  const opts = ['<option value="">+ tag…</option>'].concat(
+    subtags.map(s => `<option value="${s}"${s === extraTag ? ' selected' : ''}>+ ${s}</option>`)
+  );
+  return opts.join('');
+}
+
+function renderTxnRow(t) {
+  const dotClass = ALL_CATEGORIES.includes(t.category) ? t.category : 'Custom';
+  const { sign, cls: amtClass } = txnSignInfo(t);
+  const remarkHtml = t.remark
+    ? `<div class="remark" data-remark="${escapeHtml(t.remark)}" title="Click to see every transaction sharing this note">${escapeHtml(t.remark)}</div>`
+    : '';
+  const hint = transferHint(t);
+  const hintHtml = hint ? `<div class="transfer-hint">(${escapeHtml(hint)})</div>` : '';
+  const extraOpts = extraTagOptionsHtml(t.category, t.subTag, t.extraTag);
+  const extraSelectHtml = extraOpts
+    ? `<select class="txn-extratag-select${t.extraTag ? ' has-extra' : ''}" data-row="${t.row}">${extraOpts}</select>`
+    : '';
+  return `
+    <div class="txn">
+      <div class="dot ${dotClass}"></div>
+      <div class="info">
+        <div class="merchant">${txnTitle(t)}</div>
+        ${hintHtml}
+        <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
+        ${remarkHtml}
+        <div class="cat-select-row">
+          <select class="txn-cat-select" data-row="${t.row}">${categoryOptionsHtml(t.category, t.subTag, t.account)}</select>
+          ${extraSelectHtml}
+        </div>
+      </div>
+      <div class="txn-actions">
+        <div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
+        <button class="remark-btn${t.remark ? ' has-remark' : ''}" data-row="${t.row}" title="Add/edit remark">✎</button>
+      </div>
+    </div>`;
+}
+
+// Lets you reassign a transaction's category/subtag right from the list
+// (e.g. fixing an "Unsure" row, or moving a Pokemon Go charge from
+// Entertainment to Subscription) without re-adding it. Changing the primary
+// category/subtag also clears any secondary "+ tag" (extraTag), since it
+// belonged to the old category's subtag set and may no longer make sense.
+function attachCatSelectHandlers() {
+  document.querySelectorAll('.txn-cat-select').forEach(el => {
+    el.onchange = async () => {
+      const row = Number(el.dataset.row);
+      const [category, subTag] = el.value.split('|');
+      const t = allTxns.find(x => x.row === row);
+      const hadExtraTag = t && t.extraTag;
+      if (t) { t.category = category; t.subTag = subTag; t.extraTag = ''; }
+      el.disabled = true;
+      await callApi('updateCategory', { row, category, subTag });
+      if (hadExtraTag) await callApi('updateExtraTag', { row, extraTag: '' });
+      render();
+    };
+  });
+}
+
+// Lets a transaction that genuinely covers two things at once (e.g. one
+// payment for both Housing > Rent and Housing > WiFi) also carry a second
+// subtag from the same category — the row still counts once, under its one
+// primary subTag, but now also shows up when you filter the list by either
+// subtag (see the "present" set in renderSubFilters() and the match in
+// render()). Only offered when the category has more than one subtag to
+// choose from (see extraTagOptionsHtml()).
+function attachExtraTagHandlers() {
+  document.querySelectorAll('.txn-extratag-select').forEach(el => {
+    el.onchange = async () => {
+      const row = Number(el.dataset.row);
+      const extraTag = el.value;
+      const t = allTxns.find(x => x.row === row);
+      if (t) t.extraTag = extraTag;
+      el.disabled = true;
+      await callApi('updateExtraTag', { row, extraTag });
+      render();
+    };
+  });
+}
+
+// Lets you attach a free-text remark to any transaction (e.g. "lunch with
+// Ali", "car aircon regas") — separate from Notes, which holds
+// system/import-derived text. Uses a plain prompt() for a lightweight,
+// one-tap edit rather than an inline text field.
+function attachRemarkHandlers() {
+  document.querySelectorAll('.remark-btn').forEach(el => {
+    el.onclick = async () => {
+      const row = Number(el.dataset.row);
+      const t = allTxns.find(x => x.row === row);
+      const val = window.prompt('Remark for this transaction:', (t && t.remark) || '');
+      if (val === null) return; // cancelled
+      if (t) t.remark = val;
+      await callApi('updateRemark', { row, remark: val });
+      render();
+    };
+  });
+}
+
+// Manual "link" for grouping transactions that belong together even across
+// different accounts/categories — e.g. you pay a group lunch on TNG, then
+// each friend's reimbursement lands as a separate Transfer row, maybe in a
+// different account entirely. Rather than a new field, this reuses the
+// existing free-text Remark: put the same note (e.g. "Lunch 7/30 split") on
+// the original payment AND on each reimbursement via the ✎ button, then
+// click that note on any one of them to instantly filter the whole list
+// down to every transaction sharing that exact remark — regardless of
+// account, category, or time filter, all of which get reset to "All" here
+// so nothing hides the rest of the group.
+function groupByRemark(remark) {
+  if (!remark) return;
+  searchQuery = remark;
+  document.getElementById('searchBox').value = remark;
+  activeAccountFilter = 'All';
+  activeFilter = 'All';
+  activeSubFilter = 'All';
+  activeTimeFilter = null;
+  render();
+}
+function attachLinkHandlers() {
+  document.querySelectorAll('.remark[data-remark]').forEach(el => {
+    el.onclick = () => groupByRemark(el.dataset.remark);
+  });
+}
+
+document.getElementById('groupBy').onchange = (e) => { groupMode = e.target.value; render(); };
+document.getElementById('sortBy').onchange = (e) => { sortMode = e.target.value; render(); };
+document.getElementById('searchBox').oninput = (e) => { searchQuery = e.target.value.trim(); render(); };
+
+// ---- Add transaction ----
+const addBackdrop = document.getElementById('addBackdrop');
+// Re-renders the Category dropdown whenever the Account changes, so "Card
+// Reload" (TNG-only — see categoryOptionsHtml()) disappears the moment you
+// switch Account to HL Bank/PBank, instead of staying selectable there.
+// Falls back to Car/Toll if the currently-picked category+subtag combo no
+// longer has a matching option for the new account.
+function refreshFCategoryOptions() {
+  const sel = document.getElementById('fCategory');
+  let [prevCategory, prevSubTag] = (sel.value || '').split('|');
+  const account = document.getElementById('fAccount').value;
+  // Card Reload no longer applies once you're not on TNG — don't try to
+  // keep it "selected" (that would defeat the filter in categoryOptionsHtml
+  // and leave it visible/chosen), fall back to Car/Toll instead.
+  if (prevCategory === 'Transfer' && prevSubTag === 'Card Reload' && account !== 'TNG') {
+    prevCategory = 'Car'; prevSubTag = 'Toll';
+  }
+  sel.innerHTML = categoryOptionsHtml(prevCategory || 'Car', prevSubTag || 'Toll', account);
+}
+document.getElementById('fCategory').innerHTML = categoryOptionsHtml('Car', 'Toll', 'TNG');
+document.getElementById('fAccount').onchange = refreshFCategoryOptions;
+document.getElementById('addBtn').onclick = () => {
+  const now = new Date();
+  document.getElementById('fDate').value = now.toISOString().slice(0,10);
+  document.getElementById('fTime').value = now.toTimeString().slice(0,5);
+  document.getElementById('fRemember').checked = false;
+  addBackdrop.classList.add('open');
+};
+document.getElementById('addClose').onclick = () => addBackdrop.classList.remove('open');
+
+document.getElementById('fSubmit').onclick = async () => {
+  const amount = parseFloat(document.getElementById('fAmount').value);
+  const date = document.getElementById('fDate').value;
+  const time = document.getElementById('fTime').value;
+  const [category, subTag] = document.getElementById('fCategory').value.split('|');
+  const merchant = document.getElementById('fMerchant').value;
+  const account = document.getElementById('fAccount').value;
+  const rememberMerchant = document.getElementById('fRemember').checked;
+  if (!amount || !date) return;
+
+  const btn = document.getElementById('fSubmit');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    await callApi('add', { row: { date, time, amount, category, subTag, merchant, source: 'Manual', notes: merchant, type: 'Manual', rememberMerchant, account } });
+    addBackdrop.classList.remove('open');
+    document.getElementById('fAmount').value = '';
+    document.getElementById('fMerchant').value = '';
+    loadData();
+  } catch (err) {
+    alert('Could not add: ' + err.message);
+  }
+  btn.disabled = false; btn.textContent = 'Add';
+};
+
+// ================== IMPORT (PDF + CSV, with review step) ==================
+
+const importBackdrop = document.getElementById('importBackdrop');
+const importStatusEl = document.getElementById('importStatus');
+const importSubmitBtn = document.getElementById('importSubmit');
+const importBackBtn = document.getElementById('importBack');
+const importPickField = document.getElementById('importPickField');
+const importPreviewList = document.getElementById('importPreviewList');
+
+let importStage = 'pick'; // 'pick' | 'preview'
+let pendingImportRows = [];
+
+function resetImportSheet() {
+  importStage = 'pick';
+  pendingImportRows = [];
+  importPickField.style.display = 'block';
+  importPreviewList.style.display = 'none';
+  importPreviewList.innerHTML = '';
+  importBackBtn.style.display = 'none';
+  importSubmitBtn.textContent = 'Read file';
+  importStatusEl.className = 'status-msg';
+  importStatusEl.textContent = '';
+  document.getElementById('fFile').value = '';
+}
+
+document.getElementById('importBtn').onclick = () => { resetImportSheet(); importBackdrop.classList.add('open'); };
+document.getElementById('importClose').onclick = () => importBackdrop.classList.remove('open');
+importBackBtn.onclick = resetImportSheet;
+
+// The file picker's accept type + label change depending on what's being
+// imported — a screenshot needs an image, everything else needs a
+// PDF/CSV — so this has to be re-applied whenever the "Import from"
+// dropdown changes, not just once at load.
+function updateImportPickFieldForAccount() {
+  const importAccount = document.getElementById('importAccount').value;
+  const fFile = document.getElementById('fFile');
+  const label = document.getElementById('importPickLabel');
+  if (importAccount === 'TNG-Screenshot') {
+    fFile.accept = '.png,.jpg,.jpeg';
+    label.textContent = 'Screenshot (TNG "Activity"/"History" screen)';
+  } else {
+    fFile.accept = '.pdf,.csv';
+    label.textContent = 'Statement file';
+  }
+}
+document.getElementById('importAccount').onchange = updateImportPickFieldForAccount;
+updateImportPickFieldForAccount();
+
+// ---- CSV parsing (wrapped as a promise) ----
+function parseCsvFile(file) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const rows = [];
+        results.data.forEach(r => {
+          const type = r['Transaction Type'] || r['Type'] || '';
+          const description = r['Description'] || r['Merchant'] || '';
+          const dateRaw = r['Date'] || '';
+          const amountRaw = (r['Amount (RM)'] || r['Amount'] || '0').toString().replace(/[^0-9.\-]/g, '');
+          const guess = categorize(description, type);
+          if (!guess) return;
+          let date = dateRaw;
+          const m = dateRaw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+          if (m) date = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+          // Time may come from its own column, or be embedded in the Date
+          // cell itself (e.g. "30/06/2026 14:23").
+          let time = r['Time'] || '';
+          if (!time) {
+            const tm = dateRaw.match(TIME_TOKEN_RE);
+            if (tm) time = tm[1];
+          }
+          time = normalizeTime(time);
+          rows.push({
+            date, time, amount: parseFloat(amountRaw) || 0,
+            category: guess.category, subTag: guess.subTag,
+            merchant: description, source: 'TNG CSV Import', notes: type, type,
+            account: 'TNG'
+          });
+        });
+        resolve(rows);
+      },
+      error: reject
+    });
+  });
+}
+
+// ================== BANK STATEMENT IMPORT (Bank A / Bank B) ==================
+// Bank A and Bank B are real bank accounts that feed the TNG wallet: salary
+// lands in Bank A, gets moved to Bank B, then Bank B tops up the TNG wallet.
+// Each bank exports a totally different CSV layout, so each gets its own
+// small parser + categorizer rather than trying to force them through the
+// TNG-shaped parseCsvFile above. Both ultimately produce the same row shape
+// as every other import path: {date,time,amount,category,subTag,merchant,
+// source,notes,type,account}.
+
+// Strips a trailing digit run from a name string. Bank A's exports glue the
+// transaction reference number onto the end of a truncated payer/payee name
+// (e.g. "ENCIK MUHAMAD FAHMI BIN H283855" where "283855" is the reference),
+// so this trims that back to something closer to just the name.
+function stripTrailingRef(name) {
+  return (name || '').replace(/\d+$/, '').trim();
+}
+
+// Bank A (Statement.csv): a Public Bank-style savings account export. It has
+// a metadata header block (account number, balance, etc.), then a loosely
+// comma-separated table — Date, Ref No, Description code, Debit, Credit,
+// followed by several more comma-separated "details" fields (payer/payee
+// name, memo) that don't line up with a clean header. Papa.parse without a
+// header just gives raw arrays per line, which is what we want here so we
+// can pick out real transaction rows by testing column 0 for a date.
+// detailCols: the trimmed extra comma-separated fields after Debit/Credit,
+// kept as SEPARATE columns rather than one joined string — a name sitting in
+// one column shouldn't get confused with a reference number sitting in the
+// column right next to it (e.g. col0 = reference-ish text, col1 = the
+// payer's full name for a salary credit, col2+ = memo text).
+function categorizeBankA(typeCode, detailCols) {
+  const t = (typeCode || '').toUpperCase();
+  const col0 = detailCols[0] || '';
+  const col1 = detailCols[1] || '';
+  const allUpper = detailCols.join(' ').toUpperCase();
+
+  if (t === 'DEP-ECP') {
+    if (allUpper.includes('PAYROLL')) {
+      const payer = (col1.split(/\s{2,}/)[0] || col1).trim();
+      return { category: 'Income', subTag: 'Salary', merchant: `Salary${payer ? ' (' + payer + ')' : ''}` };
+    }
+    return { category: 'Income', subTag: 'Other', merchant: 'Bank Credit' };
+  }
+  if (t.startsWith('TSFR FUND CR')) {
+    const parts = col0.split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
+    const payer = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+    // A credit from HL Bank itself (rather than an external payer) would be
+    // money moving back between your own accounts — Internal, not Income.
+    if (/NG JIA YAO/i.test(col0)) {
+      return { category: 'Transfer', subTag: 'Internal', merchant: 'From HL Bank' };
+    }
+    return { category: 'Income', subTag: 'Other', merchant: `Bank Credit${payer ? ' (' + payer + ')' : ''}` };
+  }
+  if (t === 'DUITNOW TRSF DR') {
+    const name = stripTrailingRef(col0.split(/\s{2,}/)[0] || col0);
+    // Movement to your own HL Bank account — filed under the single
+    // "Internal" subtag (see CATEGORY_OPTIONS) rather than a dedicated
+    // "To HL Bank" subtag; the merchant text still says which leg it was.
+    if (/NG JIA YAO/i.test(col0)) {
+      return { category: 'Transfer', subTag: 'Internal', merchant: 'To HL Bank' };
+    }
+    return { category: 'Transfer', subTag: 'To Others', merchant: `To Others (${name})` };
+  }
+  if (t === 'DUITNOW QR DR') {
+    const name = stripTrailingRef(col0.split(/\s{2,}/)[0] || col0);
+    return { category: 'Transfer', subTag: 'To Others', merchant: `To Others (${name})` };
+  }
+  if (t === 'PB DEBIT CARD DR' || t === 'DR MYDEBIT') {
+    const merchantName = col0.replace(/^VISA\d+\s*/, '').replace(/^\d[\dX]{9,}\s*/i, '').split(/\s{2,}/)[0].trim();
+    const col0Upper = col0.toUpperCase();
+    for (const rule of CATEGORY_RULES) {
+      for (const kw of rule.keywords) {
+        if (col0Upper.includes(kw)) {
+          return { category: rule.category, subTag: rule.subTag || '', merchant: merchantName || col0 };
+        }
+      }
+    }
+    return { category: 'Other', subTag: 'Unsure', merchant: merchantName || col0 };
+  }
+  return { category: 'Other', subTag: 'Unsure', merchant: col0 || t };
+}
+
+async function parseBankACsvFile(file) {
+  const text = await file.text();
+  const parsed = Papa.parse(text, { skipEmptyLines: false });
+  const DATE_RE = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const rows = [];
+  (parsed.data || []).forEach(cols => {
+    if (!cols || !cols.length) return;
+    const dateRaw = String(cols[0] || '').trim();
+    const m = dateRaw.match(DATE_RE);
+    if (!m) return; // skip metadata/header/blank rows
+    const date = `${m[3]}-${m[2]}-${m[1]}`;
+    const typeCode = String(cols[2] || '').trim();
+    const debit = parseFloat(String(cols[3] || '').replace(/,/g, '').trim()) || 0;
+    const credit = parseFloat(String(cols[4] || '').replace(/,/g, '').trim()) || 0;
+    const amount = debit || credit;
+    if (!amount) return;
+    const detailCols = cols.slice(5).map(c => String(c || '').trim());
+    const guess = categorizeBankA(typeCode, detailCols);
+    rows.push({
+      date, time: '', amount,
+      category: guess.category, subTag: guess.subTag,
+      merchant: guess.merchant, source: 'PBank CSV Import', notes: typeCode, type: typeCode,
+      account: 'PBank',
+      // PBank's statement always tells you which column the amount came
+      // from — a credit is always money coming in, a debit always going
+      // out — so the real direction is known outright here rather than
+      // guessed from category/subtag.
+      flow: credit ? 'in' : 'out'
+    });
+  });
+  return rows;
+}
+
+// Bank B (CASATran...csv): a CASA account export — proper quoted CSV with a
+// real header (Date, Description, Reference, Deposit (MYR), Withdrawal
+// (MYR)). This is the account that funds the TNG wallet, so its "POS
+// Purchase ... TNG-EWALLET" rows are recognized specially as Transfer > To
+// TNG rather than a generic purchase.
+function categorizeBankB(desc, reference) {
+  const descUpper = (desc || '').toUpperCase();
+  const ref = (reference || '').trim();
+  const refUpper = ref.toUpperCase();
+
+  // Money leaving to top up the TNG wallet — movement to your own account,
+  // so it's filed under the single "Internal" subtag (see CATEGORY_OPTIONS)
+  // rather than a dedicated "To TNG" subtag.
+  if (refUpper.includes('TNG-EWALLET')) {
+    return { category: 'Transfer', subTag: 'Internal', merchant: 'To TNG (Wallet Reload)' };
+  }
+  if (descUpper === 'INSTANT TRANSFER') {
+    const nameMatch = ref.match(/from\s*ng\s*(.*?)\d{8,}/i);
+    const isBankA = /NG JIA YAO/i.test(ref);
+    // Same logic — money arriving from your own PBank account is Internal,
+    // not an external "From Others" credit.
+    if (isBankA) return { category: 'Transfer', subTag: 'Internal', merchant: 'From PBank' };
+    const name = stripTrailingRef(nameMatch ? nameMatch[1] : ref);
+    return { category: 'Transfer', subTag: 'From Others', merchant: `From Others (${name})` };
+  }
+  if (descUpper.startsWith('FUND TRF')) {
+    const nameMatch = ref.match(/^Fund transfer\d*(.*)$/i);
+    const name = stripTrailingRef(nameMatch ? nameMatch[1] : ref);
+    return { category: 'Transfer', subTag: 'Internal', merchant: `Internal Transfer${name ? ' (' + name + ')' : ''}` };
+  }
+  if (descUpper === 'INTEREST') {
+    return { category: 'Income', subTag: 'Interest', merchant: 'Interest' };
+  }
+  if (descUpper === 'DUITNOW QR') {
+    const nameMatch = ref.match(/^QR Payment(.*?)\d{8,}/i);
+    const name = stripTrailingRef(nameMatch ? nameMatch[1] : ref);
+    return { category: 'Transfer', subTag: 'To Others', merchant: `To Others (${name})` };
+  }
+  if (descUpper === 'POS PURCHASE' || descUpper === 'MYDEBIT PURCHASE') {
+    for (const rule of CATEGORY_RULES) {
+      for (const kw of rule.keywords) {
+        if (refUpper.includes(kw)) {
+          const merchantName = ref.replace(/^DEBITCARD\s*/i, '').split(/\s{2,}/)[0].trim();
+          return { category: rule.category, subTag: rule.subTag || '', merchant: merchantName || ref };
+        }
+      }
+    }
+    const merchantName = ref.replace(/^DEBITCARD\s*/i, '').split(/\s{2,}/)[0].trim();
+    return { category: 'Other', subTag: 'Unsure', merchant: merchantName || ref };
+  }
+  return { category: 'Other', subTag: 'Unsure', merchant: ref || desc };
+}
+
+function parseBankBCsvFile(file) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const rows = [];
+        results.data.forEach(r => {
+          const dateRaw = (r['Date'] || '').trim();
+          const desc = (r['Description'] || '').trim();
+          const reference = (r['Reference'] || '').trim();
+          const deposit = parseFloat((r['Deposit (MYR)'] || '').replace(/,/g, '')) || 0;
+          const withdrawal = parseFloat((r['Withdrawal (MYR)'] || '').replace(/,/g, '')) || 0;
+          const amount = deposit || withdrawal;
+          if (!amount) return;
+          const m = dateRaw.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+          const MONTHS = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' };
+          const date = m ? `${m[3]}-${MONTHS[m[2]] || '01'}-${m[1].padStart(2,'0')}` : dateRaw;
+          const guess = categorizeBankB(desc, reference);
+          rows.push({
+            date, time: '', amount,
+            category: guess.category, subTag: guess.subTag,
+            merchant: guess.merchant, source: 'HL Bank CSV Import', notes: desc, type: desc,
+            account: 'HL Bank',
+            // Same reasoning as PBank — the Deposit/Withdrawal column the
+            // amount actually came from tells you the real direction
+            // outright, no need to guess from category/subtag.
+            flow: withdrawal ? 'out' : 'in'
+          });
+        });
+        resolve(rows);
+      },
+      error: reject
+    });
+  });
+}
+
+// ---- PDF parsing ----
+// TNG's exported statement is a table with FIXED columns (Date, Status,
+// Transaction Type, Reference, Description, Details, Amount (RM), Wallet
+// Balance (RM)). Long cells (Reference, Details) wrap onto extra lines
+// *within* a row, which breaks any parser that reconstructs plain text
+// lines by grouping items purely by y-position (a wrapped cell's extra
+// lines land in-between what should be two separate transaction rows).
+// So instead of reconstructing "lines" at all, this works directly off
+// pdf.js's positioned text items: find every Date-column item to mark
+// row boundaries, then for every item between one row boundary and the
+// next, bucket it into a column by its x position and join the pieces
+// column-by-column.
+const PDF_COLUMNS = [
+  ['date', 0, 75],
+  ['status', 75, 135],
+  ['type', 135, 225],
+  ['reference', 225, 290],
+  ['description', 290, 455],
+  ['details', 455, 650],
+  ['amount', 650, 745],
+  ['balance', 745, 100000],
+];
+const DATE_TOKEN_RE = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+// Matches a time-of-day token like "14:23", "2:23:11", or "2:23 PM" —
+// used to pick up the transaction time if the statement prints one
+// anywhere in the row (commonly right next to the date).
+const TIME_TOKEN_RE = /\b(\d{1,2}:\d{2}(?::\d{2})?\s?(?:AM|PM|am|pm)?)\b/;
+
+// Normalizes a raw time token ("2:23 PM", "14:23:11", "9:05") to 24-hour
+// "HH:MM" for storage/sorting; returns '' if it doesn't look like a time.
+function normalizeTime(raw) {
+  if (!raw) return '';
+  const m = raw.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s?(AM|PM|am|pm)?$/);
+  if (!m) return '';
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const ampm = m[3] ? m[3].toUpperCase() : null;
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  if (h > 23) return '';
+  return String(h).padStart(2, '0') + ':' + min;
+}
+const TXN_TYPES = ['DuitNow QR TNGD', 'PayDirect Payment', 'Transfer to Wallet', 'Receive from Wallet', 'RFID Payment', 'DuitNow QR', 'Reload', 'Payment', 'Cashback'];
+const FOOTER_PATTERNS = [
+  /\*?This is a system generated.*$/i,
+  /email\.\s*For further enquiry.*$/i,
+  /\+?603[\d\s]*$/,
+  /\d{1,2}[:.]\d{2}\s?(am|pm) to \d{1,2}[:.]\d{2}\s?(am|pm).*$/i,
+  /\(including public holidays\)\.?$/i,
+  /Thank you\.?$/i,
+];
+
+function columnForX(x) {
+  for (const [name, lo, hi] of PDF_COLUMNS) { if (x >= lo && x < hi) return name; }
+  return 'balance';
+}
+
+function cleanMerchant(m) {
+  FOOTER_PATTERNS.forEach(pat => { m = m.replace(pat, '').trim(); });
+  m = m.replace(/\d{8,}.*$/, '').trim();
+  return m;
+}
+
+// Parses one pdf.js page's text items (content.items, from getTextContent())
+// into transaction records using the row/column reconstruction above.
+function parsePdfPageItems(items) {
+  const usable = items.filter(it => it.str && it.str.trim().length && it.transform);
+  if (!usable.length) return [];
+  // This statement's PDF page is rotated, so pdf.js's raw (unrotated)
+  // per-item transform reports the axes swapped relative to how the page is
+  // actually displayed: transform[5] is the horizontal/column position and
+  // transform[4] is the vertical "distance down the page" (already
+  // increasing downward, no flip needed) -- the reverse of the usual
+  // bottom-left-origin convention. Verified against the real exported PDF's
+  // actual pdf.js item coordinates.
+  const withPos = usable.map(it => ({ x: it.transform[5], top: it.transform[4], str: it.str.trim() }));
+
+  const dateRows = withPos.filter(it => it.x < 75 && DATE_TOKEN_RE.test(it.str));
+  dateRows.sort((a, b) => a.top - b.top);
+  if (!dateRows.length) return [];
+
+  const records = [];
+  for (let i = 0; i < dateRows.length; i++) {
+    const rowTop = dateRows[i].top - 0.5;
+    const rowBottom = i + 1 < dateRows.length ? dateRows[i + 1].top - 0.5 : Infinity;
+    const rowItems = withPos.filter(it => it.top >= rowTop && it.top < rowBottom);
+    rowItems.sort((a, b) => a.top - b.top || a.x - b.x);
+
+    const cols = {};
+    rowItems.forEach(it => { (cols[columnForX(it.x)] = cols[columnForX(it.x)] || []).push(it.str); });
+
+    const dateRaw = (cols.date || [])[0];
+    const typeStr = (cols.type || []).join(' ');
+    let ttype = null;
+    for (const t of TXN_TYPES) { if (typeStr.startsWith(t)) { ttype = t; break; } }
+    if (!dateRaw || !ttype) continue;
+
+    const amtStr = (cols.amount || []).join(' ');
+    const amtMatch = amtStr.match(/RM\s?([\d,]+\.\d{2})/);
+    if (!amtMatch) continue;
+    const amount = parseFloat(amtMatch[1].replace(/,/g, ''));
+
+    let merchant = cleanMerchant((cols.description || []).join(' '));
+    if (!merchant) merchant = ttype;
+
+    const dm = dateRaw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const date = dm ? `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}` : dateRaw;
+
+    // Time isn't always in a fixed column — search every item in this row
+    // (except the date token itself) for something that looks like a time.
+    let time = '';
+    for (const it of rowItems) {
+      if (it.str === dateRaw) continue;
+      const tm = it.str.match(TIME_TOKEN_RE);
+      if (tm) { time = normalizeTime(tm[1]); if (time) break; }
+    }
+
+    records.push({ date, time, amount, merchant, type: ttype });
+  }
+  return records;
+}
+
+async function extractPdfRecords(file) {
+  if (!window.pdfjsLib) throw new Error('PDF reader failed to load — check your connection and try again.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: buf });
+  loadingTask.onPassword = (callback, reason) => {
+    const msg = reason === 2 ? 'Incorrect password — try again:' : 'This PDF is password-protected. Enter the password:';
+    const pwd = window.prompt(msg);
+    callback(pwd || '');
+  };
+  const pdf = await loadingTask.promise;
+  let records = [];
+  let rawDump = null;
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    if (p === 1 && !rawDump) {
+      rawDump = content.items.slice(0, 60).map((it, i) => {
+        const x = Math.round(it.transform[4]);
+        const y = Math.round(it.transform[5] * 10) / 10;
+        return `${i}: x=${x} y=${y} "${it.str}"`;
+      }).join('\n');
+    }
+    records = records.concat(parsePdfPageItems(content.items));
+  }
+  records.__rawDump = rawDump;
+  return records;
+}
+
+async function parsePdfFile(file) {
+  const records = await extractPdfRecords(file);
+
+  if (!records.length) {
+    const rawDump = records.__rawDump || '(none)';
+    const err = new Error(`Couldn't recognize any transactions in that PDF.\n\nRaw items (page 1):\n${rawDump}`);
+    err.diagnostic = true;
+    throw err;
+  }
+
+  const rows = [];
+  records.forEach(r => {
+    const guess = categorize(r.merchant, r.type);
+    if (!guess) return; // Reload / Transfer / Receive / Cashback — not spending
+    rows.push({
+      date: r.date, time: r.time || '', amount: r.amount,
+      category: guess.category, subTag: guess.subTag,
+      merchant: r.merchant, source: 'TNG PDF Import', notes: r.type, type: r.type,
+      account: 'TNG'
+    });
+  });
+  return rows;
+}
+
+// ---- Screenshot parsing (client-side OCR via Tesseract.js) ----
+// The TNG "Activity"/"History" screen renders each transaction as 2-3
+// stacked lines: a date+time line ("30 Jul, 18:45"), a merchant+amount line
+// ("MC DER BOB BURGER   -RM11.00"), and an optional payment-method(+points)
+// line ("DuitNow QR TNGD   +11 points"). Verified against real screenshots
+// with Tesseract in --psm 6 ("assume a single uniform block of text") — the
+// default auto page-segmentation mode was unreliable and dropped amounts
+// entirely on some rows (especially Toll rows), --psm 6 recovered all of
+// them. Tesseract.js groups same-line words into one text string per line
+// (in left-to-right reading order) when running in this mode, which is
+// exactly the row structure this parser expects.
+const SCREENSHOT_DATE_RE = /^(\d{1,2})\s+([A-Za-z]{3}),?\s+(\d{1,2}:\d{2})$/;
+const SCREENSHOT_MONTHS = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12' };
+// Known toll plaza -> highway prefix, matching the "HIGHWAY - PLAZA" merchant
+// text convention already used by past TNG PDF imports (e.g. "KESAS - AWAN
+// BESAR WEST"). Unrecognized plazas are kept as just the plaza name — the
+// CATEGORY_RULES keyword match (e.g. "AWAN BESAR") still works either way,
+// this is purely cosmetic/consistency.
+const TOLL_HIGHWAY_PREFIX = { 'AWAN BESAR': 'KESAS', 'PLAZA LOKE YEW': 'BESRAYA' };
+const SCREENSHOT_TYPE_RE = /^[A-Za-z][A-Za-z0-9 ()\/.,:-]{2,}$/;
+
+// The line right after a merchant+amount line is usually the payment method
+// ("PayDirect Payment", "DuitNow QR TNGD"), sometimes with a "+11 points" /
+// "0 points" badge merged onto the same OCR line — strip that off. Returns
+// '' if the line doesn't look like a real payment-method string at all
+// (e.g. stray OCR noise from icons/nav-bar text below the last transaction
+// in the screenshot).
+function extractScreenshotType(candidate) {
+  if (!candidate) return '';
+  if (/^Delayed on/i.test(candidate)) return '';
+  const cleaned = candidate.replace(/[+-]?\d+\s*points\s*$/i, '').trim();
+  if (!cleaned || !SCREENSHOT_TYPE_RE.test(cleaned)) return '';
+  return cleaned;
+}
+
+// lines: OCR'd text, one string per visual line, top-to-bottom order.
+function parseScreenshotLines(lines) {
+  const dateIdxs = [];
+  lines.forEach((l, i) => { if (SCREENSHOT_DATE_RE.test(l)) dateIdxs.push(i); });
+
+  // The year isn't shown on each row ("30 Jul", not "30 Jul 2026") — assumes
+  // the screenshot is recent (this year). Fix the date by hand afterward if
+  // you're importing an old screenshot.
+  const nowYear = new Date().getFullYear();
+  const records = [];
+
+  for (let k = 0; k < dateIdxs.length; k++) {
+    const idx = dateIdxs[k];
+    const m = lines[idx].match(SCREENSHOT_DATE_RE);
+    const day = m[1].padStart(2, '0');
+    const mon = SCREENSHOT_MONTHS[m[2].toLowerCase()] || '01';
+    const time = m[3];
+    const date = `${nowYear}-${mon}-${day}`;
+
+    const merchantLine = lines[idx + 1] || '';
+    const amtMatch = merchantLine.match(/([+-]?RM\s?[\d,]+\.\d{2})\s*$/i);
+    if (!amtMatch) continue; // couldn't find an amount on this row — skip it
+
+    const amount = parseFloat(amtMatch[1].replace(/[^0-9.]/g, ''));
+    let merchant = merchantLine.slice(0, amtMatch.index).trim();
+
+    let type = '';
+    const nextIdx = idx + 2;
+    if (nextIdx < lines.length && !SCREENSHOT_DATE_RE.test(lines[nextIdx])) {
+      type = extractScreenshotType(lines[nextIdx]);
+    }
+
+    if (/^Reload$/i.test(merchant)) {
+      type = 'Reload';
+      merchant = 'Credit / Debit Card';
+    } else {
+      merchant = merchant.replace(/^Exit Toll:\s*/i, '').trim();
+      const merchantUpper = merchant.toUpperCase();
+      for (const plaza in TOLL_HIGHWAY_PREFIX) {
+        if (merchantUpper.includes(plaza)) { merchant = TOLL_HIGHWAY_PREFIX[plaza] + ' - ' + merchant; break; }
+      }
+    }
+
+    records.push({ date, time, amount, merchant, type });
+  }
+  return records;
+}
+
+async function extractScreenshotRecords(file) {
+  if (!window.Tesseract) throw new Error('OCR library failed to load — check your connection and try again.');
+  const worker = await Tesseract.createWorker('eng');
+  let lines;
+  try {
+    await worker.setParameters({ tessedit_pageseg_mode: '6' });
+    const { data } = await worker.recognize(file);
+    lines = (data.lines || []).map(l => (l.text || '').trim()).filter(Boolean);
+  } finally {
+    await worker.terminate();
+  }
+  const records = parseScreenshotLines(lines);
+  records.__rawLines = lines;
+  return records;
+}
+
+async function parseScreenshotFile(file) {
+  const records = await extractScreenshotRecords(file);
+  if (!records.length) {
+    const rawLines = (records.__rawLines || []).join('\n') || '(none)';
+    const err = new Error(`Couldn't recognize any transactions in that screenshot.\n\nRecognized text:\n${rawLines}`);
+    err.diagnostic = true;
+    throw err;
+  }
+  const rows = [];
+  records.forEach(r => {
+    const guess = categorize(r.merchant, r.type);
+    if (!guess) return;
+    rows.push({
+      date: r.date, time: r.time || '', amount: r.amount,
+      category: guess.category, subTag: guess.subTag,
+      merchant: r.merchant, source: 'TNG Screenshot Import', notes: r.type, type: r.type,
+      account: 'TNG'
+    });
+  });
+  return rows;
+}
+
+// ---- Preview / review step ----
+function renderImportPreview() {
+  importPreviewList.innerHTML = pendingImportRows.map((r, i) => {
+    const { sign, cls: amtClass } = txnSignInfo(r);
+    return `
+    <div class="txn preview-row">
+      <div class="preview-top">
+        <div class="dot ${ALL_CATEGORIES.includes(r.category) ? r.category : 'Custom'}"></div>
+        <div class="info">
+          <div class="merchant">${txnTitle(r)}</div>
+          <div class="meta">${r.date} · ${r.time || 'No time record'}</div>
+        </div>
+        <div class="${amtClass}">${sign}RM${Number(r.amount).toFixed(2)}</div>
+        <span class="preview-remove" data-idx="${i}">✕</span>
+      </div>
+      <select data-cat-idx="${i}">${categoryOptionsHtml(r.category, r.subTag, r.account)}</select>
+      <label class="preview-remember">
+        <input type="checkbox" data-remember-idx="${i}"> Always categorize "${r.merchant}" this way
+      </label>
+    </div>
+  `;
+  }).join('');
+
+  importPreviewList.querySelectorAll('[data-idx]').forEach(el => {
+    el.onclick = () => {
+      pendingImportRows.splice(Number(el.dataset.idx), 1);
+      renderImportPreview();
+      importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
+    };
+  });
+  importPreviewList.querySelectorAll('[data-cat-idx]').forEach(el => {
+    el.onchange = () => {
+      const idx = Number(el.dataset.catIdx);
+      const [category, subTag] = el.value.split('|');
+      pendingImportRows[idx].category = category;
+      pendingImportRows[idx].subTag = subTag;
+    };
+  });
+  importPreviewList.querySelectorAll('[data-remember-idx]').forEach(el => {
+    el.onchange = () => {
+      const idx = Number(el.dataset.rememberIdx);
+      pendingImportRows[idx].rememberMerchant = el.checked;
+    };
+  });
+}
+
+function showImportPreview(rows) {
+  pendingImportRows = rows;
+  importStage = 'preview';
+  importPickField.style.display = 'none';
+  importPreviewList.style.display = 'flex';
+  importBackBtn.style.display = 'block';
+  renderImportPreview();
+  importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
+  importStatusEl.textContent = pendingImportRows.length
+    ? `Review the ${pendingImportRows.length} transactions below — fix the category if needed, tap ✕ to drop any that look wrong, then Import.`
+    : '';
+}
+
+importSubmitBtn.onclick = async () => {
+  if (importStage === 'pick') {
+    const file = document.getElementById('fFile').files[0];
+    if (!file) { importStatusEl.textContent = 'Choose a file first.'; return; }
+
+    const importAccount = document.getElementById('importAccount').value;
+
+    importStatusEl.className = 'status-msg';
+    importStatusEl.textContent = importAccount === 'TNG-Screenshot'
+      ? 'Reading screenshot… (OCR can take 10-30s, especially the first time)'
+      : 'Reading file…';
+    importSubmitBtn.disabled = true;
+    let rows = [];
+    try {
+      if (importAccount === 'PBank') {
+        rows = await parseBankACsvFile(file);
+      } else if (importAccount === 'HL Bank') {
+        rows = await parseBankBCsvFile(file);
+      } else if (importAccount === 'TNG-Screenshot') {
+        rows = await parseScreenshotFile(file);
+      } else if (file.name.toLowerCase().endsWith('.pdf')) {
+        rows = await parsePdfFile(file);
+      } else {
+        rows = await parseCsvFile(file);
+      }
+    } catch (err) {
+      if (err && err.diagnostic) {
+        importStatusEl.className = 'status-msg debug';
+        importStatusEl.textContent = err.message;
+      } else {
+        importStatusEl.className = 'status-msg';
+        importStatusEl.textContent = 'Could not read file: ' + (err && err.message ? err.message : err);
+      }
+      importSubmitBtn.disabled = false;
+      return;
+    }
+    importSubmitBtn.disabled = false;
+
+    if (!rows.length) { importStatusEl.textContent = 'No spending transactions found in that file.'; return; }
+    showImportPreview(rows);
+    return;
+  }
+
+  // importStage === 'preview' -> actually commit
+  if (!pendingImportRows.length) { importStatusEl.textContent = 'Nothing left to import.'; return; }
+  importStatusEl.textContent = `Importing ${pendingImportRows.length} transactions…`;
+  importSubmitBtn.disabled = true;
+  try {
+    await callApi('import', { rows: pendingImportRows });
+    importStatusEl.textContent = `Imported ${pendingImportRows.length} transactions.`;
+    setTimeout(() => { importBackdrop.classList.remove('open'); loadData(); }, 800);
+  } catch (err) {
+    importStatusEl.textContent = 'Import failed — try again.';
+    importSubmitBtn.disabled = false;
+  }
+};
+
+loadData();
+</script>
+</body>
+</html>
