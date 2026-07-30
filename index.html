@@ -65,6 +65,10 @@
   .cal-day-panel .cal-day-panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
   .cal-day-panel .cal-day-panel-head span:first-child { font-size: 15px; font-weight: 500; }
   .cal-day-panel .cal-day-panel-head span:last-child { font-size: 15px; font-weight: 500; color: var(--accent); }
+  .cal-account-header {
+    display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);
+    margin: 12px 2px 6px; text-transform: uppercase; letter-spacing: 0.02em;
+  }
 
   .trend-group-toggle { display: flex; gap: 8px; margin: 4px 0 14px; }
   .trend-group-btn {
@@ -885,7 +889,27 @@ function renderCalDayPanel() {
   const label = dateObj.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
   let html = `<div class="cal-day-panel"><div class="cal-day-panel-head"><span>${label}</span><span>${formatSignedRM(total)}</span></div>`;
-  html += dayTxns.length ? dayTxns.map(t => renderTxnRow(t)).join('') : '<div class="empty">No transactions.</div>';
+  if (!dayTxns.length) {
+    html += '<div class="empty">No transactions.</div>';
+  } else {
+    // Grouped by account (TNG/HL Bank/PBank/Cash order, any other account
+    // after) so a day touching multiple accounts reads as separate blocks
+    // instead of one interleaved list.
+    const byAccount = {};
+    dayTxns.forEach(t => {
+      const acct = t.account || 'Other';
+      (byAccount[acct] = byAccount[acct] || []).push(t);
+    });
+    const order = ACCOUNTS.filter(a => byAccount[a]).concat(Object.keys(byAccount).filter(a => !ACCOUNTS.includes(a)));
+    order.forEach(acct => {
+      const acctTxns = byAccount[acct];
+      const acctTotal = acctTxns
+        .filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
+        .reduce((s, t) => s + spendAmount(t), 0);
+      html += `<div class="cal-account-header"><span>${acct}</span><span>${formatSignedRM(acctTotal)}</span></div>`;
+      html += acctTxns.map(t => renderTxnRow(t)).join('');
+    });
+  }
   html += '</div>';
   panelEl.innerHTML = html;
   attachCatSelectHandlers();
