@@ -1309,18 +1309,18 @@ document.querySelectorAll('.trend-group-btn').forEach(btn => {
 function formatRangeBtnLabel(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+// Small inline popup calendar used for the Trends "Custom range" from/to
+// pickers — a proper tap-a-day grid instead of the native <input type=date>,
+// which on mobile Safari shows an awkward spinner rather than a calendar.
+let miniCalTarget = null; // 'from' | 'to' | null (closed)
+let miniCalMonth = new Date();
+
 function renderRangeButtons() {
   document.getElementById('trendFromBtn').textContent = formatRangeBtnLabel(trendRangeFrom);
   document.getElementById('trendToBtn').textContent = formatRangeBtnLabel(trendRangeTo);
   document.querySelectorAll('.range-date-btn').forEach(b => b.classList.toggle('active', b.dataset.target === miniCalTarget));
 }
 renderRangeButtons();
-
-// Small inline popup calendar used for the Trends "Custom range" from/to
-// pickers — a proper tap-a-day grid instead of the native <input type=date>,
-// which on mobile Safari shows an awkward spinner rather than a calendar.
-let miniCalTarget = null; // 'from' | 'to' | null (closed)
-let miniCalMonth = new Date();
 
 function openMiniCal(target) {
   miniCalTarget = target;
