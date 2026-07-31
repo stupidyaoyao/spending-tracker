@@ -123,6 +123,11 @@
   .chart-stats .stat-value.income { color: #30d158; }
   .chart-stats .stat-value.positive { color: #30d158; }
   .chart-stats .stat-value.negative { color: #ff453a; }
+  .chart-stats .stat { cursor: pointer; }
+  .stat-breakdown { display: none; margin: 10px 0 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .stat-breakdown.show { display: block; }
+  .stat-breakdown-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 3px 0; }
+  .stat-breakdown-row.total { color: #f5f5f7; font-weight: 600; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; padding-top: 6px; }
   .chart-loading {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
     background: var(--card); border-radius: 10px;
@@ -290,10 +295,11 @@
         <span id="chartTotal"></span>
       </div>
       <div class="chart-stats" id="chartStats" style="display:none;">
-        <div class="stat"><span class="stat-label">Expense</span><span class="stat-value expense" id="statExpense"></span></div>
-        <div class="stat"><span class="stat-label">Income</span><span class="stat-value income" id="statIncome"></span></div>
-        <div class="stat"><span class="stat-label">Balance</span><span class="stat-value" id="statBalance"></span></div>
+        <div class="stat" data-stat="expense"><span class="stat-label">Expense</span><span class="stat-value expense" id="statExpense"></span></div>
+        <div class="stat" data-stat="income"><span class="stat-label">Income</span><span class="stat-value income" id="statIncome"></span></div>
+        <div class="stat" data-stat="balance"><span class="stat-label">Balance</span><span class="stat-value" id="statBalance"></span></div>
       </div>
+      <div class="stat-breakdown" id="statBreakdown"></div>
       <div class="chart-wrap">
         <canvas id="chart"></canvas>
         <div class="chart-loading show" id="chartLoading"><div class="spinner"></div></div>
@@ -1189,7 +1195,10 @@ function startOfWeek(d) {
 // Which time window the pies (big + mini) are scoped to — null means all
 // time (no scoping). Set by tapping one of the Today/This week/This month
 // cards below; tapping the already-active one clears it back to all time.
-let activeTimeFilter = null; // null | 'today' | 'week' | 'month'
+let activeTimeFilter = 'month'; // null | 'today' | 'week' | 'month' — defaults to
+// this month so "Overall Expense" answers "how much did I spend this
+// month" out of the box, instead of an all-time total that looked similar
+// to (but didn't match) the separate "This month" card above it.
 
 function isInTimeFilter(t) {
   if (!activeTimeFilter) return true;
@@ -1496,12 +1505,25 @@ function renderCharts() {
 // i.e. all-categories — view) and toggles it against the plain single RM
 // total renderChartOn already wrote for the "By type" (one category
 // selected) view.
+// Which of Expense/Income/Balance is currently expanded to show its
+// per-account breakdown (see renderStatBreakdown below) — null means none
+// are open. Persists across re-renders so it stays open while you tap
+// Today/This week/This month.
+let openStatBreakdown = null;
+
+function formatStatValue(stat, v) {
+  if (stat === 'balance') return (v < 0 ? '-RM' : '+RM') + Math.abs(v).toFixed(2);
+  return 'RM' + v.toFixed(2);
+}
+
 function updateBigStats(base) {
   const statsEl = document.getElementById('chartStats');
   const totalEl = document.getElementById('chartTotal');
+  const breakdownEl = document.getElementById('statBreakdown');
   if (activeFilter !== 'All') {
     statsEl.style.display = 'none';
     totalEl.style.display = '';
+    breakdownEl.classList.remove('show');
     return;
   }
   totalEl.style.display = 'none';
@@ -1512,6 +1534,33 @@ function updateBigStats(base) {
   const balEl = document.getElementById('statBalance');
   balEl.textContent = (balance < 0 ? '-RM' : '+RM') + Math.abs(balance).toFixed(2);
   balEl.className = 'stat-value ' + (balance < 0 ? 'negative' : 'positive');
+
+  document.querySelectorAll('#chartStats .stat').forEach(el => {
+    el.onclick = () => {
+      const stat = el.dataset.stat;
+      openStatBreakdown = openStatBreakdown === stat ? null : stat;
+      renderStatBreakdown(base);
+    };
+  });
+  renderStatBreakdown(base);
+}
+
+// Tapping Expense/Income/Balance reveals the per-account math behind that
+// combined number — e.g. Expense RM4399.75 = TNG RM1368.42 + HL Bank
+// RM1900.23 + PBank RM1038.70 + Cash RM92.40 — so the total is never a
+// mystery. Uses the same base pool and time/category/search scoping as the
+// number above it (statsFor), just split per account instead of combined.
+function renderStatBreakdown(base) {
+  const el = document.getElementById('statBreakdown');
+  if (!openStatBreakdown) { el.classList.remove('show'); el.innerHTML = ''; return; }
+  const stat = openStatBreakdown;
+  const rows = ACCOUNTS.map(a => ({ account: a, value: statsFor(base.filter(t => t.account === a))[stat] }))
+    .filter(r => r.value !== 0);
+  const total = rows.reduce((s, r) => s + r.value, 0);
+  el.innerHTML = rows.map(r =>
+    `<div class="stat-breakdown-row"><span>${r.account}</span><span>${formatStatValue(stat, r.value)}</span></div>`
+  ).join('') + `<div class="stat-breakdown-row total"><span>Total</span><span>${formatStatValue(stat, total)}</span></div>`;
+  el.classList.add('show');
 }
 
 const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Housing', 'Other', 'Transfer', 'Income'];
