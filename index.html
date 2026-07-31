@@ -94,6 +94,7 @@
   .total-card { flex: 1; background: var(--card); border-radius: 14px; padding: 12px; }
   .total-card .label { font-size: 12px; color: var(--muted); }
   .total-card .value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  .total-card .sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
   .total-card { cursor: pointer; border: 1px solid transparent; }
   .total-card.active { border-color: var(--accent); background: #241c0f; }
   .filters { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; }
@@ -151,6 +152,17 @@
   .toolbar select {
     flex: 1; padding: 9px 10px; border-radius: 10px; border: none; background: var(--card);
     color: var(--text); font-size: 13px;
+  }
+  .toolbar-secondary { margin: -2px 0 10px; }
+  .toolbar-btn {
+    background: var(--card); border: 1px solid rgba(255,255,255,0.08); color: var(--text);
+    border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+  }
+  .trend-range-row { display: none; align-items: center; gap: 8px; margin: -6px 0 14px; font-size: 12px; color: var(--muted); }
+  .trend-range-row.show { display: flex; }
+  .trend-range-row input[type="date"] {
+    background: var(--card); border: 1px solid rgba(255,255,255,0.08); color: var(--text);
+    border-radius: 8px; padding: 6px 8px; font-size: 12px;
   }
 
   .list { display: flex; flex-direction: column; gap: 8px; }
@@ -332,6 +344,10 @@
       </select>
     </div>
 
+    <div class="toolbar-secondary" id="toolbarSecondary" style="display:none;">
+      <button class="toolbar-btn" id="expandAllBtn">Expand all</button>
+    </div>
+
     <div class="list" id="list"><div class="empty">Loading…</div></div>
   </div>
 
@@ -354,6 +370,11 @@
     <div class="trend-group-toggle" id="trendGroupToggle">
       <button class="trend-group-btn active" data-group="month">By month</button>
       <button class="trend-group-btn" data-group="week">By week</button>
+      <button class="trend-group-btn" data-group="day">By day</button>
+      <button class="trend-group-btn" data-group="custom">Custom range</button>
+    </div>
+    <div class="trend-range-row" id="trendRangeRow">
+      <input type="date" id="trendRangeFrom"> <span>to</span> <input type="date" id="trendRangeTo">
     </div>
     <div class="trend-card">
       <div class="trend-card-label" id="trendLabel"></div>
@@ -698,7 +719,15 @@ const ACCOUNTS = ['TNG', 'HL Bank', 'PBank', 'Cash'];
 // mini-pie grid so it doesn't clutter the main view — its own pie only
 // shows up once you click the Cash chip specifically (see accountsToShow in
 // renderCharts()).
-const MINI_PIE_ACCOUNTS = ['TNG', 'HL Bank', 'PBank'];
+// View-only grouping for the mini pie row: HL Bank + PBank collapse into a
+// single "Banks" pie since day-to-day they're both just "the bank" — every
+// backend field, the Account filter chips, and true-balance tracking still
+// treat them as two fully separate accounts (tapping the HL Bank or PBank
+// chip individually still zooms into just that one, unmerged).
+const MINI_PIE_GROUPS = [
+  { label: 'TNG', accounts: ['TNG'] },
+  { label: 'Banks', accounts: ['HL Bank', 'PBank'] }
+];
 let activeAccountFilter = 'All';
 let activeFilter = 'All';
 let activeSubFilter = 'All';
@@ -736,7 +765,13 @@ let activityLog = [];
 // two categories side by side.
 let trendCategories = ['All'];
 let trendSubTag = 'All';
-let trendGroup = 'month'; // 'month' or 'week' — which the comparison bars are bucketed by
+let trendGroup = 'month'; // 'month' | 'week' | 'day' | 'custom' — which the comparison bars are bucketed by
+// Only used when trendGroup === 'custom' — the user-picked date range,
+// defaulted to the last 30 days so the inputs start with something sensible.
+const _trendToday = new Date();
+const _trendMonthAgo = new Date(_trendToday); _trendMonthAgo.setDate(_trendToday.getDate() - 29);
+let trendRangeFrom = _trendMonthAgo.toISOString().slice(0, 10);
+let trendRangeTo = _trendToday.toISOString().slice(0, 10);
 // Keyed by canvas id — the big combined pie (id="chart") plus up to 3 mini
 // per-account pies (id="miniChart-TNG" etc). A plain map instead of one
 // singleton since multiple pies are now on screen at once.
@@ -952,11 +987,18 @@ document.getElementById('calNext').onclick = () => {
 // for week grouping — the bucket a given transaction date falls into.
 function trendBucketKey(dateStr, group) {
   if (group === 'month') return dateStr.slice(0, 7);
+  if (group === 'day' || group === 'custom') return dateStr.slice(0, 10);
   const d = new Date(dateStr + 'T00:00:00');
   const day = d.getDay();
   const diff = (day === 0 ? -6 : 1) - day; // shift back to that week's Monday
   d.setDate(d.getDate() + diff);
   return d.toISOString().slice(0, 10);
+}
+// "31 Jul - 14 Aug" — the human label for a custom date range.
+function formatRangeLabel(from, to) {
+  if (!from || !to) return '';
+  const f = (s) => new Date(s + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return `${f(from)} - ${f(to)}`;
 }
 function trendBucketLabel(key, group) {
   if (group === 'month') {
@@ -1058,38 +1100,50 @@ function renderTrends() {
   const labelEl = document.getElementById('trendLabel');
   const valueEl = document.getElementById('trendValue');
   const canvas = document.getElementById('trendsChart');
-  const windowSize = trendGroup === 'month' ? 6 : 8;
+  const isCustom = trendGroup === 'custom';
+  document.getElementById('trendRangeRow').classList.toggle('show', isCustom);
+  // Day buckets can span weeks/months of data, so give it a wider window
+  // than week; a custom range shows every day inside it (no window cap).
+  const windowSize = trendGroup === 'month' ? 6 : (trendGroup === 'day' ? 14 : 8);
+  const inRange = (t) => !isCustom || (t.date >= trendRangeFrom && t.date <= trendRangeTo);
 
   if (trendCategories.length <= 1) {
     // Single series — same "current period + %change vs prior" readout as
-    // before, optionally drilled into one subtag.
+    // before, optionally drilled into one subtag. In custom-range mode the
+    // "current" figure becomes the total for the whole range instead of just
+    // the latest bucket, and there's no meaningful "prior period" to diff
+    // against, so the %-change readout is skipped.
     const category = trendCategories[0];
-    const buckets = trendBucketsFor(trendFilteredTxnsFor(category, trendSubTag));
+    const buckets = trendBucketsFor(trendFilteredTxnsFor(category, trendSubTag).filter(inRange));
     const sortedKeys = Object.keys(buckets).sort();
-    const keys = sortedKeys.slice(-windowSize);
+    const keys = isCustom ? sortedKeys : sortedKeys.slice(-windowSize);
     const labels = keys.map(k => trendBucketLabel(k, trendGroup));
     const values = keys.map(k => Math.round((buckets[k] || 0) * 100) / 100);
 
-    const label = category === 'All'
+    const baseLabel = category === 'All'
       ? 'All spending'
       : (trendSubTag !== 'All' ? category + ' · ' + trendSubTag : category);
-    labelEl.textContent = label;
+    labelEl.textContent = isCustom ? baseLabel + ' · ' + formatRangeLabel(trendRangeFrom, trendRangeTo) : baseLabel;
 
-    const current = values.length ? values[values.length - 1] : 0;
-    const prev = values.length > 1 ? values[values.length - 2] : undefined;
-    // Below this, the prior bucket is basically a sliver of real data (e.g.
-    // the very first month/week your tracker has, which only covers a couple
-    // of days) — comparing against it produces a technically-correct but
-    // useless number like "18929%". Skip the delta entirely rather than show
-    // that.
-    const MIN_MEANINGFUL_PREV = 20;
-    let deltaHtml = '';
-    if (prev !== undefined && prev >= MIN_MEANINGFUL_PREV) {
-      const pct = Math.round(((current - prev) / prev) * 100);
-      const cls = pct > 0 ? 'up' : (pct < 0 ? 'down' : '');
-      const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '–');
-      const periodWord = trendGroup === 'month' ? 'last month' : 'last week';
-      deltaHtml = `<span class="trend-delta ${cls}">${arrow} ${Math.abs(pct)}% vs ${periodWord}</span>`;
+    let current, deltaHtml = '';
+    if (isCustom) {
+      current = values.reduce((s, v) => s + v, 0);
+    } else {
+      current = values.length ? values[values.length - 1] : 0;
+      const prev = values.length > 1 ? values[values.length - 2] : undefined;
+      // Below this, the prior bucket is basically a sliver of real data (e.g.
+      // the very first month/week your tracker has, which only covers a
+      // couple of days) — comparing against it produces a technically-correct
+      // but useless number like "18929%". Skip the delta entirely rather
+      // than show that.
+      const MIN_MEANINGFUL_PREV = 20;
+      if (prev !== undefined && prev >= MIN_MEANINGFUL_PREV) {
+        const pct = Math.round(((current - prev) / prev) * 100);
+        const cls = pct > 0 ? 'up' : (pct < 0 ? 'down' : '');
+        const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '–');
+        const periodWord = trendGroup === 'month' ? 'last month' : (trendGroup === 'week' ? 'last week' : 'yesterday');
+        deltaHtml = `<span class="trend-delta ${cls}">${arrow} ${Math.abs(pct)}% vs ${periodWord}</span>`;
+      }
     }
     valueEl.innerHTML = `${formatSignedRM(current)}${deltaHtml}`;
 
@@ -1097,9 +1151,9 @@ function renderTrends() {
       labels,
       datasets: [{
         data: values,
-        backgroundColor: values.map((v, i) => i === values.length - 1 ? '#f5a623' : '#3a3a3d'),
+        backgroundColor: values.map((v, i) => (!isCustom && i === values.length - 1) ? '#f5a623' : '#3a3a3d'),
         borderRadius: 6,
-        maxBarThickness: 40
+        maxBarThickness: isCustom ? 16 : 40
       }]
     };
     renderTrendsChart(canvas, chartData, false);
@@ -1109,13 +1163,14 @@ function renderTrends() {
     // side by side. The single RM+%change readout doesn't make sense across
     // several categories at once, so it's left blank; the legend + tooltips
     // carry the per-category numbers instead.
-    const perCategory = trendCategories.map(cat => ({ cat, buckets: trendBucketsFor(trendFilteredTxnsFor(cat, 'All')) }));
+    const perCategory = trendCategories.map(cat => ({ cat, buckets: trendBucketsFor(trendFilteredTxnsFor(cat, 'All').filter(inRange)) }));
     const allKeys = new Set();
     perCategory.forEach(pc => Object.keys(pc.buckets).forEach(k => allKeys.add(k)));
-    const keys = Array.from(allKeys).sort().slice(-windowSize);
+    const sortedAll = Array.from(allKeys).sort();
+    const keys = isCustom ? sortedAll : sortedAll.slice(-windowSize);
     const labels = keys.map(k => trendBucketLabel(k, trendGroup));
 
-    labelEl.textContent = trendCategories.join(' vs ');
+    labelEl.textContent = trendCategories.join(' vs ') + (isCustom ? ' · ' + formatRangeLabel(trendRangeFrom, trendRangeTo) : '');
     valueEl.innerHTML = '';
 
     const chartData = {
@@ -1125,7 +1180,7 @@ function renderTrends() {
         data: keys.map(k => Math.round((pc.buckets[k] || 0) * 100) / 100),
         backgroundColor: TREND_CATEGORY_COLORS[pc.cat] || '#8e8e93',
         borderRadius: 6,
-        maxBarThickness: 24
+        maxBarThickness: isCustom ? 12 : 24
       }))
     };
     renderTrendsChart(canvas, chartData, true);
@@ -1173,6 +1228,10 @@ document.querySelectorAll('.trend-group-btn').forEach(btn => {
     renderTrends();
   };
 });
+document.getElementById('trendRangeFrom').value = trendRangeFrom;
+document.getElementById('trendRangeTo').value = trendRangeTo;
+document.getElementById('trendRangeFrom').onchange = (e) => { trendRangeFrom = e.target.value; renderTrends(); };
+document.getElementById('trendRangeTo').onchange = (e) => { trendRangeTo = e.target.value; renderTrends(); };
 
 // History page — a reverse-chronological audit trail of real edits (see
 // ACTIVITY_LOG_SHEET in Code.gs). Only starts from when this feature was
@@ -1224,6 +1283,22 @@ function isInTimeFilter(t) {
   return true;
 }
 
+// "Updated 30 Jul, 14:47" — the date+time of the most recent transaction in
+// the whole dataset (across every account), shown under the Today card so
+// it's obvious how fresh the data is, separate from what today's spend
+// total actually is.
+function lastUpdatedLabel() {
+  if (!allTxns.length) return '';
+  let latest = null;
+  allTxns.forEach(t => {
+    const dt = new Date(t.date + 'T' + (t.time || '00:00'));
+    if (!isNaN(dt.getTime()) && (!latest || dt > latest)) latest = dt;
+  });
+  if (!latest) return '';
+  return 'Updated ' + latest.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) +
+    ', ' + latest.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
 function renderTotals(txns) {
   const now = new Date();
   const weekStart = startOfWeek(now);
@@ -1235,11 +1310,16 @@ function renderTotals(txns) {
   const week = sum(t => new Date(t.date) >= weekStart);
   const month = sum(t => new Date(t.date) >= monthStart);
 
+  const todayDateLabel = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+  const fmtShort = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const weekRangeLabel = `${fmtShort(weekStart)} - ${fmtShort(weekEnd)}`;
+
   const cardActive = (scope) => activeTimeFilter === scope ? ' active' : '';
   document.getElementById('totals').innerHTML = `
-    <div class="total-card${cardActive('today')}" data-scope="today"><div class="label">Today</div><div class="value">RM${today.toFixed(2)}</div></div>
-    <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">This week</div><div class="value">RM${week.toFixed(2)}</div></div>
-    <div class="total-card${cardActive('month')}" data-scope="month"><div class="label">This month</div><div class="value">RM${month.toFixed(2)}</div></div>
+    <div class="total-card${cardActive('today')}" data-scope="today"><div class="label">Today</div><div class="value">${formatSignedRM(today)}</div><div class="sub">${todayDateLabel}</div><div class="sub">${lastUpdatedLabel()}</div></div>
+    <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">This week</div><div class="value">${formatSignedRM(week)}</div><div class="sub">${weekRangeLabel}</div></div>
+    <div class="total-card${cardActive('month')}" data-scope="month"><div class="label">This month</div><div class="value">${formatSignedRM(month)}</div></div>
   `;
   // Tapping a card scopes the pies (big + mini, see renderCharts()) to that
   // period; tapping the same card again clears back to all-time. This is
@@ -1449,35 +1529,42 @@ function renderCharts() {
   }
   container.style.display = '';
 
-  const accountsToShow = activeAccountFilter === 'All' ? MINI_PIE_ACCOUNTS : [activeAccountFilter];
+  // On the overview (Account filter = All), HL Bank + PBank collapse into
+  // one combined "Banks" pie for viewing — day-to-day they're both just
+  // "the bank" — while every backend field/filter still keeps them fully
+  // separate. Tapping the HL Bank or PBank chip individually still zooms
+  // into just that one account, unmerged, same as before.
+  const groupsToShow = activeAccountFilter === 'All'
+    ? MINI_PIE_GROUPS
+    : [{ label: activeAccountFilter, accounts: [activeAccountFilter] }];
   container.classList.toggle('zoomed', activeAccountFilter !== 'All');
 
-  container.innerHTML = accountsToShow.map(a => `
+  container.innerHTML = groupsToShow.map(g => `
     <div class="mini-chart-card">
-      <div class="mini-chart-head"><span>${a}</span><span id="miniTotal-${cssSafe(a)}"></span></div>
+      <div class="mini-chart-head"><span>${g.label}</span><span id="miniTotal-${cssSafe(g.label)}"></span></div>
       <div class="mini-chart-wrap">
-        <canvas id="miniChart-${cssSafe(a)}"></canvas>
+        <canvas id="miniChart-${cssSafe(g.label)}"></canvas>
         <div class="chart-loading"><div class="spinner"></div></div>
       </div>
-      <div class="mini-chart-truebalance" id="miniTrue-${cssSafe(a)}"></div>
-      <div class="mini-chart-updated" id="miniTrueUpdated-${cssSafe(a)}"></div>
-      ${a === 'TNG' ? `<div class="mini-chart-truebalance" id="miniCardTrue-TNG"></div><div class="mini-chart-updated" id="miniCardTrueUpdated-TNG"></div>` : ''}
+      <div class="mini-chart-truebalance" id="miniTrue-${cssSafe(g.label)}"></div>
+      <div class="mini-chart-updated" id="miniTrueUpdated-${cssSafe(g.label)}"></div>
+      ${g.accounts.includes('TNG') ? `<div class="mini-chart-truebalance" id="miniCardTrue-TNG"></div><div class="mini-chart-updated" id="miniCardTrueUpdated-TNG"></div>` : ''}
     </div>
   `).join('');
 
-  accountsToShow.forEach(a => {
-    const acctTxns = allTxns.filter(t => t.account === a);
-    renderChartOn('miniChart-' + cssSafe(a), chartTxnsFor(acctTxns), activeSubFilter, {
-      totalEl: 'miniTotal-' + cssSafe(a), legend: false
+  groupsToShow.forEach(g => {
+    const acctTxns = allTxns.filter(t => g.accounts.includes(t.account));
+    renderChartOn('miniChart-' + cssSafe(g.label), chartTxnsFor(acctTxns), activeSubFilter, {
+      totalEl: 'miniTotal-' + cssSafe(g.label), legend: false
     });
     // On the "All categories" view, the mini pie's number is its Balance
-    // (Income minus Expense) for that account, colored green/red by sign,
-    // instead of the plain Expense-only total renderChartOn just wrote —
-    // when a specific category is selected, leave that as-is (the
-    // category's own subtotal for this account is more useful there).
+    // (Income minus Expense) for that account/group, colored green/red by
+    // sign, instead of the plain Expense-only total renderChartOn just
+    // wrote — when a specific category is selected, leave that as-is (the
+    // category's own subtotal is more useful there).
     if (activeFilter === 'All') {
       const { balance } = statsFor(acctTxns);
-      const el = document.getElementById('miniTotal-' + cssSafe(a));
+      const el = document.getElementById('miniTotal-' + cssSafe(g.label));
       if (el) {
         el.textContent = (balance < 0 ? '-RM' : '+RM') + Math.abs(balance).toFixed(2);
         el.className = balance < 0 ? 'negative' : 'positive';
@@ -1486,21 +1573,32 @@ function renderCharts() {
     // True running balance — the real account balance (anchor + every
     // transaction since), not the Income-Expense "Balance" stat above.
     // Only shows for accounts with an anchor set (see trueBalanceFor()) —
-    // Cash intentionally has none, so it just shows nothing here.
-    const trueEl = document.getElementById('miniTrue-' + cssSafe(a));
+    // Cash intentionally has none, so it just shows nothing here. For a
+    // merged group (Banks), sum each account's real balance but also spell
+    // out the per-account split right after, so merging the view never
+    // hides which bank actually holds what.
+    const trueEl = document.getElementById('miniTrue-' + cssSafe(g.label));
     if (trueEl) {
-      const tb = trueBalanceFor(a);
-      trueEl.textContent = tb === null ? '' : 'Balance: RM' + tb.toFixed(2);
+      const balances = g.accounts.map(a => ({ a, b: trueBalanceFor(a) })).filter(x => x.b !== null);
+      if (!balances.length) {
+        trueEl.textContent = '';
+      } else if (g.accounts.length === 1) {
+        trueEl.textContent = 'Balance: RM' + balances[0].b.toFixed(2);
+      } else {
+        const total = balances.reduce((s, x) => s + x.b, 0);
+        const parts = balances.map(x => `${x.a} RM${x.b.toFixed(2)}`).join(' + ');
+        trueEl.textContent = `Balance: RM${total.toFixed(2)} (${parts})`;
+      }
     }
-    const trueUpdatedEl = document.getElementById('miniTrueUpdated-' + cssSafe(a));
+    const trueUpdatedEl = document.getElementById('miniTrueUpdated-' + cssSafe(g.label));
     if (trueUpdatedEl) {
-      const anchor = accountBalances.find(b => b.account === a);
-      trueUpdatedEl.textContent = anchor ? formatAnchorDate(anchor.asOfDate) : '';
+      const dates = g.accounts.map(a => { const anc = accountBalances.find(b => b.account === a); return anc ? anc.asOfDate : null; }).filter(Boolean);
+      trueUpdatedEl.textContent = dates.length ? formatAnchorDate(dates.sort().slice(-1)[0]) : '';
     }
     // TNG's physical Card balance (separate pseudo-account) shows as a
     // second line right under the eWallet Balance line — see the
     // "TNG Card Top-up" note on CATEGORY_OPTIONS.
-    if (a === 'TNG') {
+    if (g.accounts.includes('TNG')) {
       const cardEl = document.getElementById('miniCardTrue-TNG');
       if (cardEl) {
         const cardBal = trueBalanceFor('TNG Card');
@@ -1527,6 +1625,7 @@ let openStatBreakdown = null;
 
 function formatStatValue(stat, v) {
   if (stat === 'balance') return (v < 0 ? '-RM' : '+RM') + Math.abs(v).toFixed(2);
+  if (stat === 'expense') return formatSignedRM(v); // spend-positive -> "-RM", matches every other total
   return 'RM' + v.toFixed(2);
 }
 
@@ -1544,7 +1643,7 @@ function updateBigStats(base) {
   statsEl.style.display = 'flex';
   const { expense, income } = statsFor(base);
   const balance = currentBalanceTotal();
-  document.getElementById('statExpense').textContent = 'RM' + expense.toFixed(2);
+  document.getElementById('statExpense').textContent = formatSignedRM(expense);
   document.getElementById('statIncome').textContent = 'RM' + income.toFixed(2);
   const balEl = document.getElementById('statBalance');
   balEl.textContent = (balance < 0 ? '-RM' : '+RM') + Math.abs(balance).toFixed(2);
@@ -1689,6 +1788,9 @@ function groupKeyFor(t) {
 }
 
 function render() {
+  // Reset here — only the "Group by: Day" branch below turns this back on,
+  // since expand/collapse-all only makes sense for day groups.
+  document.getElementById('toolbarSecondary').style.display = 'none';
   renderAccountFilters();
   // Account filter (All/TNG/HL Bank/PBank) narrows the pool everything else
   // below operates on, same as how the category filter narrows further.
@@ -1754,6 +1856,18 @@ function render() {
   // rows. Category/merchant grouping stays always-expanded, since those
   // groups are usually what you're already narrowing down to on purpose.
   const isDayMode = groupMode === 'day';
+  if (isDayMode && order.length) {
+    const allExpanded = order.every(k => expandedDayGroups.has(k));
+    const secondary = document.getElementById('toolbarSecondary');
+    const btn = document.getElementById('expandAllBtn');
+    secondary.style.display = '';
+    btn.textContent = allExpanded ? 'Collapse all' : 'Expand all';
+    btn.onclick = () => {
+      if (allExpanded) expandedDayGroups.clear();
+      else order.forEach(k => expandedDayGroups.add(k));
+      render();
+    };
+  }
   let html = '';
   order.forEach(key => {
     // On the "All categories" view, keep Transfer/Income out of each group's
