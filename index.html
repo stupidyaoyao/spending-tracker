@@ -63,7 +63,8 @@
   body.hide-balance #statIncome,
   body.hide-balance .txn .amount.in,
   body.hide-balance #statBreakdown.breakdown-balance,
-  body.hide-balance #statBreakdown.breakdown-income {
+  body.hide-balance #statBreakdown.breakdown-income,
+  body.hide-balance .total-card .income-sub {
     filter: blur(7px);
     user-select: none;
   }
@@ -126,14 +127,21 @@
   .history-summary-row .when { font-size: 12px; color: var(--muted); text-align: right; }
   .history-section-label { font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
   .page-updated { text-align: center; font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
-  .totals { display: flex; gap: 10px; margin: 14px 0; }
-  .total-card { flex: 1; background: var(--card); border-radius: 14px; padding: 12px; }
+  /* 2x2 grid rather than a 4-wide flex row: with "flex: 1" + nowrap values,
+     cards with longer numbers (e.g. "-RM4299.75") pulled themselves wider
+     than cards with short ones ("RM0.00"), so the row looked uneven/misaligned.
+     minmax(0, 1fr) columns force every card to the exact same width no
+     matter its content, and the extra width per card also gives the All
+     time card room for its Income sub-line below. */
+  .totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+  .total-card { min-width: 0; background: var(--card); border-radius: 14px; padding: 12px; }
   .total-card .label { font-size: 12px; color: var(--muted); }
   .total-card .value { font-size: 18px; font-weight: 700; margin-top: 4px; white-space: nowrap; }
   @media (max-width: 400px) {
     .total-card .value { font-size: 15px; }
   }
   .total-card .sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .total-card .sub.income-sub { color: #30d158; font-weight: 600; font-size: 11px; }
   .total-card { cursor: pointer; border: 1px solid transparent; }
   .total-card.active { border-color: var(--accent); background: #241c0f; }
   .filters { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; }
@@ -1692,7 +1700,7 @@ function lastUpdatedLabel(base) {
     ', ' + latest.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
-function renderTotals(txns) {
+function renderTotals(txns, incomeTxns) {
   const now = new Date();
   const weekStart = startOfWeek(now);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1703,18 +1711,28 @@ function renderTotals(txns) {
   const week = sum(t => new Date(t.date) >= weekStart);
   const month = sum(t => new Date(t.date) >= monthStart);
   const allTime = sum(() => true);
+  // All time also shows its Income total (unlike Today/Week/Month, which
+  // stay pure-expense to match the compact card style) — incomeTxns is the
+  // same account/category/search/date-range-filtered pool as txns, just
+  // without the Income-category exclusion, passed in from render(). Only
+  // meaningful on the "All categories" view, same as the Overall Expense/
+  // Income split above it.
+  const allTimeIncome = (incomeTxns || []).reduce((s, t) => s + Number(t.amount || 0), 0);
 
   const todayDateLabel = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
   const fmtShort = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const weekRangeLabel = `${fmtShort(weekStart)} - ${fmtShort(weekEnd)}`;
+  const allTimeIncomeSub = (incomeTxns && incomeTxns.length)
+    ? `<div class="sub income-sub">Income +RM${allTimeIncome.toFixed(2)}</div>`
+    : '';
 
   const cardActive = (scope) => activeTimeFilter === scope ? ' active' : '';
   document.getElementById('totals').innerHTML = `
     <div class="total-card${cardActive('today')}" data-scope="today"><div class="label">Today</div><div class="value">${formatSignedRM(today)}</div><div class="sub">${todayDateLabel}</div><div class="sub">${lastUpdatedLabel()}</div></div>
     <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">This week</div><div class="value">${formatSignedRM(week)}</div><div class="sub">${weekRangeLabel}</div></div>
     <div class="total-card${cardActive('month')}" data-scope="month"><div class="label">This month</div><div class="value">${formatSignedRM(month)}</div></div>
-    <div class="total-card${cardActive('all')}" data-scope="all"><div class="label">All time</div><div class="value">${formatSignedRM(allTime)}</div></div>
+    <div class="total-card${cardActive('all')}" data-scope="all"><div class="label">All time</div><div class="value">${formatSignedRM(allTime)}</div>${allTimeIncomeSub}</div>
   `;
   // Tapping a card scopes the pies (big + mini, see renderCharts()) to that
   // period; tapping the same card again clears back to all-time. This is
@@ -2303,7 +2321,12 @@ function render() {
   const summaryTxns = activeFilter === 'All'
     ? filtered.filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
     : filtered;
-  renderTotals(summaryTxns);
+  // Same account/category/search/date-range-filtered pool as summaryTxns,
+  // but keeping Income rows instead of excluding them — feeds the All time
+  // card's Income sub-line. Only populated on the "All categories" view
+  // (same condition the Overall Expense/Income split above uses).
+  const incomeTxnsForTotals = activeFilter === 'All' ? filtered.filter(t => t.category === 'Income') : [];
+  renderTotals(summaryTxns, incomeTxnsForTotals);
   // The pies (combined + per-account) are computed independently from
   // allTxns/each account's own slice — see renderCharts() — so the account
   // filter chips never touch the combined pie, only which mini pie(s) show.
