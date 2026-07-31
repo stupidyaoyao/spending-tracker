@@ -128,6 +128,7 @@
   .stat-breakdown.show { display: block; }
   .stat-breakdown-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 3px 0; }
   .stat-breakdown-row.total { color: #f5f5f7; font-weight: 600; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; padding-top: 6px; }
+  .stat-breakdown-note { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 8px; }
   .chart-loading {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
     background: var(--card); border-radius: 10px;
@@ -630,6 +631,19 @@ function trueBalanceFor(account) {
   const after = relevant.filter(t => t.date > anchor.asOfDate);
   const delta = after.reduce((s, t) => s + (txnFlow(t) === 'in' ? Number(t.amount || 0) : -Number(t.amount || 0)), 0);
   return anchor.asOfBalance + delta;
+}
+
+// The Overall "Balance" stat is your real money right now, not an
+// Income-Expense flow for whatever period is selected — so it's the sum of
+// every account's true running balance (TNG eWallet, HL Bank, PBank, TNG
+// Card), skipping Cash since it has no starting balance anchor. Unlike
+// Expense/Income above it, this number doesn't change when you tap
+// Today/This week/This month.
+function currentBalanceTotal() {
+  return ['TNG', 'HL Bank', 'PBank', 'TNG Card'].reduce((s, a) => {
+    const b = trueBalanceFor(a);
+    return s + (b === null ? 0 : b);
+  }, 0);
 }
 
 // "Updated 30 Jul 2026" — the date you last told the tracker this account's
@@ -1528,7 +1542,8 @@ function updateBigStats(base) {
   }
   totalEl.style.display = 'none';
   statsEl.style.display = 'flex';
-  const { expense, income, balance } = statsFor(base);
+  const { expense, income } = statsFor(base);
+  const balance = currentBalanceTotal();
   document.getElementById('statExpense').textContent = 'RM' + expense.toFixed(2);
   document.getElementById('statIncome').textContent = 'RM' + income.toFixed(2);
   const balEl = document.getElementById('statBalance');
@@ -1554,12 +1569,22 @@ function renderStatBreakdown(base) {
   const el = document.getElementById('statBreakdown');
   if (!openStatBreakdown) { el.classList.remove('show'); el.innerHTML = ''; return; }
   const stat = openStatBreakdown;
-  const rows = ACCOUNTS.map(a => ({ account: a, value: statsFor(base.filter(t => t.account === a))[stat] }))
-    .filter(r => r.value !== 0);
+  let rows, note = '';
+  if (stat === 'balance') {
+    // Real running balance per account, not Income-Expense — same source
+    // as currentBalanceTotal() above.
+    rows = ['TNG', 'HL Bank', 'PBank', 'TNG Card']
+      .map(a => ({ account: a, value: trueBalanceFor(a) }))
+      .filter(r => r.value !== null);
+    note = '<div class="stat-breakdown-note">Cash not included — no starting balance set for it yet</div>';
+  } else {
+    rows = ACCOUNTS.map(a => ({ account: a, value: statsFor(base.filter(t => t.account === a))[stat] }))
+      .filter(r => r.value !== 0);
+  }
   const total = rows.reduce((s, r) => s + r.value, 0);
   el.innerHTML = rows.map(r =>
     `<div class="stat-breakdown-row"><span>${r.account}</span><span>${formatStatValue(stat, r.value)}</span></div>`
-  ).join('') + `<div class="stat-breakdown-row total"><span>Total</span><span>${formatStatValue(stat, total)}</span></div>`;
+  ).join('') + `<div class="stat-breakdown-row total"><span>Total</span><span>${formatStatValue(stat, total)}</span></div>` + note;
   el.classList.add('show');
 }
 
