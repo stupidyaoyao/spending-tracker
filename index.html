@@ -20,14 +20,14 @@
     --muted: #8e8e93;
     /* Semantic palette: categories that are always spending (Car/Food/
        Shopping/Entertainment/Housing) get warm red/orange tones; Transfer
-       stays neutral grey since money can move either direction; Other stays
-       purple as a "needs review" flag since it holds the Unsure subtag. */
+       stays neutral grey since money can move either direction; Unsure stays
+       purple as a "needs review" flag. */
     --car: #ff453a;
     --shopping: #ff9f0a;
     --food: #ff6b35;
     --entertainment: #ffd60a;
     --housing: #ff7a9c;
-    --other: #bf5af2;
+    --unsure: #bf5af2;
     --transfer: #8e8e93;
     --income: #30d158;
   }
@@ -90,6 +90,12 @@
   .history-entry .history-action { font-size: 12px; color: var(--accent); font-weight: 500; }
   .history-entry .history-time { font-size: 11px; color: var(--muted); flex-shrink: 0; }
   .history-entry .history-details { font-size: 14px; margin-top: 4px; }
+  .history-summary { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  .history-summary-row { background: var(--card); border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: baseline; }
+  .history-summary-row .acct { font-size: 14px; font-weight: 600; }
+  .history-summary-row .when { font-size: 12px; color: var(--muted); text-align: right; }
+  .history-section-label { font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
+  .page-updated { text-align: center; font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
   .totals { display: flex; gap: 10px; margin: 14px 0; }
   .total-card { flex: 1; background: var(--card); border-radius: 14px; padding: 12px; }
   .total-card .label { font-size: 12px; color: var(--muted); }
@@ -207,7 +213,7 @@
   .dot.Food { background: var(--food); }
   .dot.Entertainment { background: var(--entertainment); }
   .dot.Housing { background: var(--housing); }
-  .dot.Other { background: var(--other); }
+  .dot.Unsure { background: var(--unsure); }
   .dot.Transfer { background: var(--transfer); }
   .dot.Income { background: var(--income); }
   .dot.Custom { background: var(--muted); }
@@ -385,6 +391,7 @@
       <span id="calMonthLabel"></span>
       <button class="cal-nav-btn" id="calNext">&rsaquo;</button>
     </div>
+    <div class="page-updated" id="calUpdated"></div>
     <div class="cal-weekdays">
       <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
     </div>
@@ -393,6 +400,7 @@
   </div>
 
   <div id="trendsPage" style="display:none;">
+    <div class="page-updated" id="trendsUpdated"></div>
     <div class="filters" id="trendFilters"></div>
     <div class="filters subfilters" id="trendSubFilters"></div>
     <div class="trend-group-toggle" id="trendGroupToggle">
@@ -423,6 +431,8 @@
   </div>
 
   <div id="historyPage" style="display:none;">
+    <div class="history-summary" id="historySummary"></div>
+    <div class="history-section-label">Recent activity</div>
     <div class="history-list" id="historyList"><div class="empty">Loading…</div></div>
   </div>
 </div>
@@ -568,7 +578,11 @@ const CATEGORY_RULES = [
     'AEON DEPT', 'FASHION', 'UNIQLO', 'PADINI', 'H&M'
   ] },
   { category: 'Shopping', subTag: 'Online', keywords: ['PINDUODUO', 'GWP', 'SHOPEE', 'LAZADA', 'TAOBAO'] },
-  { category: 'Shopping', keywords: ['GUARDIAN', 'WATSON'] },
+  // Health/skincare shops — pharmacies specifically, not general Shopping.
+  { category: 'Shopping', subTag: 'Pharmacies', keywords: [
+    'GUARDIAN', 'WATSON', 'CARING PHARMACY', 'BIG PHARMACY', 'ALPRO PHARMACY',
+    'HEALTH LANE', 'AEON WELLNESS'
+  ] },
   { category: 'Food', keywords: [
     'KOPITIAM', 'RESTORAN', 'RESTAURANT', 'MIXED RICE', 'KITCHEN',
     'BURGER', 'RAMEN', 'CHAGEE', 'LAUK', 'BUN', 'THONG KEE', 'YCS',
@@ -585,8 +599,8 @@ const CATEGORY_RULES = [
   { category: 'Housing', subTag: 'Carpark Rent', keywords: ['CARPARK RENT'] },
   // "PMB..." reference codes are Public Bank Mutual (unit trust) transfers —
   // money genuinely leaving to an external investment, not a tracked account
-  // and not everyday spending, so it gets its own subtag under Other.
-  { category: 'Other', subTag: 'Invest', keywords: ['PMB'] },
+  // and not everyday spending, so it gets its own subtag under Unsure.
+  { category: 'Unsure', subTag: 'Invest', keywords: ['PMB'] },
 ];
 // No transaction types are excluded anymore — Reload / Receive from Wallet /
 // Cashback now import under "Transfer" (see categorize() below) instead of
@@ -603,6 +617,7 @@ const CATEGORY_OPTIONS = [
   { category: 'Shopping', subTag: 'Convenience Store', label: 'Shopping · Convenience Store' },
   { category: 'Shopping', subTag: 'Hypermarket', label: 'Shopping · Hypermarket' },
   { category: 'Shopping', subTag: 'Online', label: 'Shopping · Online' },
+  { category: 'Shopping', subTag: 'Pharmacies', label: 'Shopping · Pharmacies' },
   { category: 'Shopping', subTag: '', label: 'Shopping · Other' },
   { category: 'Food', subTag: '', label: 'Food' },
   { category: 'Entertainment', subTag: '', label: 'Entertainment' },
@@ -611,9 +626,8 @@ const CATEGORY_OPTIONS = [
   { category: 'Housing', subTag: 'Water & Electric', label: 'Housing · Water & Electric' },
   { category: 'Housing', subTag: 'WiFi', label: 'Housing · WiFi' },
   { category: 'Housing', subTag: 'Carpark Rent', label: 'Housing · Carpark Rent' },
-  { category: 'Other', subTag: 'Unsure', label: 'Other · Unsure' },
-  { category: 'Other', subTag: 'Invest', label: 'Other · Invest' },
-  { category: 'Other', subTag: '', label: 'Other · Uncategorized' },
+  { category: 'Unsure', subTag: 'Invest', label: 'Unsure · Invest' },
+  { category: 'Unsure', subTag: '', label: 'Unsure' },
   { category: 'Transfer', subTag: 'Card Reload', label: 'Transfer · Card Reload' },
   // The physical TNG Card (Enhanced/NFC card) has its OWN balance, separate
   // from the eWallet — RFID toll only ever deducts the eWallet, while
@@ -746,9 +760,9 @@ function categorize(description, type) {
   }
 
   // Unresolved person-to-person send -> Transfer > To Others; anything else
-  // unmatched -> Other > Unsure.
+  // unmatched -> plain Unsure (no subtag).
   if (type === 'Transfer to Wallet') return { category: 'Transfer', subTag: 'To Others' };
-  return { category: 'Other', subTag: 'Unsure' };
+  return { category: 'Unsure', subTag: '' };
 }
 
 let allTxns = [];
@@ -932,6 +946,7 @@ function renderCalendar() {
   const month = calendarMonth.getMonth();
   document.getElementById('calMonthLabel').textContent =
     calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  document.getElementById('calUpdated').textContent = lastUpdatedLabel();
 
   const startWeekday = new Date(year, month, 1).getDay(); // 0 = Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1136,12 +1151,14 @@ function trendBucketsFor(txns) {
   });
   return map;
 }
-// One color per top-level category, reusing the same CSS custom properties
-// the rest of the app already uses for these categories (dot colors, pie
-// slices) so a category means the same color everywhere.
+// A dedicated high-contrast palette for the Trends comparison chart —
+// deliberately NOT the same warm red/orange/yellow tones used for dot
+// colors/pie slices elsewhere, since those all sit too close together on
+// the hue wheel to tell apart when several categories are plotted side by
+// side as bars. Each category gets its own distinct hue here instead.
 const TREND_CATEGORY_COLORS = {
-  Car: '#ff453a', Shopping: '#ff9f0a', Food: '#ff6b35',
-  Entertainment: '#ffd60a', Housing: '#ff7a9c', Other: '#bf5af2'
+  Car: '#0a84ff', Shopping: '#ff9f0a', Food: '#30d158',
+  Entertainment: '#ffd60a', Housing: '#ff375f', Unsure: '#bf5af2'
 };
 
 // Compresses bar HEIGHT only (sign-preserving square root) so a month with
@@ -1182,6 +1199,7 @@ const trendValueLabelPlugin = {
 };
 
 function renderTrends() {
+  document.getElementById('trendsUpdated').textContent = lastUpdatedLabel();
   renderTrendFilters();
   renderTrendSubFilters();
 
@@ -1395,10 +1413,19 @@ document.getElementById('trendToBtn').onclick = () => { miniCalTarget === 'to' ?
 document.getElementById('miniCalPrev').onclick = () => { miniCalMonth.setMonth(miniCalMonth.getMonth() - 1); renderMiniCal(); };
 document.getElementById('miniCalNext').onclick = () => { miniCalMonth.setMonth(miniCalMonth.getMonth() + 1); renderMiniCal(); };
 
-// History page — a reverse-chronological audit trail of real edits (see
-// ACTIVITY_LOG_SHEET in Code.gs). Only starts from when this feature was
-// added, so it won't show anything from before today.
+// History page — leads with the thing actually asked for: per account,
+// "records now reach up to X" — i.e. the newest transaction date/time on
+// file for each account, which is what changes every time a screenshot or
+// CSV gets uploaded for that account. Below it, the raw reverse-chronological
+// edit log (see ACTIVITY_LOG_SHEET in Code.gs) — only starts from when that
+// feature was added, so it won't show anything from before today.
 function renderHistory() {
+  const summaryEl = document.getElementById('historySummary');
+  summaryEl.innerHTML = ACCOUNTS.map(a => {
+    const label = lastUpdatedLabel(allTxns.filter(t => t.account === a)) || 'No records yet';
+    return `<div class="history-summary-row"><span class="acct">${escapeHtml(a)}</span><span class="when">${escapeHtml(label)}</span></div>`;
+  }).join('');
+
   const el = document.getElementById('historyList');
   if (!activityLog.length) {
     el.innerHTML = '<div class="empty">No history yet — new edits will show up here.</div>';
@@ -1449,10 +1476,11 @@ function isInTimeFilter(t) {
 // the whole dataset (across every account), shown under the Today card so
 // it's obvious how fresh the data is, separate from what today's spend
 // total actually is.
-function lastUpdatedLabel() {
-  if (!allTxns.length) return '';
+function lastUpdatedLabel(base) {
+  const pool = base || allTxns;
+  if (!pool.length) return '';
   let latest = null;
-  allTxns.forEach(t => {
+  pool.forEach(t => {
     const dt = new Date(t.date + 'T' + (t.time || '00:00'));
     if (!isNaN(dt.getTime()) && (!latest || dt > latest)) latest = dt;
   });
@@ -1499,11 +1527,11 @@ function renderTotals(txns) {
 
 // Semantic palette: categories that are always spending get warm red/orange
 // tones (Car/Food/Shopping/Entertainment/Housing), Transfer stays neutral
-// grey since money moves either direction, and Other stays purple as a
-// "needs review" flag since it holds the Unsure subtag.
+// grey since money moves either direction, and Unsure stays purple as a
+// "needs review" flag.
 const CHART_COLORS = {
   Car: '#ff453a', Shopping: '#ff9f0a', Food: '#ff6b35', Entertainment: '#ffd60a',
-  Housing: '#ff7a9c', Other: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
+  Housing: '#ff7a9c', Unsure: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
 };
 
 // Not real spending — Transfer covers wallet top-ups (Card Reload), P2P
@@ -1521,12 +1549,12 @@ function colorFor(key) { return CHART_COLORS[key] || '#8e8e93'; }
 // the category itself is neutral regardless of which subtag.
 const SUBTAG_COLORS = {
   Toll: '#0a84ff', Parking: '#64d2ff', Fuel: '#5e5ce6', Service: '#30d5ff', Ride: '#ff6961',
-  'Convenience Store': '#34c759', Hypermarket: '#30d158',
+  'Convenience Store': '#34c759', Hypermarket: '#30d158', Pharmacies: '#ff2d55',
   Subscription: '#ff6482',
   Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
-  Unsure: '#ff453a',
+  Invest: '#ff453a',
   'Card Reload': '#a1a1a6', 'TNG Card Top-up': '#6e6e73', 'To Others': '#8e8e93', 'From Others': '#636366', 'Internal': '#48484a',
-  Salary: '#30d158', Interest: '#64d2ff', Other: '#bf5af2'
+  Salary: '#30d158', Interest: '#64d2ff', Other: '#bf5af2', Others: '#8e8e93'
 };
 function colorForSub(key) { return SUBTAG_COLORS[key] || '#8e8e93'; }
 
@@ -1594,19 +1622,66 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
   // toggle on the Overall pie) always breaks down by subTag too — Income
   // only has one "category" so a by-category pie would just be one slice.
   const bySubTag = opts.incomeMode || activeFilter !== 'All';
+  // Food has no subtags of its own (see CATEGORY_OPTIONS) — grouping by
+  // subTag there would just dump every row into one "Others" slice. Instead
+  // group by merchant name for VIEWING only (no subtag is written back to
+  // the data): a shop visited 2+ times gets its own slice, anything visited
+  // once pools into "Others" so one-off purchases don't clutter the chart
+  // with dozens of tiny slivers.
+  const isFoodMerchantMode = !opts.incomeMode && activeFilter === 'Food';
+  // A Housing row that covers two things at once (e.g. one payment for both
+  // Rent + WiFi, see the "+ tag" extraTag feature) still counts once in the
+  // data under its one primary subTag — but for VIEWING here, split its
+  // amount evenly across both slices so the pie doesn't over-attribute the
+  // whole payment to just the primary tag.
+  const isHousingSplitMode = !opts.incomeMode && activeFilter === 'Housing';
   const totals = {};
-  txns.forEach(t => {
-    const key = bySubTag ? (t.subTag || 'Uncategorized') : t.category;
-    totals[key] = (totals[key] || 0) + spendAmount(t);
-  });
+  if (isFoodMerchantMode) {
+    const counts = {};
+    txns.forEach(t => {
+      const m = (t.merchant || '').trim() || 'Others';
+      counts[m] = (counts[m] || 0) + 1;
+    });
+    txns.forEach(t => {
+      const m = (t.merchant || '').trim() || 'Others';
+      const key = counts[m] >= 2 ? m : 'Others';
+      totals[key] = (totals[key] || 0) + spendAmount(t);
+    });
+  } else if (isHousingSplitMode) {
+    txns.forEach(t => {
+      const amt = spendAmount(t);
+      const primary = t.subTag || 'Others';
+      if (t.extraTag) {
+        totals[primary] = (totals[primary] || 0) + amt / 2;
+        totals[t.extraTag] = (totals[t.extraTag] || 0) + amt / 2;
+      } else {
+        totals[primary] = (totals[primary] || 0) + amt;
+      }
+    });
+  } else {
+    txns.forEach(t => {
+      const key = bySubTag ? (t.subTag || 'Others') : t.category;
+      totals[key] = (totals[key] || 0) + spendAmount(t);
+    });
+  }
   const labels = Object.keys(totals);
   const values = labels.map(l => totals[l]);
   const grand = values.reduce((a, b) => a + b, 0);
-  const colorFn = bySubTag ? colorForSub : colorFor;
+  // Merchant names (Food mode) aren't in the static subtag palette, so hash
+  // them to a color deterministically instead — keeps the same shop the
+  // same color across renders without hardcoding every merchant by name.
+  const MERCHANT_PALETTE = ['#0a84ff', '#30d158', '#ff9f0a', '#bf5af2', '#64d2ff', '#ff375f', '#ffd60a', '#5e5ce6', '#ff6961', '#34c759'];
+  function merchantColor(label) {
+    if (label === 'Others') return '#8e8e93';
+    let h = 0;
+    for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0;
+    return MERCHANT_PALETTE[h % MERCHANT_PALETTE.length];
+  }
+  const colorFn = isFoodMerchantMode ? merchantColor : (bySubTag ? colorForSub : colorFor);
   const GREYED_OUT = '#3a3a3c';
-  const isHighlighting = !opts.incomeMode && bySubTag && highlightKey && highlightKey !== 'All';
+  const isHighlighting = !opts.incomeMode && bySubTag && !isFoodMerchantMode && highlightKey && highlightKey !== 'All';
 
-  if (opts.titleEl) document.getElementById(opts.titleEl).textContent = opts.incomeMode ? 'Income' : (bySubTag ? 'By type' : 'Overall');
+  if (opts.titleEl) document.getElementById(opts.titleEl).textContent = opts.incomeMode ? 'Income' : (isFoodMerchantMode ? 'By shop' : (bySubTag ? 'By type' : 'Overall'));
   if (opts.totalEl) {
     const totalEl = document.getElementById(opts.totalEl);
     if (totalEl) totalEl.textContent = 'RM' + grand.toFixed(2);
@@ -1777,12 +1852,19 @@ function renderCharts() {
     // TNG's physical Card balance (separate pseudo-account) shows as a
     // second line right under the eWallet Balance line — see the
     // "TNG Card Top-up" note on CATEGORY_OPTIONS. Colored the same way as
-    // the eWallet balance above for consistency.
+    // the eWallet balance above for consistency. NOTE: this is only ever
+    // built from top-up amounts (money IN) — there's no data source that
+    // captures the card being used for parking/non-PayDirect tolls (money
+    // OUT), since those deductions never appear as a TNG transaction row.
+    // So this number only ever goes up and will always show green; it's
+    // really "total topped up since anchor", not a true live balance. The
+    // title tooltip below spells that out on hover/long-press.
     if (g.accounts.includes('TNG')) {
       const cardEl = document.getElementById('miniCardTrue-TNG');
       if (cardEl) {
         const cardBal = trueBalanceFor('TNG Card');
         cardEl.textContent = cardBal === null ? '' : 'Card: RM' + cardBal.toFixed(2);
+        cardEl.title = 'Only tracks top-ups (money in) — card usage/spend isn’t recorded separately, so this always trends upward.';
         cardEl.classList.toggle('positive', cardBal !== null && cardBal >= 0);
         cardEl.classList.toggle('negative', cardBal !== null && cardBal < 0);
       }
@@ -1869,7 +1951,7 @@ function renderStatBreakdown(base) {
   el.classList.add('show');
 }
 
-const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Housing', 'Other', 'Transfer', 'Income'];
+const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Housing', 'Unsure', 'Transfer', 'Income'];
 
 // Top-level "which real-world account" filter — All / TNG / HL Bank / PBank
 // — a separate dimension from the category filters below it. Which account
@@ -1908,7 +1990,7 @@ function renderFilters(accountTxns) {
 }
 
 // Second row of chips shown only when the active category has subtags (Car,
-// Housing, Other) — e.g. selecting Car reveals Toll/Parking/Fuel/Service/Ride
+// Housing, Unsure) — e.g. selecting Car reveals Toll/Parking/Fuel/Service/Ride
 // so you can drill into just one without leaving the category. Same idea as
 // renderFilters() hiding unused category chips per account: a subtag chip
 // only shows if the current account+category slice actually has a row with
@@ -2562,9 +2644,9 @@ function categorizeBankA(typeCode, detailCols) {
         }
       }
     }
-    return { category: 'Other', subTag: 'Unsure', merchant: merchantName || col0 };
+    return { category: 'Unsure', subTag: '', merchant: merchantName || col0 };
   }
-  return { category: 'Other', subTag: 'Unsure', merchant: col0 || t };
+  return { category: 'Unsure', subTag: '', merchant: col0 || t };
 }
 
 async function parseBankACsvFile(file) {
@@ -2648,9 +2730,9 @@ function categorizeBankB(desc, reference) {
       }
     }
     const merchantName = ref.replace(/^DEBITCARD\s*/i, '').split(/\s{2,}/)[0].trim();
-    return { category: 'Other', subTag: 'Unsure', merchant: merchantName || ref };
+    return { category: 'Unsure', subTag: '', merchant: merchantName || ref };
   }
-  return { category: 'Other', subTag: 'Unsure', merchant: ref || desc };
+  return { category: 'Unsure', subTag: '', merchant: ref || desc };
 }
 
 function parseBankBCsvFile(file) {
