@@ -64,7 +64,7 @@
   body.hide-balance .txn .amount.in,
   body.hide-balance #statBreakdown.breakdown-balance,
   body.hide-balance #statBreakdown.breakdown-income,
-  body.hide-balance .total-card .income-sub {
+  body.hide-balance .total-all-value.income {
     filter: blur(7px);
     user-select: none;
   }
@@ -127,22 +127,35 @@
   .history-summary-row .when { font-size: 12px; color: var(--muted); text-align: right; }
   .history-section-label { font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
   .page-updated { text-align: center; font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
-  /* 2x2 grid rather than a 4-wide flex row: with "flex: 1" + nowrap values,
-     cards with longer numbers (e.g. "-RM4299.75") pulled themselves wider
-     than cards with short ones ("RM0.00"), so the row looked uneven/misaligned.
-     minmax(0, 1fr) columns force every card to the exact same width no
-     matter its content, and the extra width per card also gives the All
-     time card room for its Income sub-line below. */
-  .totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
-  .total-card { min-width: 0; background: var(--card); border-radius: 14px; padding: 12px; }
+  /* Back to the original 3-across row for Today/This week/This month —
+     All time now lives in its own full-width rectangle below (see
+     .totals-all) instead of being a 4th card squeezed into this row. */
+  .totals { display: flex; gap: 10px; margin: 14px 0 10px; }
+  .total-card { flex: 1; min-width: 0; background: var(--card); border-radius: 14px; padding: 12px; }
   .total-card .label { font-size: 12px; color: var(--muted); }
   .total-card .value { font-size: 18px; font-weight: 700; margin-top: 4px; white-space: nowrap; }
   @media (max-width: 400px) {
     .total-card .value { font-size: 15px; }
   }
   .total-card .sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
-  .total-card .sub.income-sub { color: #30d158; font-weight: 600; font-size: 11px; }
   .total-card { cursor: pointer; border: 1px solid transparent; }
+  /* All time: a single wide rectangle with Expense/Income side by side,
+     colored the same way (red/green) and sized the same as each other —
+     unlike the earlier cramped 4th-card version, there's room here to show
+     both numbers clearly instead of one muted and one bold. */
+  .totals-all { margin: 0 0 14px; }
+  .total-card-all { background: var(--card); border-radius: 14px; padding: 14px 16px; cursor: pointer; border: 1px solid transparent; }
+  .total-card-all.active { border-color: var(--accent); background: #241c0f; }
+  .total-card-all .label { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .total-all-row { display: flex; justify-content: space-around; align-items: center; }
+  .total-all-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .total-all-label { font-size: 11px; color: var(--muted); }
+  .total-all-value { font-size: 20px; font-weight: 700; white-space: nowrap; }
+  .total-all-value.expense { color: #ff453a; }
+  .total-all-value.income { color: #30d158; }
+  @media (max-width: 400px) {
+    .total-all-value { font-size: 17px; }
+  }
   .total-card.active { border-color: var(--accent); background: #241c0f; }
   .filters { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; }
   .filter-chip {
@@ -377,6 +390,7 @@
 
   <div id="mainPage">
     <div class="totals" id="totals"></div>
+    <div class="totals-all" id="totalsAll"></div>
 
     <div class="chart-card">
       <div class="chart-head">
@@ -1723,16 +1737,26 @@ function renderTotals(txns, incomeTxns) {
   const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
   const fmtShort = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const weekRangeLabel = `${fmtShort(weekStart)} - ${fmtShort(weekEnd)}`;
-  const allTimeIncomeSub = (incomeTxns && incomeTxns.length)
-    ? `<div class="sub income-sub">Income +RM${allTimeIncome.toFixed(2)}</div>`
-    : '';
 
   const cardActive = (scope) => activeTimeFilter === scope ? ' active' : '';
   document.getElementById('totals').innerHTML = `
     <div class="total-card${cardActive('today')}" data-scope="today"><div class="label">Today</div><div class="value">${formatSignedRM(today)}</div><div class="sub">${todayDateLabel}</div><div class="sub">${lastUpdatedLabel()}</div></div>
     <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">This week</div><div class="value">${formatSignedRM(week)}</div><div class="sub">${weekRangeLabel}</div></div>
     <div class="total-card${cardActive('month')}" data-scope="month"><div class="label">This month</div><div class="value">${formatSignedRM(month)}</div></div>
-    <div class="total-card${cardActive('all')}" data-scope="all"><div class="label">All time</div><div class="value">${formatSignedRM(allTime)}</div>${allTimeIncomeSub}</div>
+  `;
+  // All time gets its own wide rectangle below, showing Expense (red) and
+  // Income (green) side by side at the same size — rather than being
+  // squeezed into a 4th card with a single net number, it now answers the
+  // same question the Overall Expense/Income split does, just for all-time
+  // instead of whichever period is selected there.
+  document.getElementById('totalsAll').innerHTML = `
+    <div class="total-card-all${cardActive('all')}" data-scope="all">
+      <div class="label">All time</div>
+      <div class="total-all-row">
+        <div class="total-all-col"><span class="total-all-label">Expense</span><span class="total-all-value expense">${formatSignedRM(allTime)}</span></div>
+        <div class="total-all-col"><span class="total-all-label">Income</span><span class="total-all-value income">+RM${allTimeIncome.toFixed(2)}</span></div>
+      </div>
+    </div>
   `;
   // Tapping a card scopes the pies (big + mini, see renderCharts()) to that
   // period; tapping the same card again clears back to all-time. This is
@@ -1742,7 +1766,7 @@ function renderTotals(txns, incomeTxns) {
   // purposes (see isInTimeFilter() treating 'all' same as null) — it just
   // gets its own explicit scope name so it's directly tappable/highlightable
   // instead of only reachable by toggling another card off.
-  document.querySelectorAll('#totals .total-card').forEach(el => {
+  document.querySelectorAll('#totals .total-card, #totalsAll .total-card-all').forEach(el => {
     el.onclick = () => {
       const scope = el.dataset.scope;
       activeTimeFilter = activeTimeFilter === scope ? null : scope;
