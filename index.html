@@ -115,6 +115,12 @@
     display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
   }
   .chart-card .chart-head span { font-size: 13px; color: var(--muted); }
+  .chart-mode-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
+  .chart-mode-btn {
+    background: #1c1c1e; border: 1px solid transparent; color: var(--muted);
+    border-radius: 999px; padding: 6px 14px; font-size: 12px; cursor: pointer;
+  }
+  .chart-mode-btn.active { background: var(--accent); color: #1a1a1a; font-weight: 600; }
   .chart-wrap { position: relative; height: 180px; }
   .chart-stats { display: flex; gap: 10px; margin-bottom: 10px; }
   .chart-stats .stat { flex: 1; text-align: center; }
@@ -299,6 +305,8 @@
   .mini-chart-wrap { position: relative; height: 110px; }
   .mini-charts.zoomed .mini-chart-wrap { height: 220px; }
   .mini-chart-truebalance { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; font-weight: 500; }
+  .mini-chart-truebalance.positive { color: #30d158; }
+  .mini-chart-truebalance.negative { color: #ff453a; }
   .mini-chart-updated { text-align: center; font-size: 11px; color: var(--muted); opacity: 0.7; margin-top: 2px; }
 </style>
 </head>
@@ -322,6 +330,10 @@
       <div class="chart-head">
         <span id="chartTitle">Overall</span>
         <span id="chartTotal"></span>
+      </div>
+      <div class="chart-mode-toggle" id="chartModeToggle" style="display:none;">
+        <button class="chart-mode-btn active" data-mode="expense">Expense</button>
+        <button class="chart-mode-btn" data-mode="income">Income</button>
       </div>
       <div class="chart-stats" id="chartStats" style="display:none;">
         <div class="stat" data-stat="expense"><span class="stat-label">Expense</span><span class="stat-value expense" id="statExpense"></span></div>
@@ -759,6 +771,18 @@ let activeAccountFilter = 'All';
 let activeFilter = 'All';
 let activeSubFilter = 'All';
 let searchQuery = '';
+// Which lens the big combined "Overall" pie shows — 'expense' (by category,
+// the default) or 'income' (by source: Salary/Interest/Other). Only
+// meaningful while activeFilter === 'All'; drilling into a specific
+// category always shows that category's own subtag breakdown regardless.
+let overallChartMode = 'expense';
+document.querySelectorAll('.chart-mode-btn').forEach(btn => {
+  btn.onclick = () => {
+    overallChartMode = btn.dataset.mode;
+    document.querySelectorAll('.chart-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+    renderCharts();
+  };
+});
 let groupMode = 'day';
 let sortMode = 'date_desc';
 // Which day-group headers (groupMode === 'day' only) are currently expanded
@@ -1502,7 +1526,7 @@ const SUBTAG_COLORS = {
   Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
   Unsure: '#ff453a',
   'Card Reload': '#a1a1a6', 'TNG Card Top-up': '#6e6e73', 'To Others': '#8e8e93', 'From Others': '#636366', 'Internal': '#48484a',
-  Salary: '#30d158', Interest: '#64d2ff'
+  Salary: '#30d158', Interest: '#64d2ff', Other: '#bf5af2'
 };
 function colorForSub(key) { return SUBTAG_COLORS[key] || '#8e8e93'; }
 
@@ -1566,8 +1590,10 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
   opts = opts || {};
   // When viewing a single category, break the donut down by subTag instead
   // of category (every row would otherwise share the same category label
-  // and collapse into a single slice).
-  const bySubTag = activeFilter !== 'All';
+  // and collapse into a single slice). Income mode (see the Expense/Income
+  // toggle on the Overall pie) always breaks down by subTag too — Income
+  // only has one "category" so a by-category pie would just be one slice.
+  const bySubTag = opts.incomeMode || activeFilter !== 'All';
   const totals = {};
   txns.forEach(t => {
     const key = bySubTag ? (t.subTag || 'Uncategorized') : t.category;
@@ -1578,9 +1604,9 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
   const grand = values.reduce((a, b) => a + b, 0);
   const colorFn = bySubTag ? colorForSub : colorFor;
   const GREYED_OUT = '#3a3a3c';
-  const isHighlighting = bySubTag && highlightKey && highlightKey !== 'All';
+  const isHighlighting = !opts.incomeMode && bySubTag && highlightKey && highlightKey !== 'All';
 
-  if (opts.titleEl) document.getElementById(opts.titleEl).textContent = bySubTag ? 'By type' : 'Overall';
+  if (opts.titleEl) document.getElementById(opts.titleEl).textContent = opts.incomeMode ? 'Income' : (bySubTag ? 'By type' : 'Overall');
   if (opts.totalEl) {
     const totalEl = document.getElementById(opts.totalEl);
     if (totalEl) totalEl.textContent = 'RM' + grand.toFixed(2);
@@ -1636,9 +1662,18 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
 // minis are further scoped by activeTimeFilter (Today/This week/This
 // month/all-time) via chartTxnsFor()/statsFor().
 function renderCharts() {
-  renderChartOn('chart', chartTxnsFor(allTxns), activeSubFilter, {
-    titleEl: 'chartTitle', totalEl: 'chartTotal', legend: true, pie: true
-  });
+  const modeToggleEl = document.getElementById('chartModeToggle');
+  if (modeToggleEl) modeToggleEl.style.display = activeFilter === 'All' ? 'flex' : 'none';
+
+  if (activeFilter === 'All' && overallChartMode === 'income') {
+    renderChartOn('chart', incomeTxnsFor(allTxns), 'All', {
+      titleEl: 'chartTitle', totalEl: 'chartTotal', legend: true, pie: true, incomeMode: true
+    });
+  } else {
+    renderChartOn('chart', chartTxnsFor(allTxns), activeSubFilter, {
+      titleEl: 'chartTitle', totalEl: 'chartTotal', legend: true, pie: true
+    });
+  }
   updateBigStats(allTxns);
   document.getElementById('chartLoading').classList.remove('show');
 
@@ -1696,36 +1731,42 @@ function renderCharts() {
       totalEl: 'miniTotal-' + cssSafe(g.label), legend: false
     });
     // On the "All categories" view, the mini pie's head number is that
-    // account/group's REAL current balance (same "actual money you have"
-    // meaning as the Overall Balance stat) — not the period Income-Expense
-    // net flow, which could show something like "-RM1038" for PBank this
-    // month even though PBank genuinely holds RM7000+. Falls back to the
-    // period Income-Expense figure only when no account in the group has a
-    // balance anchor set (e.g. Cash), since there's no real balance to show
-    // instead. When a specific category is selected, leave the plain
-    // Expense-only total renderChartOn wrote as-is.
+    // account/group's Income-Expense net flow for whichever period is
+    // selected (Today/This week/This month/all-time via activeTimeFilter) —
+    // "how much did I use or earn" for that window. The account's REAL
+    // current balance is a separate, always-current figure shown below the
+    // pie instead (see trueEl below) so the two don't get conflated. When a
+    // specific category is selected, leave the plain Expense-only total
+    // renderChartOn wrote as-is.
     if (activeFilter === 'All') {
+      const { balance } = statsFor(acctTxns);
       const el = document.getElementById('miniTotal-' + cssSafe(g.label));
       if (el) {
-        const trueBalances = g.accounts.map(a => trueBalanceFor(a)).filter(b => b !== null);
-        const total = trueBalances.length
-          ? trueBalances.reduce((s, b) => s + b, 0)
-          : statsFor(acctTxns).balance;
-        el.textContent = (total < 0 ? '-RM' : '+RM') + Math.abs(total).toFixed(2);
-        el.className = total < 0 ? 'negative' : 'positive';
+        el.textContent = (balance < 0 ? '-RM' : '+RM') + Math.abs(balance).toFixed(2);
+        el.className = balance < 0 ? 'negative' : 'positive';
       }
     }
-    // Per-account real-balance split — only needed for a merged group
-    // (Banks), so merging the view never hides which bank actually holds
-    // what. For a single account the head number above already IS this
-    // account's true balance, so there's nothing left to add here.
+    // Real running balance — the account's actual current money (anchor +
+    // every transaction since), not the period net flow shown up top.
+    // Colored green/red by sign (instead of the same muted grey as the
+    // "Updated" line right below it) so it reads as its own real figure,
+    // not just a caption. For a merged group (Banks) the per-account split
+    // is spelled out in the same line so merging the view never hides which
+    // bank actually holds what. Only shows for accounts with an anchor set
+    // (see trueBalanceFor()) — Cash intentionally has none, so it's blank.
     const trueEl = document.getElementById('miniTrue-' + cssSafe(g.label));
     if (trueEl) {
       const balances = g.accounts.map(a => ({ a, b: trueBalanceFor(a) })).filter(x => x.b !== null);
-      if (!balances.length || g.accounts.length === 1) {
+      if (!balances.length) {
         trueEl.textContent = '';
+        trueEl.classList.remove('positive', 'negative');
       } else {
-        trueEl.textContent = balances.map(x => `${x.a} RM${x.b.toFixed(2)}`).join(' + ');
+        const total = balances.reduce((s, x) => s + x.b, 0);
+        trueEl.textContent = g.accounts.length === 1
+          ? 'Balance: RM' + total.toFixed(2)
+          : `Balance: RM${total.toFixed(2)} (${balances.map(x => `${x.a} RM${x.b.toFixed(2)}`).join(' + ')})`;
+        trueEl.classList.toggle('positive', total >= 0);
+        trueEl.classList.toggle('negative', total < 0);
       }
     }
     const trueUpdatedEl = document.getElementById('miniTrueUpdated-' + cssSafe(g.label));
@@ -1735,12 +1776,15 @@ function renderCharts() {
     }
     // TNG's physical Card balance (separate pseudo-account) shows as a
     // second line right under the eWallet Balance line — see the
-    // "TNG Card Top-up" note on CATEGORY_OPTIONS.
+    // "TNG Card Top-up" note on CATEGORY_OPTIONS. Colored the same way as
+    // the eWallet balance above for consistency.
     if (g.accounts.includes('TNG')) {
       const cardEl = document.getElementById('miniCardTrue-TNG');
       if (cardEl) {
         const cardBal = trueBalanceFor('TNG Card');
         cardEl.textContent = cardBal === null ? '' : 'Card: RM' + cardBal.toFixed(2);
+        cardEl.classList.toggle('positive', cardBal !== null && cardBal >= 0);
+        cardEl.classList.toggle('negative', cardBal !== null && cardBal < 0);
       }
       const cardUpdatedEl = document.getElementById('miniCardTrueUpdated-TNG');
       if (cardUpdatedEl) {
