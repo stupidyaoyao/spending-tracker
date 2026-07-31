@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Spending">
+<meta name="apple-mobile-web-app-title" content="Trancker">
 <meta name="theme-color" content="#0b0b0d">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-512.png">
@@ -59,7 +59,9 @@
      transaction amounts and charts all stay visible — those aren't what
      people are usually cagey about sharing. */
   body.hide-balance #statBalance,
-  body.hide-balance .mini-chart-truebalance {
+  body.hide-balance .mini-chart-truebalance,
+  body.hide-balance .day-header-total,
+  body.hide-balance .txn .amount {
     filter: blur(7px);
     user-select: none;
   }
@@ -125,7 +127,10 @@
   .totals { display: flex; gap: 10px; margin: 14px 0; }
   .total-card { flex: 1; background: var(--card); border-radius: 14px; padding: 12px; }
   .total-card .label { font-size: 12px; color: var(--muted); }
-  .total-card .value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  .total-card .value { font-size: 18px; font-weight: 700; margin-top: 4px; white-space: nowrap; }
+  @media (max-width: 400px) {
+    .total-card .value { font-size: 15px; }
+  }
   .total-card .sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
   .total-card { cursor: pointer; border: 1px solid transparent; }
   .total-card.active { border-color: var(--accent); background: #241c0f; }
@@ -999,10 +1004,13 @@ function calendarDayTotal(dateStr) {
 // did I spend that day", not "net money that day" — a big payday would
 // otherwise swamp the color scale and hide real spend patterns). Income days
 // (e.g. payday) still deserve to stand out somehow, so a small green dot
-// flags any day that had an Income-category transaction, without touching
-// the color/total logic above.
+// flags any day that had a real Income-category inflow, without touching
+// the color/total logic above. Requires txnFlow(t) === 'in' too — an
+// Income-category row can still be a real outflow (e.g. a bank interest
+// CHARGE filed under Income · Interest with flow explicitly set to 'out'),
+// and that shouldn't get a "money came in" dot.
 function calendarDayHasIncome(dateStr) {
-  return allTxns.some(t => t.date === dateStr && t.category === 'Income');
+  return allTxns.some(t => t.date === dateStr && t.category === 'Income' && txnFlow(t) === 'in');
 }
 
 // Continuous heat scale for the calendar grid, on a fixed RM scale (not
@@ -2352,7 +2360,7 @@ function render() {
     html += `<div class="day-group">
       <div class="day-header${headerClass}" data-key="${escapeHtml(key)}">
         <span class="day-header-left">${isDayMode ? '<span class="day-chevron">&#9662;</span>' : ''}<span>${key}</span></span>
-        <span>${formatSignedRM(groupTotal)}</span>
+        <span class="day-header-total">${formatSignedRM(groupTotal)}</span>
       </div>`;
     if (expanded) {
       groups[key].forEach(t => { html += renderTxnRow(t); });

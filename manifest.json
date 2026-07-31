@@ -1,6 +1,6 @@
 {
-  "name": "Daily Spending Tracker",
-  "short_name": "Spending",
+  "name": "Trancker",
+  "short_name": "Trancker",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
