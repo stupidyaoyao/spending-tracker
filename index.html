@@ -61,7 +61,9 @@
   body.hide-balance #statBalance,
   body.hide-balance .mini-chart-truebalance,
   body.hide-balance #statIncome,
-  body.hide-balance .txn .amount.in {
+  body.hide-balance .txn .amount.in,
+  body.hide-balance #statBreakdown.breakdown-balance,
+  body.hide-balance #statBreakdown.breakdown-income {
     filter: blur(7px);
     user-select: none;
   }
@@ -1700,6 +1702,7 @@ function renderTotals(txns) {
   const today = sum(t => isSameDay(new Date(t.date), now));
   const week = sum(t => new Date(t.date) >= weekStart);
   const month = sum(t => new Date(t.date) >= monthStart);
+  const allTime = sum(() => true);
 
   const todayDateLabel = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
@@ -1711,12 +1714,16 @@ function renderTotals(txns) {
     <div class="total-card${cardActive('today')}" data-scope="today"><div class="label">Today</div><div class="value">${formatSignedRM(today)}</div><div class="sub">${todayDateLabel}</div><div class="sub">${lastUpdatedLabel()}</div></div>
     <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">This week</div><div class="value">${formatSignedRM(week)}</div><div class="sub">${weekRangeLabel}</div></div>
     <div class="total-card${cardActive('month')}" data-scope="month"><div class="label">This month</div><div class="value">${formatSignedRM(month)}</div></div>
+    <div class="total-card${cardActive('all')}" data-scope="all"><div class="label">All time</div><div class="value">${formatSignedRM(allTime)}</div></div>
   `;
   // Tapping a card scopes the pies (big + mini, see renderCharts()) to that
   // period; tapping the same card again clears back to all-time. This is
   // purely a pie-scoping control — the totals cards themselves always show
   // their own fixed period regardless, and the transaction list below isn't
-  // affected.
+  // affected. "All time" behaves the same as no filter for pie-scoping
+  // purposes (see isInTimeFilter() treating 'all' same as null) — it just
+  // gets its own explicit scope name so it's directly tappable/highlightable
+  // instead of only reachable by toggling another card off.
   document.querySelectorAll('#totals .total-card').forEach(el => {
     el.onclick = () => {
       const scope = el.dataset.scope;
@@ -2133,6 +2140,11 @@ function renderStatBreakdown(base) {
   const el = document.getElementById('statBreakdown');
   if (!openStatBreakdown) { el.classList.remove('show'); el.innerHTML = ''; return; }
   const stat = openStatBreakdown;
+  // Tags the panel with which stat it's showing so hide-balance CSS can blur
+  // the Balance and Income breakdowns (both reveal real money figures) while
+  // leaving the Expense breakdown alone, same split as everywhere else.
+  el.classList.toggle('breakdown-balance', stat === 'balance');
+  el.classList.toggle('breakdown-income', stat === 'income');
   let rows, note = '';
   if (stat === 'balance') {
     // Real running balance per account, not Income-Expense — same source
