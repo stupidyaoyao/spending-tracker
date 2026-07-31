@@ -160,10 +160,26 @@
   }
   .trend-range-row { display: none; align-items: center; gap: 8px; margin: -6px 0 14px; font-size: 12px; color: var(--muted); }
   .trend-range-row.show { display: flex; }
-  .trend-range-row input[type="date"] {
+  .range-date-btn {
     background: var(--card); border: 1px solid rgba(255,255,255,0.08); color: var(--text);
-    border-radius: 8px; padding: 6px 8px; font-size: 12px;
+    border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer;
   }
+  .range-date-btn.active { border-color: var(--accent); color: var(--accent); }
+  .mini-cal-popup { display: none; background: var(--card); border-radius: 14px; padding: 12px; margin: -8px 0 14px; }
+  .mini-cal-popup.show { display: block; }
+  .mini-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .mini-cal-head span { font-size: 13px; font-weight: 500; }
+  .mini-cal-head .cal-nav-btn { width: 28px; height: 28px; font-size: 15px; border-radius: 8px; }
+  .mini-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+  .mini-cal-weekdays span { text-align: center; font-size: 10px; color: var(--muted); }
+  .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .mini-cal-day {
+    background: #1c1c1e; border-radius: 8px; padding: 7px 0; text-align: center;
+    font-size: 12px; color: var(--text); border: 1px solid transparent; cursor: pointer;
+  }
+  .mini-cal-day.empty-cell { background: none; cursor: default; }
+  .mini-cal-day.selected { background: var(--accent); color: #1a1a1a; font-weight: 600; }
+  .mini-cal-day.in-range { border-color: var(--accent); }
 
   .list { display: flex; flex-direction: column; gap: 8px; }
   .day-group { margin-top: 10px; }
@@ -374,7 +390,18 @@
       <button class="trend-group-btn" data-group="custom">Custom range</button>
     </div>
     <div class="trend-range-row" id="trendRangeRow">
-      <input type="date" id="trendRangeFrom"> <span>to</span> <input type="date" id="trendRangeTo">
+      <button class="range-date-btn" id="trendFromBtn" data-target="from"></button>
+      <span>to</span>
+      <button class="range-date-btn" id="trendToBtn" data-target="to"></button>
+    </div>
+    <div class="mini-cal-popup" id="miniCalPopup" style="display:none;">
+      <div class="mini-cal-head">
+        <button class="cal-nav-btn" id="miniCalPrev">&lsaquo;</button>
+        <span id="miniCalLabel"></span>
+        <button class="cal-nav-btn" id="miniCalNext">&rsaquo;</button>
+      </div>
+      <div class="mini-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+      <div class="mini-cal-grid" id="miniCalGrid"></div>
     </div>
     <div class="trend-card">
       <div class="trend-card-label" id="trendLabel"></div>
@@ -1093,6 +1120,43 @@ const TREND_CATEGORY_COLORS = {
   Entertainment: '#ffd60a', Housing: '#ff7a9c', Other: '#bf5af2'
 };
 
+// Compresses bar HEIGHT only (sign-preserving square root) so a month with
+// a RM1000+ outlier doesn't flatten every normal ~RM200 bar down to an
+// invisible sliver — 1000 -> ~31.6, 200 -> ~14.1, so the normal days stay
+// readable next to the spike. The real RM figure is kept separately
+// (dataset._raw) for the tooltip and on-bar value label, so nothing about
+// the actual numbers is hidden — only the bar height is rescaled.
+function sqrtTransform(v) {
+  return Math.sign(v) * Math.sqrt(Math.abs(v));
+}
+
+// Draws the real RM value just above each bar so the exact number is always
+// visible even when sqrtTransform has squashed a small bar down — skipped
+// once there are too many bars (long custom ranges) to avoid clutter; the
+// tooltip still has the real number on tap/hover either way.
+const trendValueLabelPlugin = {
+  id: 'trendValueLabels',
+  afterDatasetsDraw(chart) {
+    if (chart.data.labels.length > 16) return;
+    const { ctx } = chart;
+    chart.data.datasets.forEach((dataset, dsIndex) => {
+      const meta = chart.getDatasetMeta(dsIndex);
+      if (meta.hidden) return;
+      meta.data.forEach((bar, i) => {
+        const raw = dataset._raw ? dataset._raw[i] : null;
+        if (!raw) return;
+        ctx.save();
+        ctx.fillStyle = '#8e8e93';
+        ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        const pos = bar.tooltipPosition();
+        ctx.fillText(formatSignedRM(raw, 0), pos.x, pos.y - 6);
+        ctx.restore();
+      });
+    });
+  }
+};
+
 function renderTrends() {
   renderTrendFilters();
   renderTrendSubFilters();
@@ -1150,7 +1214,8 @@ function renderTrends() {
     const chartData = {
       labels,
       datasets: [{
-        data: values,
+        data: values.map(sqrtTransform),
+        _raw: values,
         backgroundColor: values.map((v, i) => (!isCustom && i === values.length - 1) ? '#f5a623' : '#3a3a3d'),
         borderRadius: 6,
         maxBarThickness: isCustom ? 16 : 40
@@ -1175,13 +1240,17 @@ function renderTrends() {
 
     const chartData = {
       labels,
-      datasets: perCategory.map(pc => ({
-        label: pc.cat,
-        data: keys.map(k => Math.round((pc.buckets[k] || 0) * 100) / 100),
-        backgroundColor: TREND_CATEGORY_COLORS[pc.cat] || '#8e8e93',
-        borderRadius: 6,
-        maxBarThickness: isCustom ? 12 : 24
-      }))
+      datasets: perCategory.map(pc => {
+        const raw = keys.map(k => Math.round((pc.buckets[k] || 0) * 100) / 100);
+        return {
+          label: pc.cat,
+          data: raw.map(sqrtTransform),
+          _raw: raw,
+          backgroundColor: TREND_CATEGORY_COLORS[pc.cat] || '#8e8e93',
+          borderRadius: 6,
+          maxBarThickness: isCustom ? 12 : 24
+        };
+      })
     };
     renderTrendsChart(canvas, chartData, true);
   }
@@ -1200,7 +1269,11 @@ function renderTrendsChart(canvas, chartData, showLegend) {
     chartInstances['trendsChart'] = new Chart(canvas.getContext('2d'), {
       type: 'bar',
       data: chartData,
+      plugins: [trendValueLabelPlugin],
       options: {
+        // Extra top padding so the on-bar value labels (drawn by
+        // trendValueLabelPlugin) never get clipped by the canvas edge.
+        layout: { padding: { top: 16 } },
         plugins: {
           legend: {
             display: showLegend, position: 'bottom',
@@ -1208,7 +1281,10 @@ function renderTrendsChart(canvas, chartData, showLegend) {
           },
           tooltip: {
             callbacks: {
-              label: (c) => (c.dataset.label ? c.dataset.label + ': ' : '') + 'RM' + Number(c.parsed.y).toFixed(2)
+              label: (c) => {
+                const raw = c.dataset._raw ? c.dataset._raw[c.dataIndex] : c.parsed.y;
+                return (c.dataset.label ? c.dataset.label + ': ' : '') + formatSignedRM(Number(raw));
+              }
             }
           }
         },
@@ -1225,13 +1301,75 @@ document.querySelectorAll('.trend-group-btn').forEach(btn => {
   btn.onclick = () => {
     trendGroup = btn.dataset.group;
     document.querySelectorAll('.trend-group-btn').forEach(b => b.classList.toggle('active', b === btn));
+    if (trendGroup !== 'custom') closeMiniCal();
     renderTrends();
   };
 });
-document.getElementById('trendRangeFrom').value = trendRangeFrom;
-document.getElementById('trendRangeTo').value = trendRangeTo;
-document.getElementById('trendRangeFrom').onchange = (e) => { trendRangeFrom = e.target.value; renderTrends(); };
-document.getElementById('trendRangeTo').onchange = (e) => { trendRangeTo = e.target.value; renderTrends(); };
+// "31 Jul 2026" — button label for the custom-range from/to pickers.
+function formatRangeBtnLabel(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function renderRangeButtons() {
+  document.getElementById('trendFromBtn').textContent = formatRangeBtnLabel(trendRangeFrom);
+  document.getElementById('trendToBtn').textContent = formatRangeBtnLabel(trendRangeTo);
+  document.querySelectorAll('.range-date-btn').forEach(b => b.classList.toggle('active', b.dataset.target === miniCalTarget));
+}
+renderRangeButtons();
+
+// Small inline popup calendar used for the Trends "Custom range" from/to
+// pickers — a proper tap-a-day grid instead of the native <input type=date>,
+// which on mobile Safari shows an awkward spinner rather than a calendar.
+let miniCalTarget = null; // 'from' | 'to' | null (closed)
+let miniCalMonth = new Date();
+
+function openMiniCal(target) {
+  miniCalTarget = target;
+  const current = target === 'from' ? trendRangeFrom : trendRangeTo;
+  miniCalMonth = new Date(current + 'T00:00:00');
+  document.getElementById('miniCalPopup').classList.add('show');
+  renderMiniCal();
+  renderRangeButtons();
+}
+function closeMiniCal() {
+  miniCalTarget = null;
+  document.getElementById('miniCalPopup').classList.remove('show');
+  renderRangeButtons();
+}
+function renderMiniCal() {
+  const year = miniCalMonth.getFullYear();
+  const month = miniCalMonth.getMonth();
+  document.getElementById('miniCalLabel').textContent = miniCalMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const selected = miniCalTarget === 'to' ? trendRangeTo : trendRangeFrom;
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="mini-cal-day empty-cell"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const inRange = dateStr >= trendRangeFrom && dateStr <= trendRangeTo;
+    const cls = 'mini-cal-day' + (dateStr === selected ? ' selected' : (inRange ? ' in-range' : ''));
+    html += `<div class="${cls}" data-date="${dateStr}">${d}</div>`;
+  }
+  document.getElementById('miniCalGrid').innerHTML = html;
+  document.querySelectorAll('.mini-cal-day[data-date]').forEach(el => {
+    el.onclick = () => {
+      const dateStr = el.dataset.date;
+      if (miniCalTarget === 'from') {
+        trendRangeFrom = dateStr;
+        if (trendRangeFrom > trendRangeTo) trendRangeTo = trendRangeFrom;
+      } else {
+        trendRangeTo = dateStr;
+        if (trendRangeTo < trendRangeFrom) trendRangeFrom = trendRangeTo;
+      }
+      closeMiniCal();
+      renderTrends();
+    };
+  });
+}
+document.getElementById('trendFromBtn').onclick = () => { miniCalTarget === 'from' ? closeMiniCal() : openMiniCal('from'); };
+document.getElementById('trendToBtn').onclick = () => { miniCalTarget === 'to' ? closeMiniCal() : openMiniCal('to'); };
+document.getElementById('miniCalPrev').onclick = () => { miniCalMonth.setMonth(miniCalMonth.getMonth() - 1); renderMiniCal(); };
+document.getElementById('miniCalNext').onclick = () => { miniCalMonth.setMonth(miniCalMonth.getMonth() + 1); renderMiniCal(); };
 
 // History page — a reverse-chronological audit trail of real edits (see
 // ACTIVITY_LOG_SHEET in Code.gs). Only starts from when this feature was
@@ -1557,37 +1695,37 @@ function renderCharts() {
     renderChartOn('miniChart-' + cssSafe(g.label), chartTxnsFor(acctTxns), activeSubFilter, {
       totalEl: 'miniTotal-' + cssSafe(g.label), legend: false
     });
-    // On the "All categories" view, the mini pie's number is its Balance
-    // (Income minus Expense) for that account/group, colored green/red by
-    // sign, instead of the plain Expense-only total renderChartOn just
-    // wrote — when a specific category is selected, leave that as-is (the
-    // category's own subtotal is more useful there).
+    // On the "All categories" view, the mini pie's head number is that
+    // account/group's REAL current balance (same "actual money you have"
+    // meaning as the Overall Balance stat) — not the period Income-Expense
+    // net flow, which could show something like "-RM1038" for PBank this
+    // month even though PBank genuinely holds RM7000+. Falls back to the
+    // period Income-Expense figure only when no account in the group has a
+    // balance anchor set (e.g. Cash), since there's no real balance to show
+    // instead. When a specific category is selected, leave the plain
+    // Expense-only total renderChartOn wrote as-is.
     if (activeFilter === 'All') {
-      const { balance } = statsFor(acctTxns);
       const el = document.getElementById('miniTotal-' + cssSafe(g.label));
       if (el) {
-        el.textContent = (balance < 0 ? '-RM' : '+RM') + Math.abs(balance).toFixed(2);
-        el.className = balance < 0 ? 'negative' : 'positive';
+        const trueBalances = g.accounts.map(a => trueBalanceFor(a)).filter(b => b !== null);
+        const total = trueBalances.length
+          ? trueBalances.reduce((s, b) => s + b, 0)
+          : statsFor(acctTxns).balance;
+        el.textContent = (total < 0 ? '-RM' : '+RM') + Math.abs(total).toFixed(2);
+        el.className = total < 0 ? 'negative' : 'positive';
       }
     }
-    // True running balance — the real account balance (anchor + every
-    // transaction since), not the Income-Expense "Balance" stat above.
-    // Only shows for accounts with an anchor set (see trueBalanceFor()) —
-    // Cash intentionally has none, so it just shows nothing here. For a
-    // merged group (Banks), sum each account's real balance but also spell
-    // out the per-account split right after, so merging the view never
-    // hides which bank actually holds what.
+    // Per-account real-balance split — only needed for a merged group
+    // (Banks), so merging the view never hides which bank actually holds
+    // what. For a single account the head number above already IS this
+    // account's true balance, so there's nothing left to add here.
     const trueEl = document.getElementById('miniTrue-' + cssSafe(g.label));
     if (trueEl) {
       const balances = g.accounts.map(a => ({ a, b: trueBalanceFor(a) })).filter(x => x.b !== null);
-      if (!balances.length) {
+      if (!balances.length || g.accounts.length === 1) {
         trueEl.textContent = '';
-      } else if (g.accounts.length === 1) {
-        trueEl.textContent = 'Balance: RM' + balances[0].b.toFixed(2);
       } else {
-        const total = balances.reduce((s, x) => s + x.b, 0);
-        const parts = balances.map(x => `${x.a} RM${x.b.toFixed(2)}`).join(' + ');
-        trueEl.textContent = `Balance: RM${total.toFixed(2)} (${parts})`;
+        trueEl.textContent = balances.map(x => `${x.a} RM${x.b.toFixed(2)}`).join(' + ');
       }
     }
     const trueUpdatedEl = document.getElementById('miniTrueUpdated-' + cssSafe(g.label));
