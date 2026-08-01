@@ -319,6 +319,23 @@
   .day-header-left { display: flex; align-items: center; gap: 6px; }
   .day-chevron { display: inline-block; font-size: 9px; transition: transform 0.15s; transform: rotate(0deg); }
   .day-header.collapsed .day-chevron { transform: rotate(-90deg); }
+  /* "Also tagged as X" reference section (see alsoTaggedSectionHtml()) —
+     rows here belong to a DIFFERENT primary category and are shown purely
+     for findability; never counted in this category's totals/pie. Visually
+     distinct (dashed border, no colored dot) so it doesn't read as more of
+     the real list. */
+  .also-tagged-section { margin-top: 18px; border-top: 1px dashed #3a3a3c; padding-top: 4px; }
+  .also-tagged-header { cursor: pointer; }
+  .also-tagged-row {
+    background: var(--card); border-radius: 14px; padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-top: 8px; cursor: pointer; opacity: 0.85;
+  }
+  .also-tagged-row:active { opacity: 1; }
+  .also-tagged-info { min-width: 0; }
+  .also-tagged-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .also-tagged-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .also-tagged-amt { font-size: 13px; color: var(--muted); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
   .txn {
     background: var(--card); border-radius: 14px; padding: 12px 14px;
     display: flex; align-items: center; gap: 12px;
@@ -1469,7 +1486,14 @@ function renderTrendSubFilters() {
   if (!possible || !possible.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   const categoryTxns = allTxns.filter(t => t.category === category);
   const present = new Set(categoryTxns.map(t => t.subTag).filter(Boolean));
-  categoryTxns.forEach(t => { if (t.extraTag) present.add(t.extraTag); });
+  // Only a SAME-category "+ also under" tag (e.g. Housing > Rent tagged
+  // also-under Housing > WiFi) makes a subtag chip present here — a
+  // cross-category tag (e.g. a Food row also-under Sports) is surfaced via
+  // the "Also tagged as X" reference section instead, not this chip row.
+  categoryTxns.forEach(t => {
+    const p = parseExtraTag(t.category, t.extraTag);
+    if (p && p.category === category) present.add(p.subTag);
+  });
   const subtags = possible.filter(s => present.has(s));
   if (!subtags.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   if (trendSubTag !== 'All' && !present.has(trendSubTag)) trendSubTag = 'All';
@@ -1486,7 +1510,11 @@ function trendFilteredTxnsFor(category, subTag) {
   let txns = allTxns.filter(t => !NON_SPEND_CATEGORIES.includes(t.category));
   if (category !== 'All') txns = txns.filter(t => t.category === category);
   if (category !== 'All' && subTag && subTag !== 'All') {
-    txns = txns.filter(t => (t.subTag || '') === subTag || t.extraTag === subTag);
+    txns = txns.filter(t => {
+      if ((t.subTag || '') === subTag) return true;
+      const p = parseExtraTag(t.category, t.extraTag);
+      return !!(p && p.category === category && p.subTag === subTag);
+    });
   }
   return txns;
 }
@@ -2259,13 +2287,13 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
   // once pools into "Others" so one-off purchases don't clutter the chart
   // with dozens of tiny slivers.
   const isFoodMerchantMode = !opts.incomeMode && activeFilter === 'Food';
-  // A Housing row that covers two things at once (e.g. one payment for both
-  // Rent + WiFi, see the "+ tag" extraTag feature) still counts once in the
-  // data under its one primary subTag — but for VIEWING here, attribute the
-  // exact amount given for the tag (extraTagAmount) to that slice, with the
-  // remainder to the primary subtag. Falls back to an even 50/50 split when
-  // no specific amount was given, same as before this field existed.
-  const isHousingSplitMode = !opts.incomeMode && activeFilter === 'Housing';
+  // A row that covers two things at once (e.g. one payment for both Housing
+  // > Rent and Housing > WiFi, or a Food payment also-under Sports — see the
+  // "+ also under" extraTag feature) counts ONCE here, in full, under its
+  // one primary category/subTag — never split across slices. The tagged-
+  // into category instead gets a separate, purely-additive "Also tagged as
+  // X" reference list (see render()) so the payment is still findable from
+  // there without double-counting it in any pie/total.
   const totals = {};
   if (isFoodMerchantMode) {
     const counts = {};
@@ -2277,19 +2305,6 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
       const m = (t.merchant || '').trim() || 'Others';
       const key = counts[m] >= 2 ? m : 'Others';
       totals[key] = (totals[key] || 0) + spendAmount(t);
-    });
-  } else if (isHousingSplitMode) {
-    txns.forEach(t => {
-      const amt = spendAmount(t);
-      const primary = t.subTag || 'Others';
-      if (t.extraTag) {
-        const hasAmount = t.extraTagAmount !== null && t.extraTagAmount !== undefined && t.extraTagAmount !== '' && t.extraTagAmount > 0 && t.extraTagAmount < amt;
-        const tagAmt = hasAmount ? Number(t.extraTagAmount) : amt / 2;
-        totals[primary] = (totals[primary] || 0) + (amt - tagAmt);
-        totals[t.extraTag] = (totals[t.extraTag] || 0) + tagAmt;
-      } else {
-        totals[primary] = (totals[primary] || 0) + amt;
-      }
     });
   } else {
     txns.forEach(t => {
@@ -2656,7 +2671,14 @@ function renderSubFilters(categoryTxns) {
   // "Internal" chip being present, instead of toward chips that no longer
   // exist (see normalizedSubTag()).
   const present = new Set((categoryTxns || []).map(t => normalizedSubTag(t.category, t.subTag)).filter(Boolean));
-  (categoryTxns || []).forEach(t => { if (t.extraTag) present.add(t.extraTag); });
+  // Only a SAME-category "+ also under" tag makes a subtag chip present here
+  // (e.g. Housing > Rent tagged also-under Housing > WiFi) — a cross-category
+  // tag (e.g. Food also-under Sports) is surfaced via the "Also tagged as X"
+  // reference section in render() instead, not this chip row.
+  (categoryTxns || []).forEach(t => {
+    const p = parseExtraTag(t.category, t.extraTag);
+    if (p && p.category === activeFilter) present.add(p.subTag);
+  });
   const subtags = possible.filter(s => present.has(s));
   if (!subtags.length) {
     el.style.display = 'none';
@@ -2700,6 +2722,57 @@ function groupKeyFor(t) {
   return '__all__';
 }
 
+// Rows whose PRIMARY category differs from `category` but that carry a
+// "+ also under" tag pointing into it (see extraTagOptionsHtml()) — e.g.
+// browsing Sports would surface a Food payment tagged "+ also under Sports".
+// Purely for findability: these never feed `category`'s totals/pie/Trends —
+// the row is already counted once, in full, under its own real category.
+function alsoTaggedIntoCategoryTxns(pool, category) {
+  return (pool || []).filter(t => {
+    if (t.category === category) return false;
+    const p = parseExtraTag(t.category, t.extraTag);
+    return !!(p && p.category === category);
+  });
+}
+
+// Whether the "Also tagged as X" reference section (below) is expanded —
+// collapsed by default so it doesn't crowd out the real list, same as the
+// grouped day-headers.
+let alsoTaggedExpanded = false;
+
+function alsoTaggedSectionHtml(category, txns) {
+  if (!txns.length) return '';
+  const rows = txns.map(t => {
+    const p = parseExtraTag(t.category, t.extraTag);
+    const hasRefAmt = t.extraTagAmount !== null && t.extraTagAmount !== undefined && t.extraTagAmount !== '';
+    const amtLabel = hasRefAmt
+      ? `RM${Number(t.extraTagAmount).toFixed(2)} of RM${Number(t.amount || 0).toFixed(2)}`
+      : `RM${Number(t.amount || 0).toFixed(2)}`;
+    const subLabel = p.subTag ? (' · ' + escapeHtml(p.subTag)) : '';
+    return `<div class="also-tagged-row" data-row="${t.row}">
+      <div class="also-tagged-info">
+        <div class="also-tagged-title">${escapeHtml(txnTitle(t))}</div>
+        <div class="also-tagged-meta">${new Date(t.date).toLocaleDateString()} · ${escapeHtml(t.category)}${subLabel}</div>
+      </div>
+      <div class="also-tagged-amt">${escapeHtml(amtLabel)}</div>
+    </div>`;
+  }).join('');
+  return `<div class="also-tagged-section">
+    <div class="day-header also-tagged-header${alsoTaggedExpanded ? '' : ' collapsed'}" id="alsoTaggedHeader">
+      <span class="day-header-left"><span class="day-chevron">&#9662;</span><span>Also tagged as ${escapeHtml(category)} (${txns.length})</span></span>
+    </div>
+    <div class="also-tagged-body"${alsoTaggedExpanded ? '' : ' style="display:none;"'}>${rows}</div>
+  </div>`;
+}
+
+function attachAlsoTaggedHandlers() {
+  const header = document.getElementById('alsoTaggedHeader');
+  if (header) header.onclick = () => { alsoTaggedExpanded = !alsoTaggedExpanded; render(); };
+  document.querySelectorAll('.also-tagged-row').forEach(el => {
+    el.onclick = () => jumpToRecord(Number(el.dataset.row));
+  });
+}
+
 function render() {
   // Reset here — the grouped branch below (any mode except "None") turns
   // this back on, since expand/collapse-all only makes sense once rows are
@@ -2716,10 +2789,15 @@ function render() {
   if (activeFilter !== 'All' && activeSubFilter !== 'All') {
     // A row matches either its primary subTag or its secondary extraTag
     // (see attachExtraTagHandlers()) — e.g. a Housing > Rent row also
-    // tagged "+ WiFi" shows up under both the Rent and WiFi chips, even
-    // though it's only counted once in totals/pie since subTag itself
-    // never changes.
-    filtered = filtered.filter(t => normalizedSubTag(t.category, t.subTag || '') === activeSubFilter || t.extraTag === activeSubFilter);
+    // tagged "+ also under WiFi" (same category) shows up under both the
+    // Rent and WiFi chips, even though it's only counted once in totals/pie
+    // since subTag itself never changes. A cross-category tag isn't matched
+    // here — see the "Also tagged as X" reference section below instead.
+    filtered = filtered.filter(t => {
+      if (normalizedSubTag(t.category, t.subTag || '') === activeSubFilter) return true;
+      const p = parseExtraTag(t.category, t.extraTag);
+      return !!(p && p.category === activeFilter && p.subTag === activeSubFilter);
+    });
   }
   // Free-text search over merchant/notes/remark/subtag — narrows the list
   // (and the totals below, same as the category filters do) to whatever
@@ -2751,8 +2829,18 @@ function render() {
   // filter chips never touch the combined pie, only which mini pie(s) show.
   renderCharts();
 
+  // Rows whose real category is something else but that are "+ also under"
+  // tagged into the category currently being browsed — see
+  // alsoTaggedIntoCategoryTxns(). Only makes sense with one specific
+  // category selected (there's no single "tagged into All" concept).
+  const alsoTaggedTxns = activeFilter !== 'All'
+    ? searchFilter(alsoTaggedIntoCategoryTxns(accountTxns, activeFilter))
+    : [];
+  const alsoTaggedHtml = alsoTaggedSectionHtml(activeFilter, alsoTaggedTxns);
+
   if (!filtered.length) {
-    document.getElementById('list').innerHTML = '<div class="empty">No transactions yet.</div>';
+    document.getElementById('list').innerHTML = '<div class="empty">No transactions yet.</div>' + alsoTaggedHtml;
+    attachAlsoTaggedHandlers();
     return;
   }
 
@@ -2762,12 +2850,13 @@ function render() {
     let html = '<div class="day-group">';
     sorted.forEach(t => { html += renderTxnRow(t); });
     html += '</div>';
-    document.getElementById('list').innerHTML = html;
+    document.getElementById('list').innerHTML = html + alsoTaggedHtml;
     attachCatSelectHandlers();
     attachExtraTagHandlers();
     attachExtraTagAmountHandlers();
     attachRemarkHandlers();
     attachLinkHandlers();
+    attachAlsoTaggedHandlers();
     return;
   }
 
@@ -2822,7 +2911,7 @@ function render() {
     }
     html += `</div>`;
   });
-  document.getElementById('list').innerHTML = html;
+  document.getElementById('list').innerHTML = html + alsoTaggedHtml;
   if (isCollapsible) {
     document.querySelectorAll('.day-header.collapsible').forEach(el => {
       el.onclick = () => {
@@ -2838,6 +2927,7 @@ function render() {
   attachExtraTagAmountHandlers();
   attachRemarkHandlers();
   attachLinkHandlers();
+  attachAlsoTaggedHandlers();
 }
 
 // A "Transfer to Wallet" row's merchant field is either a real person's name
@@ -2971,18 +3061,61 @@ function transferHint(t) {
   return null;
 }
 
-// Options for the small secondary "+ tag" select next to the main category
-// dropdown — offers every OTHER subtag in the same category (excluding the
-// row's own primary subTag), so e.g. a Housing > Rent row can also be
-// tagged "+ WiFi" when one payment genuinely covers both. Returns '' if the
-// category doesn't have at least one other subtag to offer.
+// Categories a payment's "+ also under" tag can point into. Deliberately
+// excludes Transfer/Income/Unsure — those aren't "one payment covers two
+// spend categories" situations, they're money-movement/not-yet-categorized
+// buckets that the also-under concept doesn't really apply to.
+const TAGGABLE_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Sports', 'Housing'];
+
+// extraTag started out storing a bare subtag string (e.g. "WiFi"), always
+// implicitly in the SAME category as the row's own primary category (the
+// original Rent+WiFi use case). It's since been generalized to cover ANY
+// category (e.g. a Food payment also-under Sports), stored as a compound
+// "Category|SubTag" string. This parses either form given the row's own
+// primary category for context, so old bare-string data keeps working
+// unmigrated.
+function parseExtraTag(primaryCategory, extraTag) {
+  if (!extraTag) return null;
+  const bar = extraTag.indexOf('|');
+  if (bar === -1) return { category: primaryCategory, subTag: extraTag };
+  return { category: extraTag.slice(0, bar), subTag: extraTag.slice(bar + 1) };
+}
+function extraTagKey(category, subTag) { return category + '|' + (subTag || ''); }
+// Human-readable label for a stored extraTag value, e.g. "WiFi" (same
+// category as the row) or "Sports" / "Car · Fuel" (a different category).
+function extraTagDisplayLabel(primaryCategory, extraTag) {
+  const p = parseExtraTag(primaryCategory, extraTag);
+  if (!p) return '';
+  if (p.category === primaryCategory) return p.subTag || p.category;
+  const opt = CATEGORY_OPTIONS.find(o => o.category === p.category && o.subTag === p.subTag);
+  return opt ? opt.label : (p.subTag ? (p.category + ' · ' + p.subTag) : p.category);
+}
+
+// Options for the small secondary "+ also under" select next to the main
+// category dropdown — offers every subtag from every taggable category
+// (grouped by category, via <optgroup>), excluding the row's own primary
+// category+subtag pair, so e.g. a Housing > Rent row can be tagged
+// "+ also under WiFi" (same category) or a Food row can be tagged
+// "+ also under Sports" (a different category entirely) when one payment
+// genuinely covers both. The row itself is only ever counted once, under
+// its primary category — see the "Also tagged as X" reference section in
+// render() for how the tagged-into category surfaces it without double-
+// counting. Returns '' if there's nothing to offer.
 function extraTagOptionsHtml(category, subTag, extraTag) {
-  const subtags = (SUBTAGS_BY_CATEGORY[category] || []).filter(s => s !== subTag);
-  if (!subtags.length) return '';
-  const opts = ['<option value="">+ tag…</option>'].concat(
-    subtags.map(s => `<option value="${s}"${s === extraTag ? ' selected' : ''}>+ ${s}</option>`)
-  );
-  return opts.join('');
+  if (TAGGABLE_CATEGORIES.indexOf(category) === -1) return '';
+  const currentKey = extraTag ? (extraTag.indexOf('|') === -1 ? extraTagKey(category, extraTag) : extraTag) : '';
+  const groupsHtml = TAGGABLE_CATEGORIES.map(cat => {
+    const opts = CATEGORY_OPTIONS.filter(o => o.category === cat && !(cat === category && o.subTag === subTag));
+    if (!opts.length) return '';
+    const optHtml = opts.map(o => {
+      const key = extraTagKey(o.category, o.subTag);
+      const label = o.subTag || o.category;
+      return `<option value="${key}"${key === currentKey ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    }).join('');
+    return `<optgroup label="${escapeHtml(cat)}">${optHtml}</optgroup>`;
+  }).join('');
+  if (!groupsHtml) return '';
+  return `<option value="">+ also under…</option>${groupsHtml}`;
 }
 
 // Card Reload / TNG Card Top-up are folded into "Internal" for display,
@@ -3071,18 +3204,21 @@ function renderTxnRow(t) {
     : '';
   const hint = transferHint(t);
   const hintHtml = hint ? `<div class="transfer-hint">(${escapeHtml(hint)})</div>` : '';
-  // Normalize the subTag passed to the "+ tag" options so a Card Reload/TNG
-  // Card Top-up row doesn't offer "+ Internal" as a secondary tag on itself
-  // (it already IS Internal from the frontend's point of view).
+  // Normalize the subTag passed to the "+ also under" options so a Card
+  // Reload/TNG Card Top-up row doesn't offer "+ also under Internal" on
+  // itself (it already IS Internal from the frontend's point of view).
   const extraOpts = extraTagOptionsHtml(t.category, normalizedSubTag(t.category, t.subTag), t.extraTag);
   const extraSelectHtml = extraOpts
     ? `<select class="txn-extratag-select${t.extraTag ? ' has-extra' : ''}" data-row="${t.row}">${extraOpts}</select>`
     : '';
-  // Only shown once a "+ tag" is actually picked — lets you say exactly how
-  // much of this payment is for the tag (e.g. RM100 of a RM1500 Rent payment
-  // is really WiFi) instead of always assuming an even 50/50 split.
+  // Only shown once a "+ also under" tag is actually picked — an optional
+  // reference amount (e.g. "RM100 of this RM1500 Rent payment is really
+  // WiFi") shown in the tagged-into category's "Also tagged as X" section.
+  // Purely informational — never affects any total/pie, since the full
+  // amount always stays counted once under the row's own primary category.
+  const extraTagLabelForRow = extraTagDisplayLabel(t.category, t.extraTag);
   const extraAmountHtml = (extraOpts && t.extraTag)
-    ? `<input type="number" class="txn-extratag-amount" data-row="${t.row}" step="0.01" min="0" placeholder="RM for + ${escapeHtml(t.extraTag)}" title="How much of this payment is for the + tag — leave blank to split it evenly" value="${(t.extraTagAmount !== null && t.extraTagAmount !== undefined && t.extraTagAmount !== '') ? t.extraTagAmount : ''}">`
+    ? `<input type="number" class="txn-extratag-amount" data-row="${t.row}" step="0.01" min="0" placeholder="RM of this for ${escapeHtml(extraTagLabelForRow)}" title="How much of this payment is for ${escapeHtml(extraTagLabelForRow)} — this is just for reference, the full amount still counts once under ${escapeHtml(t.category)}" value="${(t.extraTagAmount !== null && t.extraTagAmount !== undefined && t.extraTagAmount !== '') ? t.extraTagAmount : ''}">`
     : '';
   // A Card Reload/TNG Card Top-up is money moving to your own accounts —
   // never something anyone reimburses you for — so the ✎ split-link button
@@ -3113,8 +3249,8 @@ function renderTxnRow(t) {
 // Lets you reassign a transaction's category/subtag right from the list
 // (e.g. fixing an "Unsure" row, or moving a Pokemon Go charge from
 // Entertainment to Subscription) without re-adding it. Changing the primary
-// category/subtag also clears any secondary "+ tag" (extraTag), since it
-// belonged to the old category's subtag set and may no longer make sense.
+// category/subtag also clears any "+ also under" tag (extraTag), since it
+// may no longer make sense against the new primary category.
 function attachCatSelectHandlers() {
   document.querySelectorAll('.txn-cat-select').forEach(el => {
     el.onchange = async () => {
@@ -3132,22 +3268,24 @@ function attachCatSelectHandlers() {
 }
 
 // Lets a transaction that genuinely covers two things at once (e.g. one
-// payment for both Housing > Rent and Housing > WiFi) also carry a second
-// subtag from the same category — the row still counts once, under its one
-// primary subTag, but now also shows up when you filter the list by either
-// subtag (see the "present" set in renderSubFilters() and the match in
-// render()). Only offered when the category has more than one subtag to
-// choose from (see extraTagOptionsHtml()).
+// payment for both Housing > Rent and Housing > WiFi, or a Food payment
+// that's also-under Sports) carry a second, "+ also under" category/subtag —
+// the row still counts once, in full, under its one primary category, but
+// now also shows up: (a) under either subtag chip when the tag is same-
+// category (see the "present" set in renderSubFilters() and the match in
+// render()), or (b) in the tagged-into category's "Also tagged as X"
+// reference section when it's a different category (see
+// alsoTaggedIntoCategoryTxns()). Only offered for TAGGABLE_CATEGORIES rows
+// (see extraTagOptionsHtml()).
 function attachExtraTagHandlers() {
   document.querySelectorAll('.txn-extratag-select').forEach(el => {
     el.onchange = async () => {
       const row = Number(el.dataset.row);
       const extraTag = el.value;
       const t = allTxns.find(x => x.row === row);
-      // Picking a different tag (or clearing it) invalidates whatever amount
-      // was set for the OLD tag, so reset it — the amount input reappears
-      // blank (splits 50/50 by default) until a new amount is entered for
-      // this tag specifically.
+      // Picking a different tag (or clearing it) invalidates whatever
+      // reference amount was set for the OLD tag, so reset it — the amount
+      // input reappears blank until a new amount is entered for this tag.
       if (t) { t.extraTag = extraTag; t.extraTagAmount = null; }
       el.disabled = true;
       await callApi('updateExtraTag', { row, extraTag, extraTagAmount: '' });
@@ -3156,14 +3294,15 @@ function attachExtraTagHandlers() {
   });
 }
 
-// How much of this transaction's total actually belongs to the "+ tag"
-// (secondary subtag) rather than the primary one — e.g. a Housing > Rent
-// payment of RM1500 that also covers RM100 of WiFi should attribute RM100 to
-// WiFi and RM1400 to Rent, not split 50/50. Left blank, the pie/breakdown
-// views (see isHousingSplitMode) fall back to an even 50/50 split, same as
-// before this field existed. See updateExtraTag (Code.gs) for the backend
-// side — stored in its own column so it survives independently of the tag
-// name itself.
+// An optional note of how much of this transaction's total is really "for"
+// the "+ also under" tag — e.g. a Housing > Rent payment of RM1500 that also
+// covers RM100 of WiFi. Purely for reference/display in the "Also tagged as
+// X" section (see alsoTaggedSectionHtml()) — it never affects any
+// total/pie/Trends calculation, since the full amount always stays counted
+// once under the row's real primary category. Left blank, that section just
+// shows the full row amount instead of an "X of Y" breakdown. See
+// updateExtraTag (Code.gs) for the backend side — stored in its own column
+// so it survives independently of the tag itself.
 function attachExtraTagAmountHandlers() {
   document.querySelectorAll('.txn-extratag-amount').forEach(el => {
     el.onchange = async () => {
@@ -3173,9 +3312,7 @@ function attachExtraTagAmountHandlers() {
       const raw = el.value.trim();
       let amt = raw === '' ? null : Math.max(0, Number(raw) || 0);
       // Can't attribute more (or all) of the payment to the tag than the
-      // row is actually worth — that would leave nothing for the primary
-      // subtag, which doesn't make sense. Falls back to the 50/50 default
-      // instead of silently clamping to a confusing edge value.
+      // row is actually worth — that wouldn't make sense as a reference note.
       const total = Number(t.amount || 0);
       if (amt !== null && (amt <= 0 || amt >= total)) amt = null;
       t.extraTagAmount = amt;
