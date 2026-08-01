@@ -872,15 +872,17 @@ const CATEGORY_OPTIONS = [
   { category: 'Housing', subTag: 'Water & Electric', label: 'Housing · Water & Electric' },
   { category: 'Housing', subTag: 'WiFi', label: 'Housing · WiFi' },
   { category: 'Housing', subTag: 'Carpark Rent', label: 'Housing · Carpark Rent' },
-  { category: 'Transfer', subTag: 'Card Reload', label: 'Transfer · E-wallet Reload' },
-  // The physical TNG Card (Enhanced/NFC card) has its OWN balance, separate
-  // from the eWallet — RFID toll only ever deducts the eWallet, while
-  // parking/non-PayDirect tolls deduct this card. A top-up of this card
-  // shows up in TNG's own history looking just like an eWallet reload, so
-  // these get told apart by elimination: whichever "Reload"-type rows don't
-  // match an HL Bank "Wallet Reload" leg (see Code.gs renameCardTopUps())
-  // are re-tagged here instead of staying under Card Reload.
-  { category: 'Transfer', subTag: 'TNG Card Top-up', label: 'Transfer · TNG Card Top-up' },
+  // Card Reload (eWallet top-up from a bank card) and TNG Card Top-up
+  // (physical card top-up — see Code.gs renameCardTopUps() for how the two
+  // get told apart) used to be their own dropdown/filter entries. They're
+  // now folded into "Internal" for display/editing purposes — both are just
+  // money moving to your own TNG-side accounts — so there's a single option
+  // here instead of three. The raw subTag on the sheet is left untouched
+  // (still literally "Card Reload"/"TNG Card Top-up") so Code.gs's HL Bank
+  // matching pass keeps working; see normalizedSubTag()/RELOAD_SUBTAGS for
+  // how the frontend treats those rows as Internal everywhere, and
+  // reloadPairLabel() for the small yellow "TNG > Card" badge that replaces
+  // the old separate yellow dot so you can still see top-up direction.
   { category: 'Transfer', subTag: 'To Others', label: 'Transfer · To Others' },
   { category: 'Transfer', subTag: 'From Others', label: 'Transfer · From Others' },
   // Any movement between your own accounts (TNG/Bank A/Bank B), either
@@ -898,18 +900,16 @@ const CATEGORY_OPTIONS = [
   { category: 'Unsure', subTag: '', label: 'Unsure' },
 ];
 function optionValue(o) { return o.category + '|' + o.subTag; }
-// "Card Reload" only makes sense for TNG (topping up the TNG eWallet from a
-// bank/credit card) — HL Bank and PBank never get reloaded that way, so the
-// option is hidden for them. The one exception: if a row already has Card
-// Reload set (e.g. old data), keep showing it for THAT row so the dropdown
-// doesn't silently drop its own current value.
+// account is no longer used to hide/show options (Card Reload used to be
+// TNG-only) now that Card Reload/TNG Card Top-up are folded into Internal —
+// kept as a parameter so existing call sites don't need updating. Normalizes
+// selectedSubTag first so a row still literally tagged "Card Reload"/"TNG
+// Card Top-up" on the sheet shows "Internal" selected in the dropdown,
+// instead of nothing matching (see normalizedSubTag()).
 function categoryOptionsHtml(selectedCategory, selectedSubTag, account) {
-  const isCurrent = (o) => o.category === selectedCategory && o.subTag === (selectedSubTag || '');
-  return CATEGORY_OPTIONS.filter(o => {
-    const isCardReload = o.category === 'Transfer' && (o.subTag === 'Card Reload' || o.subTag === 'TNG Card Top-up');
-    if (isCardReload && account && account !== 'TNG' && account !== 'TNG Card' && !isCurrent(o)) return false;
-    return true;
-  }).map(o => {
+  const normSub = normalizedSubTag(selectedCategory, selectedSubTag || '');
+  const isCurrent = (o) => o.category === selectedCategory && o.subTag === normSub;
+  return CATEGORY_OPTIONS.map(o => {
     const val = optionValue(o);
     const sel = isCurrent(o) ? ' selected' : '';
     return `<option value="${val}"${sel}>${o.label}</option>`;
@@ -2070,7 +2070,7 @@ function renderTotals(txns, incomeTxns) {
   const weekStart = startOfWeek(now);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const sum = (filterFn) => txns.filter(filterFn).reduce((s, t) => s + spendAmount(t), 0);
+  const sum = (filterFn) => txns.filter(filterFn).reduce((s, t) => s + expenseTotalAmount(t), 0);
 
   const today = sum(t => isSameDay(new Date(t.date), now));
   const week = sum(t => new Date(t.date) >= weekStart);
@@ -2202,7 +2202,7 @@ function incomeTxnsFor(base) {
 // minus Expense for the currently selected time window (Today/This week/
 // This month/all-time), not a real running account balance.
 function statsFor(base) {
-  const expense = chartTxnsFor(base).reduce((s, t) => s + spendAmount(t), 0);
+  const expense = chartTxnsFor(base).reduce((s, t) => s + expenseTotalAmount(t), 0);
   const income = incomeTxnsFor(base).reduce((s, t) => s + Number(t.amount || 0), 0);
   return { expense, income, balance: income - expense };
 }
@@ -2625,7 +2625,10 @@ function renderSubFilters(categoryTxns) {
     el.innerHTML = '';
     return;
   }
-  const present = new Set((categoryTxns || []).map(t => t.subTag).filter(Boolean));
+  // Normalized so Card Reload/TNG Card Top-up rows count toward the
+  // "Internal" chip being present, instead of toward chips that no longer
+  // exist (see normalizedSubTag()).
+  const present = new Set((categoryTxns || []).map(t => normalizedSubTag(t.category, t.subTag)).filter(Boolean));
   (categoryTxns || []).forEach(t => { if (t.extraTag) present.add(t.extraTag); });
   const subtags = possible.filter(s => present.has(s));
   if (!subtags.length) {
@@ -2689,7 +2692,7 @@ function render() {
     // tagged "+ WiFi" shows up under both the Rent and WiFi chips, even
     // though it's only counted once in totals/pie since subTag itself
     // never changes.
-    filtered = filtered.filter(t => (t.subTag || '') === activeSubFilter || t.extraTag === activeSubFilter);
+    filtered = filtered.filter(t => normalizedSubTag(t.category, t.subTag || '') === activeSubFilter || t.extraTag === activeSubFilter);
   }
   // Free-text search over merchant/notes/remark/subtag — narrows the list
   // (and the totals below, same as the category filters do) to whatever
@@ -2779,7 +2782,7 @@ function render() {
     const groupSpendTxns = activeFilter === 'All'
       ? groups[key].filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
       : groups[key];
-    const groupTotal = groupSpendTxns.reduce((s, t) => s + spendAmount(t), 0);
+    const groupTotal = groupSpendTxns.reduce((s, t) => s + expenseTotalAmount(t), 0);
     const expanded = !isCollapsible || expandedGroups.has(key);
     const headerClass = isCollapsible ? ' collapsible' + (expanded ? '' : ' collapsed') : '';
     html += `<div class="day-group">
@@ -2860,6 +2863,24 @@ function spendAmount(t) {
   return txnFlow(t) === 'in' ? -amt : amt;
 }
 
+// Same as spendAmount(), but always contributes 0 for a row that's Internal
+// from the frontend's point of view (real Internal rows AND the merged
+// Card Reload/TNG Card Top-up rows — see normalizedSubTag()). Self-transfers
+// should never count toward an "Expense" figure, even on a totals view
+// filtered directly to the Transfer category — before this, tapping the
+// Transfer chip would lump reloads/sends/receives/internal moves into one
+// misleading "-RMxxx expense" number. Real sends (To Others) still count as
+// spend-like and real receives (From Others) still count as income-like, so
+// only Internal itself drops to 0 here. Deliberately NOT used by the subtag
+// pie breakdown (renderChartOn still calls plain spendAmount()) — that pie
+// is meant to show real transfer volumes (e.g. how much you've topped up),
+// not an expense figure, so Card Reload/TNG Card Top-up still show their
+// real amounts there.
+function expenseTotalAmount(t) {
+  if (t.category === 'Transfer' && normalizedSubTag(t.category, t.subTag) === 'Internal') return 0;
+  return spendAmount(t);
+}
+
 // Used anywhere a group/day/period TOTAL built from spendAmount() sums is
 // displayed (day-group headers, Calendar cells/day panel/account subtotals,
 // Trends readout). In that sum, positive = net money spent that
@@ -2937,36 +2958,65 @@ function extraTagOptionsHtml(category, subTag, extraTag) {
   return opts.join('');
 }
 
-// Which two accounts a TBC placeholder row is bridging, e.g. "HL > TNG" or
-// "TNG > Card" — derived from the row's own account + subTag + merchant
-// (set by whichever Code.gs reconcile rule created it), not from the
-// remark text, since the remark only ever names ONE side ("assumed
-// received into X" / "assumed sent from X"), never both. Falls back to
-// plain "TBC" if this doesn't match a known reconcile-rule shape (e.g. an
-// old/manually-added TBC row).
+// Card Reload / TNG Card Top-up are folded into "Internal" for display,
+// filtering, and editing everywhere in the frontend — the raw subTag on the
+// sheet stays untouched (literally "Card Reload"/"TNG Card Top-up") so
+// Code.gs's HL Bank matching pass and renameCardTopUps() keep working off
+// the real value. Anywhere the frontend needs to treat a row as its
+// user-facing subtag (dropdown selection, filter-chip matching), route it
+// through this first.
+const RELOAD_SUBTAGS = ['Card Reload', 'TNG Card Top-up'];
+function normalizedSubTag(category, subTag) {
+  if (category === 'Transfer' && RELOAD_SUBTAGS.includes(subTag)) return 'Internal';
+  return subTag;
+}
+
+// Which two accounts a Transfer row moves money between, e.g. "HL Bank" or
+// "TNG Card" as the OTHER side of t.account — derived from the row's own
+// account + subTag + merchant (set by whichever Code.gs reconcile/import
+// rule created it), not from remark text. Shared by tbcPairLabel() (TBC
+// placeholder rows) and reloadPairLabel() (the always-on badge for
+// Card Reload/TNG Card Top-up rows). Returns null if this doesn't match a
+// known shape.
+function accountPairOther_(t) {
+  if (t.subTag === 'Internal' && t.account === 'TNG') return 'HL Bank';
+  if (t.subTag === 'Internal' && t.account === 'HL Bank') return /From PBank/i.test(t.merchant || '') ? 'PBank' : 'TNG';
+  if (t.subTag === 'Internal' && t.account === 'PBank') return 'HL Bank';
+  if (RELOAD_SUBTAGS.includes(t.subTag) && t.account === 'TNG') return 'TNG Card';
+  if (RELOAD_SUBTAGS.includes(t.subTag) && t.account === 'TNG Card') return 'TNG';
+  return null;
+}
 const TBC_ACCOUNT_SHORT = { 'TNG': 'TNG', 'HL Bank': 'HL', 'PBank': 'P', 'TNG Card': 'Card' };
+// Falls back to plain "TBC" if accountPairOther_ doesn't recognize the shape
+// (e.g. an old/manually-added TBC row).
 function tbcPairLabel(t) {
-  let other = null;
-  if (t.subTag === 'Internal' && t.account === 'TNG') other = 'HL Bank';
-  else if (t.subTag === 'Internal' && t.account === 'HL Bank') other = /From PBank/i.test(t.merchant || '') ? 'PBank' : 'TNG';
-  else if (t.subTag === 'Internal' && t.account === 'PBank') other = 'HL Bank';
-  else if (t.subTag === 'TNG Card Top-up' && t.account === 'TNG') other = 'TNG Card';
-  else if (t.subTag === 'TNG Card Top-up' && t.account === 'TNG Card') other = 'TNG';
+  const other = accountPairOther_(t);
   if (!other) return 'TBC';
   const mine = TBC_ACCOUNT_SHORT[t.account] || t.account;
   const otherShort = TBC_ACCOUNT_SHORT[other] || other;
   const flow = txnFlow(t);
   return flow === 'in' ? `${otherShort} > ${mine} TBC` : `${mine} > ${otherShort} TBC`;
 }
+// Small yellow "which accounts" badge shown on every Card Reload/TNG Card
+// Top-up row (see renderTxnRow) — now that these no longer get their own
+// yellow dot (they render as plain grey Internal rows), this is what keeps
+// the top-up direction/amount visible at a glance instead of needing to open
+// the row. Same account-pair logic as tbcPairLabel(), just without the
+// "TBC" suffix since this isn't a placeholder waiting to be confirmed.
+function reloadPairLabel(t) {
+  const other = accountPairOther_(t);
+  if (!other) return null;
+  const mine = TBC_ACCOUNT_SHORT[t.account] || t.account;
+  const otherShort = TBC_ACCOUNT_SHORT[other] || other;
+  const flow = txnFlow(t);
+  return flow === 'in' ? `${otherShort} > ${mine}` : `${mine} > ${otherShort}`;
+}
 
-// Card Reload (bank -> eWallet) and TNG Card Top-up (eWallet/bank -> physical
-// Card) get their own yellow dot rather than Transfer's default grey — both
-// are internal transfers of your own money, so the yellow flags that at a
-// glance without needing to open the row.
-const RELOAD_SUBTAGS = ['Card Reload', 'TNG Card Top-up'];
 function renderTxnRow(t) {
   const isReloadRow = t.category === 'Transfer' && RELOAD_SUBTAGS.includes(t.subTag);
-  const dotClass = isReloadRow ? 'Reload' : (ALL_CATEGORIES.includes(t.category) ? t.category : 'Custom');
+  // Reload rows render exactly like every other Transfer row now (plain
+  // grey dot) — the reloadFlagHtml badge below is what distinguishes them.
+  const dotClass = ALL_CATEGORIES.includes(t.category) ? t.category : 'Custom';
   const { sign, cls: amtClass } = txnSignInfo(t);
   // Rows auto-added by the HL Bank <-> TNG reload rule carry a remark
   // starting with "*TBC" until the real bank record shows up and
@@ -2976,6 +3026,13 @@ function renderTxnRow(t) {
   const isTbc = !!(t.remark && t.remark.indexOf('*TBC') === 0);
   const tbcFlagHtml = isTbc
     ? `<span class="tbc-flag" title="${escapeHtml(t.remark)}">${escapeHtml(tbcPairLabel(t))}</span>`
+    : '';
+  // Reload rows that AREN'T a TBC placeholder still get the small yellow
+  // account-pair badge (see reloadPairLabel) so folding them into Internal
+  // doesn't lose the at-a-glance top-up direction the old yellow dot gave.
+  const reloadLabel = (!isTbc && isReloadRow) ? reloadPairLabel(t) : null;
+  const reloadFlagHtml = reloadLabel
+    ? `<span class="tbc-flag" title="Internal · ${escapeHtml(reloadLabel)}">${escapeHtml(reloadLabel)}</span>`
     : '';
   // The Review tab's "Confirm" button stamps a generic "Confirmed manually
   // on <date>" remark (see renderReviewList) purely as an internal marker —
@@ -2987,7 +3044,10 @@ function renderTxnRow(t) {
     : '';
   const hint = transferHint(t);
   const hintHtml = hint ? `<div class="transfer-hint">(${escapeHtml(hint)})</div>` : '';
-  const extraOpts = extraTagOptionsHtml(t.category, t.subTag, t.extraTag);
+  // Normalize the subTag passed to the "+ tag" options so a Card Reload/TNG
+  // Card Top-up row doesn't offer "+ Internal" as a secondary tag on itself
+  // (it already IS Internal from the frontend's point of view).
+  const extraOpts = extraTagOptionsHtml(t.category, normalizedSubTag(t.category, t.subTag), t.extraTag);
   const extraSelectHtml = extraOpts
     ? `<select class="txn-extratag-select${t.extraTag ? ' has-extra' : ''}" data-row="${t.row}">${extraOpts}</select>`
     : '';
@@ -2997,11 +3057,16 @@ function renderTxnRow(t) {
   const extraAmountHtml = (extraOpts && t.extraTag)
     ? `<input type="number" class="txn-extratag-amount" data-row="${t.row}" step="0.01" min="0" placeholder="RM for + ${escapeHtml(t.extraTag)}" title="How much of this payment is for the + tag — leave blank to split it evenly" value="${(t.extraTagAmount !== null && t.extraTagAmount !== undefined && t.extraTagAmount !== '') ? t.extraTagAmount : ''}">`
     : '';
+  // A Card Reload/TNG Card Top-up is money moving to your own accounts —
+  // never something anyone reimburses you for — so the ✎ split-link button
+  // (which opens "Link to a split", see openSplitPicker) doesn't apply and
+  // is hidden here rather than shown for a feature that can't make sense.
+  const remarkBtnHtml = isReloadRow ? '' : `<button class="remark-btn${t.remark ? ' has-remark' : ''}" data-row="${t.row}" title="Add/edit remark">✎</button>`;
   return `
     <div class="txn" data-row="${t.row}">
       <div class="dot ${dotClass}"></div>
       <div class="info">
-        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}</div>
+        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}</div>
         ${hintHtml}
         <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
         ${remarkHtml}
@@ -3013,7 +3078,7 @@ function renderTxnRow(t) {
       </div>
       <div class="txn-actions">
         <div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
-        <button class="remark-btn${t.remark ? ' has-remark' : ''}" data-row="${t.row}" title="Add/edit remark">✎</button>
+        ${remarkBtnHtml}
       </div>
     </div>`;
 }
@@ -3242,11 +3307,12 @@ document.getElementById('viewSplitsBtnReview').onclick = () => openSplitsModal()
 
 // Split/remark picker sheet — opened from the ✎ button on any transaction
 // row. Lists every existing split name (including ones used on just one
-// transaction so far, see remarkGroups) so you can TAP to select one
-// instead of retyping it — a typo would silently create a brand-new,
-// unlinked group instead of joining the real one. Tapping only selects/
-// highlights it; Save is a separate, deliberate step, so a mis-tap doesn't
-// immediately commit anything. Typing a brand-new name only needs the
+// transaction so far, see remarkGroups) so you can TAP to link straight to
+// it instead of retyping it — a typo would silently create a brand-new,
+// unlinked group instead of joining the real one. Tapping an existing split
+// saves + closes immediately (one tap, no separate Save press) — only
+// typing a brand-new name still needs the explicit Save button below, since
+// there's nothing in the list yet to tap. That typed name only needs the
 // main word (e.g. "Lunch") — Save appends " split" automatically so every
 // split ends up named consistently, unless the typed text exactly matches
 // an existing split (then it's saved as-is, to actually join that group).
@@ -3270,11 +3336,7 @@ function openSplitPicker(row) {
       </div>
     `).join('');
     listEl.querySelectorAll('.split-picker-option').forEach(opt => {
-      opt.onclick = () => {
-        listEl.querySelectorAll('.split-picker-option').forEach(o => o.classList.remove('selected'));
-        opt.classList.add('selected');
-        document.getElementById('splitPickerInput').value = opt.dataset.remark;
-      };
+      opt.onclick = () => saveSplitPickerRemark(opt.dataset.remark);
     });
   }
   splitPickerBackdrop.classList.add('open');
@@ -3312,21 +3374,11 @@ document.getElementById('searchBox').oninput = (e) => { searchQuery = e.target.v
 
 // ---- Add transaction ----
 const addBackdrop = document.getElementById('addBackdrop');
-// Re-renders the Category dropdown whenever the Account changes, so "Card
-// Reload" (TNG-only — see categoryOptionsHtml()) disappears the moment you
-// switch Account to HL Bank/PBank, instead of staying selectable there.
-// Falls back to Car/Toll if the currently-picked category+subtag combo no
-// longer has a matching option for the new account.
+// Re-renders the Category dropdown whenever the Account changes.
 function refreshFCategoryOptions() {
   const sel = document.getElementById('fCategory');
   let [prevCategory, prevSubTag] = (sel.value || '').split('|');
   const account = document.getElementById('fAccount').value;
-  // Card Reload no longer applies once you're not on TNG — don't try to
-  // keep it "selected" (that would defeat the filter in categoryOptionsHtml
-  // and leave it visible/chosen), fall back to Car/Toll instead.
-  if (prevCategory === 'Transfer' && prevSubTag === 'Card Reload' && account !== 'TNG') {
-    prevCategory = 'Car'; prevSubTag = 'Toll';
-  }
   sel.innerHTML = categoryOptionsHtml(prevCategory || 'Car', prevSubTag || 'Toll', account);
 }
 document.getElementById('fCategory').innerHTML = categoryOptionsHtml('Car', 'Toll', 'TNG');
