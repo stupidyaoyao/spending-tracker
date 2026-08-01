@@ -3350,16 +3350,27 @@ function parseCardPdfPageItems(items) {
   if (!usable.length) return [];
   const withPos = usable.map(it => ({ x: it.transform[4], y: it.transform[5], str: it.str.trim() }));
 
-  const onlineIdx = withPos.findIndex(it => it.str.indexOf('Online Card Transactions') !== -1);
-  const scoped = onlineIdx === -1 ? withPos : withPos.slice(0, onlineIdx);
+  // Cut off by Y position, not array index — pdf.js's item order isn't
+  // guaranteed to match visual top-to-bottom reading order (some of this
+  // statement's own online-section text showed up ahead of a few of the
+  // last offline rows in the raw item list), so anything at or below the
+  // "Online Card Transactions" heading's own height is excluded regardless
+  // of where it fell in the array.
+  const onlineHeader = withPos.find(it => it.str.indexOf('Online Card Transactions') !== -1);
+  const scoped = onlineHeader ? withPos.filter(it => it.y > onlineHeader.y) : withPos;
 
   const rowAnchors = scoped.filter(it => it.x < CARD_TRANSNO_MAXX && /^\d{5}$/.test(it.str));
   rowAnchors.sort((a, b) => b.y - a.y); // standard PDF coords: higher y = higher on the page = earlier row
 
   const records = [];
   for (let i = 0; i < rowAnchors.length; i++) {
-    const rowTop = rowAnchors[i].y + 0.5;
-    const rowBottom = i + 1 < rowAnchors.length ? rowAnchors[i + 1].y + 0.5 : -Infinity;
+    // The Trans No. anchor sits a few points BELOW the top of its own row
+    // (the Entry/Exit Date & Time lines print a bit higher) — bisecting the
+    // gap to the neighboring anchors, rather than starting exactly at this
+    // anchor's own y, is what correctly keeps a row's date/time lines from
+    // being attributed to the row above it.
+    const rowTop = i > 0 ? (rowAnchors[i - 1].y + rowAnchors[i].y) / 2 : Infinity;
+    const rowBottom = i + 1 < rowAnchors.length ? (rowAnchors[i].y + rowAnchors[i + 1].y) / 2 : -Infinity;
     const rowItems = scoped.filter(it => it.y <= rowTop && it.y > rowBottom);
 
     const dateCandidates = rowItems.filter(it => it.x >= CARD_DATE_COL[0] && it.x < CARD_DATE_COL[1]).map(it => it.str);
@@ -3371,7 +3382,14 @@ function parseCardPdfPageItems(items) {
     const amtStr = rowItems.filter(it => it.x >= CARD_AMOUNT_COL[0] && it.x < CARD_AMOUNT_COL[1]).map(it => it.str).join(' ');
     const amtMatches = amtStr.match(/\d+\.\d{2}/g);
     if (!amtMatches || !amtMatches.length) continue;
-    const sector = rowItems.filter(it => it.x >= CARD_SECTOR_COL_MIN).map(it => it.str).join(' ').trim();
+    // The first data row on each page can also pick up that page's own
+    // repeated "...Sector" column-header label bleeding in above it (same
+    // top-of-page boundary issue as the date column) — match the known
+    // sector keyword out of the joined text rather than comparing it
+    // exactly, so a stray leading "Sector" word doesn't break the match.
+    const sectorText = rowItems.filter(it => it.x >= CARD_SECTOR_COL_MIN).map(it => it.str).join(' ');
+    const sectorMatch = sectorText.match(/\b(PARKING|TOLL|RETAIL)\b/);
+    const sector = sectorMatch ? sectorMatch[1] : sectorText.trim();
 
     const dm = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     const date = `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}`;
