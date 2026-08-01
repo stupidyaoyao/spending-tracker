@@ -2635,6 +2635,15 @@ function renderAccountFilters() {
 // accountTxns (which changes whenever the Account filter changes).
 function renderFilters(accountTxns) {
   const present = new Set(accountTxns.map(t => t.category));
+  // A category with zero PRIMARY transactions but that has something
+  // "+ also under" tagged into it (see alsoTaggedIntoCategoryTxns()) should
+  // still show up as a browsable chip — otherwise its "Also tagged as X"
+  // reference section could never be reached (e.g. Sports before any real
+  // Sports-category row exists, only Food/Car/etc. payments tagged into it).
+  accountTxns.forEach(t => {
+    const p = parseExtraTag(t.category, t.extraTag);
+    if (p && p.category !== t.category) present.add(p.category);
+  });
   // If the category you had selected isn't available for the account you
   // just switched to, fall back to All rather than showing an empty list.
   if (activeFilter !== 'All' && !present.has(activeFilter)) {
