@@ -126,6 +126,16 @@
   .history-summary-row .acct { font-size: 14px; font-weight: 600; }
   .history-summary-row .when { font-size: 12px; color: var(--muted); text-align: right; }
   .history-section-label { font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
+  .review-entry { background: var(--card); border-radius: 12px; padding: 12px 14px; border: 1px solid #3a2f12; }
+  .review-entry .review-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .review-entry .review-title { font-size: 14px; font-weight: 600; }
+  .review-entry .review-amount { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .review-entry .review-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .review-entry .review-note { font-size: 12px; color: #ffd60a; font-style: italic; margin-top: 4px; }
+  .review-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .review-btn { flex: 1; border: none; border-radius: 8px; padding: 7px 0; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .review-btn.confirm { background: #1f3d2b; color: #30d158; }
+  .review-btn.delete { background: #3d1f22; color: #ff453a; }
   .page-updated { text-align: center; font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
   /* Back to the original 3-across row for Today/This week/This month —
      All time now lives in its own full-width rectangle below (see
@@ -515,6 +525,8 @@
 
   <div id="historyPage" style="display:none;">
     <div class="history-summary" id="historySummary"></div>
+    <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
+    <div class="history-list" id="reviewList"></div>
     <div class="history-section-label">Recent activity</div>
     <div class="history-list" id="historyList"><div class="empty">Loading…</div></div>
   </div>
@@ -1650,12 +1662,76 @@ document.getElementById('mainMiniCalNext').onclick = () => { mainMiniCalMonth.se
 // CSV gets uploaded for that account. Below it, the raw reverse-chronological
 // edit log (see ACTIVITY_LOG_SHEET in Code.gs) — only starts from when that
 // feature was added, so it won't show anything from before today.
+// The manual counterpart to confirmTbcIfMatches_() (Code.gs) — that backend
+// rule only clears a TBC row automatically when a real import exactly
+// matches it (same account/date/amount). This section lists every row
+// still marked "*TBC" so you can close it out by hand instead: Confirm if
+// you know it actually happened as guessed, or Delete if it turns out
+// wrong (e.g. you didn't actually reload that day) — either way the yellow
+// "!" on the Main page disappears once it's off this list.
+function renderReviewList() {
+  const label = document.getElementById('reviewSectionLabel');
+  const el = document.getElementById('reviewList');
+  const unconfirmed = allTxns.filter(t => t.remark && t.remark.indexOf('*TBC') === 0)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  if (!unconfirmed.length) {
+    label.style.display = 'none';
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  label.style.display = '';
+  el.style.display = '';
+  label.textContent = `Needs review (${unconfirmed.length})`;
+
+  el.innerHTML = unconfirmed.map(t => {
+    const { sign, cls: amtClass } = txnSignInfo(t);
+    return `
+    <div class="review-entry" data-row="${t.row}">
+      <div class="review-top">
+        <div class="review-title">${escapeHtml(txnTitle(t))}</div>
+        <div class="${amtClass} review-amount">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
+      </div>
+      <div class="review-meta">${new Date(t.date).toLocaleDateString()} · ${escapeHtml(t.account || '')}</div>
+      <div class="review-note">${escapeHtml(t.remark)}</div>
+      <div class="review-actions">
+        <button class="review-btn confirm" data-row="${t.row}">Confirm</button>
+        <button class="review-btn delete" data-row="${t.row}">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.review-btn.confirm').forEach(btn => {
+    btn.onclick = async () => {
+      const row = Number(btn.dataset.row);
+      btn.disabled = true;
+      btn.textContent = 'Confirming…';
+      const today = new Date().toISOString().slice(0, 10);
+      await callApi('updateRemark', { row, remark: 'Confirmed manually on ' + today });
+      await loadData();
+    };
+  });
+  el.querySelectorAll('.review-btn.delete').forEach(btn => {
+    btn.onclick = async () => {
+      const row = Number(btn.dataset.row);
+      if (!confirm('Delete this record permanently? This can\'t be undone.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+      await callApi('deleteTransaction', { row });
+      await loadData();
+    };
+  });
+}
+
 function renderHistory() {
   const summaryEl = document.getElementById('historySummary');
   summaryEl.innerHTML = ACCOUNTS.map(a => {
     const label = lastUpdatedLabel(allTxns.filter(t => t.account === a)) || 'No records yet';
     return `<div class="history-summary-row"><span class="acct">${escapeHtml(a)}</span><span class="when">${escapeHtml(label)}</span></div>`;
   }).join('');
+
+  renderReviewList();
 
   const el = document.getElementById('historyList');
   if (!activityLog.length) {
