@@ -597,6 +597,8 @@
         <select id="importAccount">
           <option value="TNG">TNG eWallet (PDF or CSV)</option>
           <option value="TNG-Screenshot">TNG eWallet (Screenshot)</option>
+          <option value="TNG Card">TNG Card (PDF or CSV)</option>
+          <option value="TNG Card-Screenshot">TNG Card (Screenshot)</option>
           <option value="HL Bank">HL Bank (CSV)</option>
           <option value="PBank">PBank (CSV)</option>
         </select>
@@ -753,7 +755,7 @@ function categoryOptionsHtml(selectedCategory, selectedSubTag, account) {
   const isCurrent = (o) => o.category === selectedCategory && o.subTag === (selectedSubTag || '');
   return CATEGORY_OPTIONS.filter(o => {
     const isCardReload = o.category === 'Transfer' && (o.subTag === 'Card Reload' || o.subTag === 'TNG Card Top-up');
-    if (isCardReload && account && account !== 'TNG' && !isCurrent(o)) return false;
+    if (isCardReload && account && account !== 'TNG' && account !== 'TNG Card' && !isCurrent(o)) return false;
     return true;
   }).map(o => {
     const val = optionValue(o);
@@ -783,20 +785,21 @@ let accountBalances = [];
 function trueBalanceFor(account) {
   const anchor = accountBalances.find(b => b.account === account);
   if (!anchor) return null;
-  let relevant;
-  if (account === 'TNG Card') {
-    // Pseudo-account: the physical TNG Card's own balance (separate from the
-    // eWallet — see the CATEGORY_OPTIONS note on "TNG Card Top-up"). It has
-    // no Account column of its own; it's funded purely by TNG rows tagged
-    // with that subtag.
-    relevant = allTxns.filter(t => t.account === 'TNG' && t.subTag === 'TNG Card Top-up');
-  } else if (account === 'TNG') {
-    // Card top-ups never touch the eWallet, so they're excluded here too —
-    // otherwise this would double as both the eWallet AND the card balance.
-    relevant = allTxns.filter(t => t.account === 'TNG' && t.subTag !== 'TNG Card Top-up');
-  } else {
-    relevant = allTxns.filter(t => t.account === account);
-  }
+  // TNG Card used to be a pseudo-account computed purely from TNG rows
+  // tagged "TNG Card Top-up" (an elimination guess, since the physical
+  // Card's own statement wasn't imported anywhere yet) — it only ever went
+  // up, since no data source captured Card spend (parking/tolls off the
+  // Card itself). Now that the real Card statement can be imported (see
+  // the "TNG Card (PDF or CSV)" option), TNG Card is a real account with
+  // its own rows on both sides — reload-in AND parking spend-out — so its
+  // balance comes straight from those, same as every other account. A
+  // Card top-up is also now known to be a genuine transfer OUT of the
+  // eWallet (confirmed against the real Card + eWallet statements), so
+  // it's no longer excluded from TNG's own balance either. The two old
+  // pseudo-tagged rows from before this fix (2026-07-10, 2026-07-29) both
+  // predate every account's anchor date, so this change doesn't move
+  // today's numbers — it only affects new imports going forward.
+  const relevant = allTxns.filter(t => t.account === account);
   const after = relevant.filter(t => t.date > anchor.asOfDate);
   const delta = after.reduce((s, t) => s + (txnFlow(t) === 'in' ? Number(t.amount || 0) : -Number(t.amount || 0)), 0);
   return anchor.asOfBalance + delta;
@@ -2181,22 +2184,16 @@ function renderCharts() {
       const dates = g.accounts.map(a => { const anc = accountBalances.find(b => b.account === a); return anc ? anc.asOfDate : null; }).filter(Boolean);
       trueUpdatedEl.textContent = dates.length ? formatAnchorDate(dates.sort().slice(-1)[0]) : '';
     }
-    // TNG's physical Card balance (separate pseudo-account) shows as a
-    // second line right under the eWallet Balance line — see the
-    // "TNG Card Top-up" note on CATEGORY_OPTIONS. Colored the same way as
-    // the eWallet balance above for consistency. NOTE: this is only ever
-    // built from top-up amounts (money IN) — there's no data source that
-    // captures the card being used for parking/non-PayDirect tolls (money
-    // OUT), since those deductions never appear as a TNG transaction row.
-    // So this number only ever goes up and will always show green; it's
-    // really "total topped up since anchor", not a true live balance. The
-    // title tooltip below spells that out on hover/long-press.
+    // TNG's physical Card balance shows as a second line right under the
+    // eWallet Balance line. Now backed by the Card's own real transactions
+    // (see "TNG Card (PDF or CSV)" import) — both reload-in and
+    // parking/spend-out — rather than the old top-ups-only guess.
     if (g.accounts.includes('TNG')) {
       const cardEl = document.getElementById('miniCardTrue-TNG');
       if (cardEl) {
         const cardBal = trueBalanceFor('TNG Card');
         cardEl.textContent = cardBal === null ? '' : 'Card: RM' + cardBal.toFixed(2);
-        cardEl.title = 'Only tracks top-ups (money in) — card usage/spend isn’t recorded separately, so this always trends upward.';
+        cardEl.title = 'Physical TNG Card balance — from Card statement imports (reloads + parking spend).';
         cardEl.classList.toggle('positive', cardBal !== null && cardBal >= 0);
         cardEl.classList.toggle('negative', cardBal !== null && cardBal < 0);
       }
@@ -2875,9 +2872,11 @@ function updateImportPickFieldForAccount() {
   const importAccount = document.getElementById('importAccount').value;
   const fFile = document.getElementById('fFile');
   const label = document.getElementById('importPickLabel');
-  if (importAccount === 'TNG-Screenshot') {
+  if (importAccount.endsWith('-Screenshot')) {
     fFile.accept = '.png,.jpg,.jpeg';
-    label.textContent = 'Screenshot (TNG "Activity"/"History" screen)';
+    label.textContent = importAccount === 'TNG Card-Screenshot'
+      ? 'Screenshot (TNG Card screen)'
+      : 'Screenshot (TNG "Activity"/"History" screen)';
   } else {
     fFile.accept = '.pdf,.csv';
     label.textContent = 'Statement file';
@@ -2899,11 +2898,12 @@ function parseCsvFile(file) {
           const description = r['Description'] || r['Merchant'] || '';
           const dateRaw = r['Date'] || '';
           const amountRaw = (r['Amount (RM)'] || r['Amount'] || '0').toString().replace(/[^0-9.\-]/g, '');
-          const guess = categorize(description, type);
-          if (!guess) return;
           let date = dateRaw;
           const m = dateRaw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
           if (m) date = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+          if (isInImportExcludeWindow(date)) return;
+          const guess = categorize(description, type);
+          if (!guess) return;
           // Time may come from its own column, or be embedded in the Date
           // cell itself (e.g. "30/06/2026 14:23").
           let time = r['Time'] || '';
@@ -3130,6 +3130,16 @@ function parseBankBCsvFile(file) {
   });
 }
 
+// A short testing window — any parsed transaction dated inside this range
+// is dropped from every TNG/TNG Card import (PDF, CSV, or screenshot)
+// rather than imported, so it can be added by hand from the phone instead
+// and compared against what auto-import would have produced.
+const IMPORT_EXCLUDE_FROM = '2026-07-30';
+const IMPORT_EXCLUDE_TO = '2026-08-01';
+function isInImportExcludeWindow(date) {
+  return date >= IMPORT_EXCLUDE_FROM && date <= IMPORT_EXCLUDE_TO;
+}
+
 // ---- PDF parsing ----
 // TNG's exported statement is a table with FIXED columns (Date, Status,
 // Transaction Type, Reference, Description, Details, Amount (RM), Wallet
@@ -3293,6 +3303,7 @@ async function parsePdfFile(file) {
 
   const rows = [];
   records.forEach(r => {
+    if (isInImportExcludeWindow(r.date)) return;
     const guess = categorize(r.merchant, r.type);
     if (!guess) return; // Reload / Transfer / Receive / Cashback — not spending
     rows.push({
@@ -3303,6 +3314,164 @@ async function parsePdfFile(file) {
     });
   });
   return rows;
+}
+
+// ---- TNG Card PDF parsing ----
+// The physical Card's statement is a completely different table shape from
+// the eWallet's — not rotated like the eWallet PDF, standard top-down page
+// coords (y decreases going down the page). Two sections: "Offline Card
+// Transactions" (parking fares + one Reload event, each with their own
+// Card Balance running total — this is genuinely new data, never captured
+// anywhere else) and "Online Card Transactions" (highway tolls, which are
+// confirmed duplicates of the eWallet's own RFID/PayDirect entries — same
+// real-world charge, reported on both statements — so these are skipped
+// entirely rather than double-imported). Row anchor is the "Trans No."
+// column (a bare 5-digit number at the far left); each row's extent runs
+// from its own anchor down to the next one, same boundary technique as the
+// eWallet parser above, just with un-swapped axes.
+const CARD_TRANSNO_MAXX = 45;
+const CARD_DATE_COL = [95, 148];   // "Exit Date & Time" column — this also
+                                    // catches a Reload row's one-and-only
+                                    // date, which prints into this same slot
+const CARD_TYPE_COL = [195, 236];  // "Tran Type" column (multi-line)
+const CARD_AMOUNT_COL = [460, 528]; // Trans Amount + Card Balance zone —
+                                     // occasionally merge into one text run
+                                     // (seen on the Reload row), so both
+                                     // sub-columns are read together and the
+                                     // FIRST RM figure found is taken as the
+                                     // Trans Amount
+const CARD_SECTOR_COL_MIN = 528;   // "Sector" column (PARKING / TOLL / RETAIL)
+
+// Parses one pdf.js page's text items into Offline-section Card records.
+// Stops at the first "Online Card Transactions" marker, if present on this
+// page, so Online rows are never picked up even by accident.
+function parseCardPdfPageItems(items) {
+  const usable = items.filter(it => it.str && it.str.trim().length && it.transform);
+  if (!usable.length) return [];
+  const withPos = usable.map(it => ({ x: it.transform[4], y: it.transform[5], str: it.str.trim() }));
+
+  const onlineIdx = withPos.findIndex(it => it.str.indexOf('Online Card Transactions') !== -1);
+  const scoped = onlineIdx === -1 ? withPos : withPos.slice(0, onlineIdx);
+
+  const rowAnchors = scoped.filter(it => it.x < CARD_TRANSNO_MAXX && /^\d{5}$/.test(it.str));
+  rowAnchors.sort((a, b) => b.y - a.y); // standard PDF coords: higher y = higher on the page = earlier row
+
+  const records = [];
+  for (let i = 0; i < rowAnchors.length; i++) {
+    const rowTop = rowAnchors[i].y + 0.5;
+    const rowBottom = i + 1 < rowAnchors.length ? rowAnchors[i + 1].y + 0.5 : -Infinity;
+    const rowItems = scoped.filter(it => it.y <= rowTop && it.y > rowBottom);
+
+    const dateCandidates = rowItems.filter(it => it.x >= CARD_DATE_COL[0] && it.x < CARD_DATE_COL[1]).map(it => it.str);
+    const dateStr = dateCandidates.find(s => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s));
+    const timeStr = dateCandidates.find(s => /^\d{1,2}:\d{2}:\d{2}$/.test(s)) || '';
+    if (!dateStr) continue;
+
+    const typeStr = rowItems.filter(it => it.x >= CARD_TYPE_COL[0] && it.x < CARD_TYPE_COL[1]).map(it => it.str).join(' ');
+    const amtStr = rowItems.filter(it => it.x >= CARD_AMOUNT_COL[0] && it.x < CARD_AMOUNT_COL[1]).map(it => it.str).join(' ');
+    const amtMatches = amtStr.match(/\d+\.\d{2}/g);
+    if (!amtMatches || !amtMatches.length) continue;
+    const sector = rowItems.filter(it => it.x >= CARD_SECTOR_COL_MIN).map(it => it.str).join(' ').trim();
+
+    const dm = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const date = `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}`;
+    const amount = parseFloat(amtMatches[0]);
+    const isReload = /Reload/i.test(typeStr);
+
+    records.push({ date, time: normalizeTime(timeStr), amount, sector, isReload, typeStr });
+  }
+  return records;
+}
+
+async function extractCardPdfRecords(file) {
+  if (!window.pdfjsLib) throw new Error('PDF reader failed to load — check your connection and try again.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let records = [];
+  let sawOnline = false;
+  for (let p = 1; p <= pdf.numPages && !sawOnline; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    if (content.items.some(it => it.str && it.str.indexOf('Online Card Transactions') !== -1)) sawOnline = true;
+    records = records.concat(parseCardPdfPageItems(content.items));
+  }
+  return records;
+}
+
+async function parseCardPdfFile(file) {
+  const records = await extractCardPdfRecords(file);
+  if (!records.length) {
+    const err = new Error("Couldn't recognize any transactions in that Card statement PDF.");
+    err.diagnostic = true;
+    throw err;
+  }
+  const rows = [];
+  records.forEach(r => {
+    if (isInImportExcludeWindow(r.date)) return;
+    if (r.sector === 'TOLL') return; // duplicate of the eWallet's own RFID/PayDirect entry — don't double-import
+    if (r.isReload) {
+      rows.push({
+        date: r.date, time: r.time || '', amount: r.amount,
+        category: 'Transfer', subTag: 'TNG Card Top-up',
+        merchant: 'TNG Card Reload', source: 'TNG Card PDF Import', notes: r.typeStr, type: 'Reload',
+        account: 'TNG Card', flow: 'in'
+      });
+      return;
+    }
+    if (r.sector === 'PARKING') {
+      rows.push({
+        date: r.date, time: r.time || '', amount: r.amount,
+        category: 'Car', subTag: 'Parking',
+        merchant: 'TNG Card Parking', source: 'TNG Card PDF Import', notes: r.typeStr, type: 'Parking',
+        account: 'TNG Card'
+      });
+      return;
+    }
+    // Unrecognized sector — skip rather than guess.
+  });
+  return rows;
+}
+
+// Best-effort CSV path for the Card — there's no real sample of what a
+// Card CSV export looks like yet, so this guesses at generic Date/Type/
+// Description/Amount columns (same shape as the eWallet's own CSV parser)
+// rather than a verified layout. Flag any issues if this doesn't line up
+// with an actual export.
+function parseCardCsvFile(file) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const rows = [];
+        results.data.forEach(r => {
+          const type = r['Type'] || r['Transaction Type'] || r['Tran Type'] || '';
+          const description = r['Description'] || r['Sector'] || '';
+          const dateRaw = r['Date'] || r['Exit Date'] || '';
+          const amountRaw = (r['Amount (RM)'] || r['Trans Amount (RM)'] || r['Amount'] || '0').toString().replace(/[^0-9.\-]/g, '');
+          const m = String(dateRaw).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+          const date = m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : dateRaw;
+          if (isInImportExcludeWindow(date)) return;
+          const typeUpper = String(type).toUpperCase();
+          const descUpper = String(description).toUpperCase();
+          if (typeUpper.indexOf('TOLL') !== -1 || descUpper.indexOf('TOLL') !== -1) return; // duplicate of eWallet
+          const isReload = /RELOAD/.test(typeUpper) || /RELOAD/.test(descUpper);
+          rows.push({
+            date, time: '', amount: parseFloat(amountRaw) || 0,
+            category: isReload ? 'Transfer' : 'Car',
+            subTag: isReload ? 'TNG Card Top-up' : 'Parking',
+            merchant: isReload ? 'TNG Card Reload' : 'TNG Card Parking',
+            source: 'TNG Card CSV Import', notes: type, type,
+            account: 'TNG Card',
+            flow: isReload ? 'in' : ''
+          });
+        });
+        resolve(rows);
+      },
+      error: reject
+    });
+  });
 }
 
 // ---- Screenshot parsing (client-side OCR via Tesseract.js) ----
@@ -3414,6 +3583,7 @@ async function parseScreenshotFile(file) {
   }
   const rows = [];
   records.forEach(r => {
+    if (isInImportExcludeWindow(r.date)) return;
     const guess = categorize(r.merchant, r.type);
     if (!guess) return;
     rows.push({
@@ -3421,6 +3591,43 @@ async function parseScreenshotFile(file) {
       category: guess.category, subTag: guess.subTag,
       merchant: r.merchant, source: 'TNG Screenshot Import', notes: r.type, type: r.type,
       account: 'TNG'
+    });
+  });
+  return rows;
+}
+
+// Best-effort — there's no confirmed screenshot format for the physical
+// Card yet (unlike the eWallet's well-tested "Activity" screen), so this
+// reuses the exact same OCR line parser on the assumption a Card history
+// screen follows the same date/merchant+amount/type row layout. Test
+// against a real screenshot and adjust if the format turns out different.
+async function parseCardScreenshotFile(file) {
+  const records = await extractScreenshotRecords(file);
+  if (!records.length) {
+    const rawLines = (records.__rawLines || []).join('\n') || '(none)';
+    const err = new Error(`Couldn't recognize any transactions in that screenshot.\n\nRecognized text:\n${rawLines}`);
+    err.diagnostic = true;
+    throw err;
+  }
+  const rows = [];
+  records.forEach(r => {
+    if (isInImportExcludeWindow(r.date)) return;
+    const isReload = /Reload/i.test(r.type) || /^Reload$/i.test(r.merchant);
+    if (isReload) {
+      rows.push({
+        date: r.date, time: r.time || '', amount: r.amount,
+        category: 'Transfer', subTag: 'TNG Card Top-up',
+        merchant: 'TNG Card Reload', source: 'TNG Card Screenshot Import', notes: r.type, type: 'Reload',
+        account: 'TNG Card', flow: 'in'
+      });
+      return;
+    }
+    const guess = categorize(r.merchant, r.type) || { category: 'Car', subTag: 'Parking' };
+    rows.push({
+      date: r.date, time: r.time || '', amount: r.amount,
+      category: guess.category, subTag: guess.subTag,
+      merchant: r.merchant, source: 'TNG Card Screenshot Import', notes: r.type, type: r.type,
+      account: 'TNG Card'
     });
   });
   return rows;
@@ -3493,7 +3700,7 @@ importSubmitBtn.onclick = async () => {
     const importAccount = document.getElementById('importAccount').value;
 
     importStatusEl.className = 'status-msg';
-    importStatusEl.textContent = importAccount === 'TNG-Screenshot'
+    importStatusEl.textContent = importAccount.endsWith('-Screenshot')
       ? 'Reading screenshot… (OCR can take 10-30s, especially the first time)'
       : 'Reading file…';
     importSubmitBtn.disabled = true;
@@ -3505,6 +3712,10 @@ importSubmitBtn.onclick = async () => {
         rows = await parseBankBCsvFile(file);
       } else if (importAccount === 'TNG-Screenshot') {
         rows = await parseScreenshotFile(file);
+      } else if (importAccount === 'TNG Card-Screenshot') {
+        rows = await parseCardScreenshotFile(file);
+      } else if (importAccount === 'TNG Card') {
+        rows = file.name.toLowerCase().endsWith('.pdf') ? await parseCardPdfFile(file) : await parseCardCsvFile(file);
       } else if (file.name.toLowerCase().endsWith('.pdf')) {
         rows = await parsePdfFile(file);
       } else {
