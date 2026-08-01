@@ -2967,6 +2967,13 @@ let pendingImportRows = [];
 // spliced/pushed so the preview screen can show fixed status sections
 // while Group by/Sort by still reorder rows within a section.
 let pendingImportSections = [];
+// Parallel array too — pendingImportReviewLabels[i] is the account-pair
+// label (e.g. "HL > TNG TBC") for the pending review record that
+// pendingImportRows[i] will confirm, or null if this row isn't a review
+// sync. Shown as a small yellow badge so you can see at a glance which
+// side of a transfer this import is confirming, same badge style as the
+// TBC flag already used in History/Review.
+let pendingImportReviewLabels = [];
 // Rows classified as exact duplicates of something already in your data —
 // held out of pendingImportRows (so Import won't submit them) but still
 // shown in the preview, read-only, with a "Keep anyway" escape hatch.
@@ -2976,6 +2983,7 @@ function resetImportSheet() {
   importStage = 'pick';
   pendingImportRows = [];
   pendingImportSections = [];
+  pendingImportReviewLabels = [];
   pendingImportDuplicates = [];
   importPickField.style.display = 'block';
   document.getElementById('importToolbar').style.display = 'none';
@@ -3838,14 +3846,21 @@ function renderImportPreview() {
   // row by its original index into that array.
   const indexed = pendingImportRows.map((r, i) => ({ r, i, section: pendingImportSections[i] }));
 
-  const rowHtml = ({ r, i }) => {
+  const rowHtml = ({ r, i, section }) => {
     const { sign, cls: amtClass } = txnSignInfo(r);
+    // Only reviewSynced rows have a pair label — shows which side of a
+    // transfer this import will confirm, e.g. "HL > TNG TBC", using the
+    // same yellow badge as the TBC flag in History/Review.
+    const reviewLabel = section === 'reviewSynced' ? pendingImportReviewLabels[i] : null;
+    const reviewBadgeHtml = reviewLabel
+      ? `<span class="tbc-flag" title="Confirms the pending ${escapeHtml(reviewLabel)} review record — check that side too">${escapeHtml(reviewLabel)}</span>`
+      : '';
     return `
     <div class="txn preview-row">
       <div class="preview-top">
         <div class="dot ${ALL_CATEGORIES.includes(r.category) ? r.category : 'Custom'}"></div>
         <div class="info">
-          <div class="merchant">${txnTitle(r)}</div>
+          <div class="merchant">${txnTitle(r)}${reviewBadgeHtml}</div>
           <div class="meta">${r.date} · ${r.time || 'No time record'}</div>
         </div>
         <div class="${amtClass}">${sign}RM${Number(r.amount).toFixed(2)}</div>
@@ -3920,6 +3935,7 @@ function renderImportPreview() {
       const idx = Number(el.dataset.idx);
       pendingImportRows.splice(idx, 1);
       pendingImportSections.splice(idx, 1);
+      pendingImportReviewLabels.splice(idx, 1);
       renderImportPreview();
       importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
     };
@@ -3944,6 +3960,7 @@ function renderImportPreview() {
       const [row] = pendingImportDuplicates.splice(idx, 1);
       pendingImportRows.push(row);
       pendingImportSections.push('restored');
+      pendingImportReviewLabels.push(null);
       renderImportPreview();
       importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
     };
@@ -3995,28 +4012,34 @@ function accountDateKey(account, date) { return (account || 'TNG') + '|' + date;
 // one flipping to "old date".
 function classifyImportRows(rows) {
   const existingDateKeys = new Set(allTxns.map(t => accountDateKey(t.account, t.date)));
-  const duplicate = [], reviewSynced = [], newDate = [], oldDate = [];
+  const duplicate = [], reviewSynced = [], reviewSyncedLabels = [], newDate = [], oldDate = [];
   const keptSoFar = [];
   rows.forEach(r => {
     const dupExisting = allTxns.some(t => importRowsMatch(t, r));
     const dupInBatch = keptSoFar.some(k => importRowsMatch(k, r));
     if (dupExisting || dupInBatch) { duplicate.push(r); return; }
     keptSoFar.push(r);
-    if (findReviewMatch(r)) { reviewSynced.push(r); return; }
+    const reviewMatch = findReviewMatch(r);
+    if (reviewMatch) { reviewSynced.push(r); reviewSyncedLabels.push(tbcPairLabel(reviewMatch)); return; }
     if (existingDateKeys.has(accountDateKey(r.account, r.date))) oldDate.push(r);
     else newDate.push(r);
   });
-  return { duplicate, reviewSynced, newDate, oldDate };
+  return { duplicate, reviewSynced, reviewSyncedLabels, newDate, oldDate };
 }
 
 function showImportPreview(rows, extraNote) {
-  const { duplicate, reviewSynced, newDate, oldDate } = classifyImportRows(rows);
+  const { duplicate, reviewSynced, reviewSyncedLabels, newDate, oldDate } = classifyImportRows(rows);
   pendingImportDuplicates = duplicate;
   pendingImportRows = [...reviewSynced, ...newDate, ...oldDate];
   pendingImportSections = [
     ...reviewSynced.map(() => 'reviewSynced'),
     ...newDate.map(() => 'newDate'),
     ...oldDate.map(() => 'oldDate'),
+  ];
+  pendingImportReviewLabels = [
+    ...reviewSyncedLabels,
+    ...newDate.map(() => null),
+    ...oldDate.map(() => null),
   ];
 
   importStage = 'preview';
