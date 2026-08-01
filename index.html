@@ -3883,6 +3883,15 @@ function parsePdfPageItems(items) {
   if (!dateRows.length) return [];
 
   const records = [];
+  // Every date-starting row that DIDN'T make it into `records`, with why —
+  // e.g. an unrecognized type string (exactly how the DUITNOW_RECEI row went
+  // missing before it was added to TXN_TYPES) or a column-parsing miss on
+  // the amount. Surfaced by parsePdfFile()/extractPdfRecords() as a
+  // "possible missed transactions" warning in the import preview, instead of
+  // silently dropping the row the way a future unrecognized type otherwise
+  // would. Attached to the returned array (like the existing __rawDump
+  // convention) rather than changing this function's return shape.
+  const skipped = [];
   for (let i = 0; i < dateRows.length; i++) {
     const rowTop = dateRows[i].top - 0.5;
     const rowBottom = i + 1 < dateRows.length ? dateRows[i + 1].top - 0.5 : Infinity;
@@ -3896,11 +3905,18 @@ function parsePdfPageItems(items) {
     const typeStr = (cols.type || []).join(' ');
     let ttype = null;
     for (const t of TXN_TYPES) { if (typeStr.startsWith(t)) { ttype = t; break; } }
-    if (!dateRaw || !ttype) continue;
+    const rawLine = rowItems.map(it => it.str).join(' ');
+    if (!dateRaw || !ttype) {
+      if (dateRaw) skipped.push({ date: dateRaw, rawLine, reason: 'unrecognized type' });
+      continue;
+    }
 
     const amtStr = (cols.amount || []).join(' ');
     const amtMatch = amtStr.match(/RM\s?([\d,]+\.\d{2})/);
-    if (!amtMatch) continue;
+    if (!amtMatch) {
+      skipped.push({ date: dateRaw, rawLine, reason: 'no amount found' });
+      continue;
+    }
     const amount = parseFloat(amtMatch[1].replace(/,/g, ''));
 
     let merchant = cleanMerchant((cols.description || []).join(' '));
@@ -3945,6 +3961,7 @@ function parsePdfPageItems(items) {
 
     records.push({ date, time, amount, merchant, type: ttype });
   }
+  records.__skipped = skipped;
   return records;
 }
 
@@ -3961,6 +3978,7 @@ async function extractPdfRecords(file) {
   const pdf = await loadingTask.promise;
   let records = [];
   let rawDump = null;
+  let allSkipped = [];
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
@@ -3971,9 +3989,12 @@ async function extractPdfRecords(file) {
         return `${i}: x=${x} y=${y} "${it.str}"`;
       }).join('\n');
     }
-    records = records.concat(parsePdfPageItems(content.items));
+    const pageRecords = parsePdfPageItems(content.items);
+    allSkipped = allSkipped.concat(pageRecords.__skipped || []);
+    records = records.concat(pageRecords);
   }
   records.__rawDump = rawDump;
+  records.__skipped = allSkipped;
   return records;
 }
 
@@ -3999,6 +4020,18 @@ async function parsePdfFile(file) {
       account: 'TNG'
     });
   });
+  // Independent verification pass: every date-row the column/type parser
+  // above couldn't turn into a transaction (see parsePdfPageItems's
+  // `skipped` tracking) that STILL contains a real "RMxx.xx" amount is
+  // flagged here, instead of silently vanishing the way the DUITNOW_RECEI
+  // row did before it was added to TXN_TYPES. Filters out statement
+  // boilerplate (totals/balance lines) that coincidentally contains "RM"
+  // but was never a real row to begin with. Surfaced by the caller as a
+  // warning in the import preview (see showImportPreview()'s extraNote).
+  const RM_AMOUNT_RE = /RM\s?[\d,]+\.\d{2}/;
+  const STATEMENT_JUNK_RE = /total|balance\s*b\/f|opening balance|closing balance|statement period/i;
+  rows.__possibleMissed = (records.__skipped || [])
+    .filter(s => RM_AMOUNT_RE.test(s.rawLine) && !STATEMENT_JUNK_RE.test(s.rawLine));
   return rows;
 }
 
@@ -4695,7 +4728,15 @@ importSubmitBtn.onclick = async () => {
     importSubmitBtn.disabled = false;
 
     if (!rows.length) { importStatusEl.textContent = 'No spending transactions found in that file.'; return; }
-    showImportPreview(rows);
+    // parsePdfFile() (TNG eWallet PDF only) attaches __possibleMissed — real
+    // "RMxx.xx" lines its column/type parser couldn't turn into a
+    // transaction (see the DUITNOW_RECEI bug this replaced). Surfaced up
+    // front so you can go check the PDF yourself instead of a row silently
+    // vanishing again.
+    const missedNote = (rows.__possibleMissed && rows.__possibleMissed.length)
+      ? `⚠️ ${rows.__possibleMissed.length} line(s) in the PDF looked like they might be transactions but weren't recognized — check these manually: ${rows.__possibleMissed.map(m => `[${m.date}] ${m.rawLine}`).join(' | ')}`
+      : '';
+    showImportPreview(rows, missedNote);
     return;
   }
 
