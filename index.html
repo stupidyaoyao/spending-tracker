@@ -3804,18 +3804,30 @@ function parsePdfPageItems(items) {
 
     let merchant = cleanMerchant((cols.description || []).join(' '));
     if (!merchant) merchant = ttype;
-    // The "details" column (x 455-650) was being parsed into `cols` but
-    // never actually read anywhere — for a "Transfer to Wallet"/"Receive
-    // from Wallet" row where the Description column just says the generic
-    // "FUND TRANSFER" (no name available there), this Details column is
-    // where TNG prints the actual identifying info (e.g. the recipient's
-    // name/reference), so a row that would otherwise show as a bare "Fund
-    // Transfer" with no further context now carries that detail too.
-    const details = cleanMerchant((cols.details || []).join(' '));
-    if (details && /^FUND TRANSFER$/i.test(merchant)) {
-      merchant = details;
-    } else if (details && details.toUpperCase() !== merchant.toUpperCase()) {
-      merchant = merchant + ' - ' + details;
+    // The "details" column (x 455-650) holds wildly different content
+    // depending on transaction type: for RFID/PayDirect/DuitNow rows it's
+    // just the timestamp (already pulled out separately below); for Reload
+    // rows it's an opaque base64-looking payment-gateway reference; only for
+    // Transfer to Wallet/Receive from Wallet rows does TNG occasionally put
+    // real identifying text there (e.g. a recipient name) when the
+    // Description column just says the generic "Fund Transfer". A previous
+    // version of this merged Details into the merchant for EVERY row type,
+    // which polluted ordinary merchant names with timestamps/reference
+    // blobs and broke duplicate-detection against already-imported data
+    // (see Review tab / import preview showing far more "new" than
+    // expected). Scoped to just the transfer types now, and skips details
+    // that are only a time-of-day token or a long digit/base64 blob with no
+    // real letters in it — cleanMerchant already strips runs of 8+ digits,
+    // but a real look-like-a-name check guards against anything that slips
+    // through (e.g. mixed-case base64 fragments).
+    if (ttype === 'Transfer to Wallet' || ttype === 'Receive from Wallet') {
+      const details = cleanMerchant((cols.details || []).join(' '));
+      const looksLikeRealText = details && /[A-Za-z]{3,}/.test(details) && !TIME_TOKEN_RE.test(details);
+      if (looksLikeRealText && /^FUND TRANSFER$/i.test(merchant)) {
+        merchant = details;
+      } else if (looksLikeRealText && details.toUpperCase() !== merchant.toUpperCase()) {
+        merchant = merchant + ' - ' + details;
+      }
     }
 
     const dm = dateRaw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
