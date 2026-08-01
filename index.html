@@ -3277,13 +3277,19 @@ function parseBankBCsvFile(file) {
   });
 }
 
-// A short testing window — any parsed transaction dated inside this range
-// is dropped from every TNG/TNG Card import (PDF, CSV, or screenshot)
-// rather than imported, so it can be added by hand from the phone instead
-// and compared against what auto-import would have produced.
-const IMPORT_EXCLUDE_FROM = '2026-07-30';
-const IMPORT_EXCLUDE_TO = '2026-08-01';
+// A short testing window that used to drop any parsed transaction dated
+// inside this range from every TNG/TNG Card import (PDF, CSV, or
+// screenshot), so it could be added by hand from the phone instead and
+// compared against what auto-import would have produced. That comparison
+// is done, and the window was left switched on by mistake — it was
+// silently deleting 30 Jul-1 Aug data from every real import. Disabled by
+// setting both bounds to '' so isInImportExcludeWindow() never matches;
+// left in place (rather than deleted outright) in case a similar
+// hold-out window is useful for a future testing pass.
+const IMPORT_EXCLUDE_FROM = '';
+const IMPORT_EXCLUDE_TO = '';
 function isInImportExcludeWindow(date) {
+  if (!IMPORT_EXCLUDE_FROM || !IMPORT_EXCLUDE_TO) return false;
   return date >= IMPORT_EXCLUDE_FROM && date <= IMPORT_EXCLUDE_TO;
 }
 
