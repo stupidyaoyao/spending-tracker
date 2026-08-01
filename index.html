@@ -419,8 +419,8 @@
   </header>
 
   <div id="mainPage">
-    <div class="totals" id="totals"></div>
     <div class="totals-all" id="totalsAll"></div>
+    <div class="totals" id="totals"></div>
 
     <div class="chart-card">
       <div class="chart-head">
@@ -624,6 +624,21 @@
       <div class="field" id="importPickField">
         <label id="importPickLabel">Statement file</label>
         <input type="file" id="fFile" accept=".pdf,.csv" multiple>
+      </div>
+
+      <div class="toolbar" id="importToolbar" style="display:none;">
+        <select id="importGroupBy">
+          <option value="none">Group by: None</option>
+          <option value="day">Group by: Day</option>
+          <option value="category">Group by: Category</option>
+          <option value="merchant">Group by: Merchant</option>
+        </select>
+        <select id="importSortBy">
+          <option value="date_desc">Sort: Newest first</option>
+          <option value="date_asc">Sort: Oldest first</option>
+          <option value="amount_desc">Sort: Amount high-low</option>
+          <option value="amount_asc">Sort: Amount low-high</option>
+        </select>
       </div>
 
       <div class="preview-list" id="importPreviewList" style="display:none;"></div>
@@ -1838,10 +1853,11 @@ function startOfWeek(d) {
 // Which time window the pies (big + mini) are scoped to — null means all
 // time (no scoping). Set by tapping one of the Today/This week/This month
 // cards below; tapping the already-active one clears it back to all time.
-let activeTimeFilter = 'month'; // null | 'today' | 'week' | 'month' — defaults to
-// this month so "Overall Expense" answers "how much did I spend this
-// month" out of the box, instead of an all-time total that looked similar
-// to (but didn't match) the separate "This month" card above it.
+let activeTimeFilter = 'all'; // null | 'today' | 'week' | 'month' | 'all' — the
+// "All time" card is now the first thing on the Main page, and defaults to
+// active, so the pie charts open showing your whole history rather than
+// just this month. Tap Today/This week/This month to narrow it, tap
+// whichever card is active to go back to all-time.
 
 function isInTimeFilter(t) {
   if (!activeTimeFilter) return true;
@@ -2872,6 +2888,8 @@ function attachLinkHandlers() {
 
 document.getElementById('groupBy').onchange = (e) => { groupMode = e.target.value; render(); };
 document.getElementById('sortBy').onchange = (e) => { sortMode = e.target.value; render(); };
+document.getElementById('importGroupBy').onchange = (e) => { importGroupMode = e.target.value; renderImportPreview(); };
+document.getElementById('importSortBy').onchange = (e) => { importSortMode = e.target.value; renderImportPreview(); };
 document.getElementById('searchBox').oninput = (e) => { searchQuery = e.target.value.trim(); render(); };
 
 // ---- Add transaction ----
@@ -2944,6 +2962,7 @@ function resetImportSheet() {
   importStage = 'pick';
   pendingImportRows = [];
   importPickField.style.display = 'block';
+  document.getElementById('importToolbar').style.display = 'none';
   importPreviewList.style.display = 'none';
   importPreviewList.innerHTML = '';
   importBackBtn.style.display = 'none';
@@ -3763,8 +3782,37 @@ async function parseCardScreenshotFile(file) {
 }
 
 // ---- Preview / review step ----
+// Group by / Sort by for the import preview list — separate state from the
+// Main list's groupMode/sortMode so changing one never affects the other.
+// Reuses the same txnTimestamp() helper (it only reads .date/.time, which
+// parsed rows have too) so "Newest first" etc. behaves identically to Main.
+let importGroupMode = 'none';
+let importSortMode = 'date_desc';
+
+function sortPreviewIndexed(indexed) {
+  const sorted = [...indexed];
+  if (importSortMode === 'date_desc') sorted.sort((a, b) => txnTimestamp(b.r) - txnTimestamp(a.r));
+  else if (importSortMode === 'date_asc') sorted.sort((a, b) => txnTimestamp(a.r) - txnTimestamp(b.r));
+  else if (importSortMode === 'amount_desc') sorted.sort((a, b) => Number(b.r.amount) - Number(a.r.amount));
+  else if (importSortMode === 'amount_asc') sorted.sort((a, b) => Number(a.r.amount) - Number(b.r.amount));
+  return sorted;
+}
+function previewGroupKeyFor(r) {
+  if (importGroupMode === 'day') return new Date(r.date).toDateString();
+  if (importGroupMode === 'category') return (r.category || 'Unsure') + (r.subTag ? ' · ' + r.subTag : '');
+  if (importGroupMode === 'merchant') return r.merchant || r.notes || 'Unknown';
+  return '__all__';
+}
+
 function renderImportPreview() {
-  importPreviewList.innerHTML = pendingImportRows.map((r, i) => {
+  // Sorting/grouping only changes what order rows are DISPLAYED in — the
+  // underlying pendingImportRows array (and its indices) never gets
+  // reordered, since the ✕/category/remember controls below all target a
+  // row by its original index into that array.
+  const indexed = pendingImportRows.map((r, i) => ({ r, i }));
+  const sorted = sortPreviewIndexed(indexed);
+
+  const rowHtml = ({ r, i }) => {
     const { sign, cls: amtClass } = txnSignInfo(r);
     return `
     <div class="txn preview-row">
@@ -3783,7 +3831,25 @@ function renderImportPreview() {
       </label>
     </div>
   `;
-  }).join('');
+  };
+
+  if (importGroupMode === 'none') {
+    importPreviewList.innerHTML = sorted.map(rowHtml).join('');
+  } else {
+    const groups = {};
+    const order = [];
+    sorted.forEach(item => {
+      const key = previewGroupKeyFor(item.r);
+      if (!groups[key]) { groups[key] = []; order.push(key); }
+      groups[key].push(item);
+    });
+    importPreviewList.innerHTML = order.map(key => `
+      <div class="preview-group">
+        <div class="history-section-label">${escapeHtml(key)}</div>
+        ${groups[key].map(rowHtml).join('')}
+      </div>
+    `).join('');
+  }
 
   importPreviewList.querySelectorAll('[data-idx]').forEach(el => {
     el.onclick = () => {
@@ -3843,6 +3909,7 @@ function showImportPreview(rows, extraNote) {
   pendingImportRows = kept;
   importStage = 'preview';
   importPickField.style.display = 'none';
+  document.getElementById('importToolbar').style.display = 'flex';
   importPreviewList.style.display = 'flex';
   importBackBtn.style.display = 'block';
   renderImportPreview();
