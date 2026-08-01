@@ -3197,13 +3197,18 @@ function attachLinkHandlers() {
 }
 
 // ---- Splits (remark-linked reimbursement groups) ----
-// The Review tab's "Confirm" button (see renderReviewList) stamps a
-// generic "Confirmed manually on <date>" remark onto whatever you confirm
-// that day — several unrelated confirmations on the same day end up
-// sharing that exact text, which would otherwise look like a bogus "split
-// group" of unrelated transactions. Filtered out of every split-related
-// view below so only genuine split notes show up.
-const CONFIRM_REMARK_RE = /^Confirmed manually on \d{4}-\d{2}-\d{2}$/;
+// Several places stamp an audit-trail remark like "Confirmed manually on
+// <date>" (Review tab's Confirm button) or "Confirmed via TNG Card PDF
+// Import on <date>" (manually noted when reconciling a TBC row) — any row
+// confirmed the same way on the same day ends up sharing that exact text,
+// which would otherwise look like a bogus "split group" of unrelated
+// transactions (and, with just one such row so far, a bogus 1-txn "split"
+// selectable in the picker). Matched generically ("Confirmed ... on
+// <date>") rather than one exact string per source, so any future
+// confirmation-stamp wording is caught the same way without needing a new
+// regex added here every time. Filtered out of every split-related view
+// below so only genuine split notes show up.
+const CONFIRM_REMARK_RE = /^Confirmed .+ on \d{4}-\d{2}-\d{2}$/;
 function isSplitLinkableRemark(remark) {
   if (!remark) return false;
   if (remark.indexOf('*TBC') === 0) return false;
