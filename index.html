@@ -832,6 +832,10 @@ const CATEGORY_RULES = [
     'APPLE SERVICES', 'NETFLIX', 'SPOTIFY', 'APP STORE', 'GOOGLE PLAY',
     'ANTHROPIC', 'CLAUDE', 'EXITLAG'
   ] },
+  { category: 'Sports', keywords: [
+    'SPORTS CENTRE', 'SPORT CENTRE', 'GYM', 'FITNESS', 'BADMINTON',
+    'FUTSAL', 'SWIMMING POOL'
+  ] },
   { category: 'Housing', subTag: 'Rent', keywords: ['RENT'] },
   { category: 'Housing', subTag: 'Water & Electric', keywords: ['TNB', 'SYABAS', 'AIR SELANGOR', 'INDAH WATER'] },
   { category: 'Housing', subTag: 'WiFi', keywords: ['UNIFI', 'TIME FIBRE', 'MAXIS FIBRE'] },
@@ -863,6 +867,7 @@ const CATEGORY_OPTIONS = [
   { category: 'Food', subTag: '', label: 'Food' },
   { category: 'Entertainment', subTag: '', label: 'Entertainment' },
   { category: 'Entertainment', subTag: 'Subscription', label: 'Entertainment · Subscription' },
+  { category: 'Sports', subTag: '', label: 'Sports' },
   { category: 'Housing', subTag: 'Rent', label: 'Housing · Rent' },
   { category: 'Housing', subTag: 'Water & Electric', label: 'Housing · Water & Electric' },
   { category: 'Housing', subTag: 'WiFi', label: 'Housing · WiFi' },
@@ -1490,7 +1495,7 @@ function trendBucketsFor(txns) {
 // side as bars. Each category gets its own distinct hue here instead.
 const TREND_CATEGORY_COLORS = {
   Car: '#0a84ff', Shopping: '#ff9f0a', Food: '#30d158',
-  Entertainment: '#ffd60a', Housing: '#ff375f', Unsure: '#bf5af2'
+  Entertainment: '#ffd60a', Sports: '#64d2ff', Housing: '#ff375f', Unsure: '#bf5af2'
 };
 
 // Compresses bar HEIGHT only (sign-preserving square root) so a month with
@@ -2565,7 +2570,7 @@ function renderStatBreakdown(base) {
 // Unsure sits last — it's the "needs a real category" bucket, not something
 // you'd usually filter to on purpose, so it shouldn't compete for attention
 // with the real spending categories at the front of the row.
-const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Housing', 'Transfer', 'Income', 'Unsure'];
+const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Sports', 'Housing', 'Transfer', 'Income', 'Unsure'];
 
 // Top-level "which real-world account" filter — All / TNG / HL Bank / PBank
 // — a separate dimension from the category filters below it. Which account
