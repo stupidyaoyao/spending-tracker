@@ -69,10 +69,16 @@
     user-select: none;
   }
   .page-tab {
+    position: relative;
     padding: 8px 16px; border-radius: 999px; background: var(--card); color: var(--text);
     font-size: 13px; font-weight: 500; border: 1px solid transparent;
   }
   .page-tab.active { background: #0a84ff; color: #fff; }
+  .tab-badge {
+    position: absolute; top: -6px; right: -6px; background: #ffb300; color: #1a1a1a;
+    font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; line-height: 16px;
+    border-radius: 999px; padding: 0 3px; text-align: center;
+  }
 
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 14px; }
   .cal-nav-btn { background: var(--card); color: var(--text); font-size: 18px; width: 36px; height: 36px; border-radius: 10px; border: none; }
@@ -117,6 +123,13 @@
 
   .history-list { display: flex; flex-direction: column; gap: 8px; }
   .history-entry { background: var(--card); border-radius: 12px; padding: 10px 14px; }
+  .history-entry.linked { cursor: pointer; }
+  .history-entry.linked:active { opacity: 0.7; }
+  .txn.jump-highlight { animation: jumpFlash 1.6s ease-out; border-radius: 12px; }
+  @keyframes jumpFlash {
+    0% { background: rgba(10, 132, 255, 0.35); }
+    100% { background: transparent; }
+  }
   .history-entry .history-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .history-entry .history-action { font-size: 12px; color: var(--accent); font-weight: 500; }
   .history-entry .history-time { font-size: 11px; color: var(--muted); flex-shrink: 0; }
@@ -401,6 +414,7 @@
       <button class="page-tab" data-page="calendar">Calendar</button>
       <button class="page-tab" data-page="trends">Trends</button>
       <button class="page-tab" data-page="history">History</button>
+      <button class="page-tab" data-page="review">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
     </div>
   </header>
 
@@ -525,10 +539,13 @@
 
   <div id="historyPage" style="display:none;">
     <div class="history-summary" id="historySummary"></div>
-    <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
-    <div class="history-list" id="reviewList"></div>
     <div class="history-section-label">Recent activity</div>
     <div class="history-list" id="historyList"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div id="reviewPage" style="display:none;">
+    <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
+    <div class="history-list" id="reviewList"></div>
   </div>
 </div>
 
@@ -606,7 +623,7 @@
 
       <div class="field" id="importPickField">
         <label id="importPickLabel">Statement file</label>
-        <input type="file" id="fFile" accept=".pdf,.csv">
+        <input type="file" id="fFile" accept=".pdf,.csv" multiple>
       </div>
 
       <div class="preview-list" id="importPreviewList" style="display:none;"></div>
@@ -1003,6 +1020,10 @@ async function loadData() {
 // or History.
 function renderApp() {
   render();
+  // Always refresh the review list/badge, regardless of which page is
+  // active — the Review tab's count badge needs to stay current even while
+  // you're looking at Main/Calendar/Trends, not just when you visit it.
+  renderReviewList();
   if (activePage === 'calendar') renderCalendar();
   if (activePage === 'trends') renderTrends();
   if (activePage === 'history') renderHistory();
@@ -1015,9 +1036,11 @@ function switchPage(page) {
   document.getElementById('calendarPage').style.display = page === 'calendar' ? '' : 'none';
   document.getElementById('trendsPage').style.display = page === 'trends' ? '' : 'none';
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
+  document.getElementById('reviewPage').style.display = page === 'review' ? '' : 'none';
   if (page === 'calendar') renderCalendar();
   if (page === 'trends') renderTrends();
   if (page === 'history') renderHistory();
+  if (page === 'review') renderReviewList();
 }
 document.querySelectorAll('.page-tab').forEach(el => {
   el.onclick = () => switchPage(el.dataset.page);
@@ -1678,14 +1701,18 @@ function renderReviewList() {
   const unconfirmed = allTxns.filter(t => t.remark && t.remark.indexOf('*TBC') === 0)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
+  const badge = document.getElementById('reviewTabBadge');
+  if (badge) {
+    badge.textContent = unconfirmed.length ? String(unconfirmed.length) : '';
+    badge.style.display = unconfirmed.length ? '' : 'none';
+  }
+
+  el.style.display = '';
   if (!unconfirmed.length) {
-    label.style.display = 'none';
-    el.style.display = 'none';
-    el.innerHTML = '';
+    label.textContent = 'Needs review';
+    el.innerHTML = '<div class="empty">Nothing needs review right now.</div>';
     return;
   }
-  label.style.display = '';
-  el.style.display = '';
   label.textContent = `Needs review (${unconfirmed.length})`;
 
   el.innerHTML = unconfirmed.map(t => {
@@ -1730,11 +1757,16 @@ function renderReviewList() {
 function renderHistory() {
   const summaryEl = document.getElementById('historySummary');
   summaryEl.innerHTML = ACCOUNTS.map(a => {
-    const label = lastUpdatedLabel(allTxns.filter(t => t.account === a)) || 'No records yet';
+    // Screenshot imports are meant as a quick daily activity log, not a full
+    // reconciliation — they still show up in Recent activity below, but
+    // don't count toward "when was this account last properly updated"
+    // (that's reserved for a real statement/CSV import, which double-checks
+    // the whole record). Manual "Add expense" entries do count, same as
+    // before.
+    const nonScreenshot = allTxns.filter(t => t.account === a && !/Screenshot/i.test(t.source || ''));
+    const label = lastUpdatedLabel(nonScreenshot) || 'No records yet';
     return `<div class="history-summary-row"><span class="acct">${escapeHtml(a)}</span><span class="when">${escapeHtml(label)}</span></div>`;
   }).join('');
-
-  renderReviewList();
 
   const el = document.getElementById('historyList');
   if (!activityLog.length) {
@@ -1746,11 +1778,47 @@ function renderHistory() {
     const when = isNaN(d.getTime())
       ? h.timestamp
       : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    return `<div class="history-entry">
+    // Entries tied to one specific transaction (a manual add, a single
+    // confirm/edit) carry a row number from the backend — those are
+    // clickable and jump straight to that record on the Main page. Bulk
+    // entries (an import of N rows, an auto-reconcile pass) aren't tied to
+    // a single record, so they're plain text.
+    const hasRow = h.row !== undefined && h.row !== null && h.row !== '';
+    return `<div class="history-entry${hasRow ? ' linked' : ''}"${hasRow ? ` data-row="${h.row}"` : ''}>
       <div class="history-top"><span class="history-action">${escapeHtml(h.action)}</span><span class="history-time">${when}</span></div>
       <div class="history-details">${escapeHtml(h.details)}</div>
     </div>`;
   }).join('');
+  el.querySelectorAll('.history-entry.linked').forEach(entry => {
+    entry.onclick = () => jumpToRecord(Number(entry.dataset.row));
+  });
+}
+
+// Jumps to a specific transaction on the Main page from a "Recent activity"
+// entry (or anywhere else with a row number) — clears whatever filters
+// would otherwise hide it, scrolls it into view, and flashes it blue so
+// it's easy to spot.
+function jumpToRecord(row) {
+  const t = allTxns.find(x => x.row === row);
+  if (!t) return;
+  activeAccountFilter = 'All';
+  activeFilter = 'All';
+  activeSubFilter = 'All';
+  searchQuery = '';
+  const searchBox = document.getElementById('searchBox');
+  if (searchBox) searchBox.value = '';
+  mainRangeFrom = null;
+  mainRangeTo = null;
+  if (typeof renderMainRangeButtons === 'function') renderMainRangeButtons();
+  if (groupMode === 'day') expandedDayGroups.add(new Date(t.date).toDateString());
+  switchPage('main');
+  requestAnimationFrame(() => {
+    const rowEl = document.querySelector(`.txn[data-row="${row}"]`);
+    if (!rowEl) return;
+    rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    rowEl.classList.add('jump-highlight');
+    setTimeout(() => rowEl.classList.remove('jump-highlight'), 1600);
+  });
 }
 
 function isSameDay(d, ref) {
@@ -2693,7 +2761,7 @@ function renderTxnRow(t) {
     ? `<select class="txn-extratag-select${t.extraTag ? ' has-extra' : ''}" data-row="${t.row}">${extraOpts}</select>`
     : '';
   return `
-    <div class="txn">
+    <div class="txn" data-row="${t.row}">
       <div class="dot ${dotClass}"></div>
       <div class="info">
         <div class="merchant">${txnTitle(t)}${tbcFlagHtml}</div>
@@ -2896,11 +2964,13 @@ function updateImportPickFieldForAccount() {
   const label = document.getElementById('importPickLabel');
   if (importAccount.endsWith('-Screenshot')) {
     fFile.accept = '.png,.jpg,.jpeg';
-    label.textContent = importAccount === 'TNG Card-Screenshot'
-      ? 'Screenshot (TNG Card screen)'
-      : 'Screenshot (TNG "Activity"/"History" screen)';
+    fFile.multiple = true;
+    label.textContent = (importAccount === 'TNG Card-Screenshot'
+      ? 'Screenshot(s) (TNG Card screen)'
+      : 'Screenshot(s) (TNG "Activity"/"History" screen)') + ' — pick multiple to import several at once';
   } else {
     fFile.accept = '.pdf,.csv';
+    fFile.multiple = false;
     label.textContent = 'Statement file';
   }
 }
@@ -3525,7 +3595,11 @@ function parseCardCsvFile(file) {
 // them. Tesseract.js groups same-line words into one text string per line
 // (in left-to-right reading order) when running in this mode, which is
 // exactly the row structure this parser expects.
-const SCREENSHOT_DATE_RE = /^(\d{1,2})\s+([A-Za-z]{3}),?\s+(\d{1,2}:\d{2})$/;
+// Not end-anchored ($ dropped) — on dense screenshots Tesseract sometimes
+// merges the date/time and the merchant+amount into a single OCR line
+// instead of two, and parseScreenshotLines() below needs to detect "this
+// line starts a record" even when there's more text after the time.
+const SCREENSHOT_DATE_RE = /^(\d{1,2})\s+([A-Za-z]{3}),?\s+(\d{1,2}:\d{2})/;
 const SCREENSHOT_MONTHS = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12' };
 // Known toll plaza -> highway prefix, matching the "HIGHWAY - PLAZA" merchant
 // text convention already used by past TNG PDF imports (e.g. "KESAS - AWAN
@@ -3562,21 +3636,33 @@ function parseScreenshotLines(lines) {
 
   for (let k = 0; k < dateIdxs.length; k++) {
     const idx = dateIdxs[k];
-    const m = lines[idx].match(SCREENSHOT_DATE_RE);
+    const line = lines[idx];
+    const m = line.match(SCREENSHOT_DATE_RE);
     const day = m[1].padStart(2, '0');
     const mon = SCREENSHOT_MONTHS[m[2].toLowerCase()] || '01';
     const time = m[3];
     const date = `${nowYear}-${mon}-${day}`;
 
-    const merchantLine = lines[idx + 1] || '';
-    const amtMatch = merchantLine.match(/([+-]?RM\s?[\d,]+\.\d{2})\s*$/i);
+    // Usually the date/time is its own OCR line and the merchant+amount is
+    // the next line down. But on some screenshots (lots of close-together
+    // rows) Tesseract merges the date/time and merchant+amount onto one
+    // line — try that first so those rows aren't silently dropped, and
+    // fall back to the next line otherwise.
+    let merchantLine = line.slice(m[0].length).trim();
+    let usedNextLineForMerchant = false;
+    let amtMatch = merchantLine.match(/([+-]?RM\s?[\d,]+\.\d{2})\s*$/i);
+    if (!amtMatch) {
+      merchantLine = lines[idx + 1] || '';
+      usedNextLineForMerchant = true;
+      amtMatch = merchantLine.match(/([+-]?RM\s?[\d,]+\.\d{2})\s*$/i);
+    }
     if (!amtMatch) continue; // couldn't find an amount on this row — skip it
 
     const amount = parseFloat(amtMatch[1].replace(/[^0-9.]/g, ''));
     let merchant = merchantLine.slice(0, amtMatch.index).trim();
 
     let type = '';
-    const nextIdx = idx + 2;
+    const nextIdx = usedNextLineForMerchant ? idx + 2 : idx + 1;
     if (nextIdx < lines.length && !SCREENSHOT_DATE_RE.test(lines[nextIdx])) {
       type = extractScreenshotType(lines[nextIdx]);
     }
@@ -3734,26 +3820,58 @@ function showImportPreview(rows) {
 
 importSubmitBtn.onclick = async () => {
   if (importStage === 'pick') {
-    const file = document.getElementById('fFile').files[0];
-    if (!file) { importStatusEl.textContent = 'Choose a file first.'; return; }
+    const files = Array.from(document.getElementById('fFile').files || []);
+    if (!files.length) { importStatusEl.textContent = 'Choose a file first.'; return; }
 
     const importAccount = document.getElementById('importAccount').value;
+    const isScreenshot = importAccount.endsWith('-Screenshot');
 
     importStatusEl.className = 'status-msg';
-    importStatusEl.textContent = importAccount.endsWith('-Screenshot')
-      ? 'Reading screenshot… (OCR can take 10-30s, especially the first time)'
-      : 'Reading file…';
     importSubmitBtn.disabled = true;
     let rows = [];
+
+    if (isScreenshot) {
+      // Multiple screenshots can be picked at once (e.g. a day's worth of
+      // TNG activity) — read each one in turn and merge everything found
+      // into a single preview list. One bad/unreadable screenshot doesn't
+      // block the rest; its error just gets listed at the end.
+      const failures = [];
+      for (let i = 0; i < files.length; i++) {
+        importStatusEl.textContent = files.length > 1
+          ? `Reading screenshot ${i + 1} of ${files.length}… (OCR can take 10-30s each)`
+          : 'Reading screenshot… (OCR can take 10-30s, especially the first time)';
+        const f = files[i];
+        try {
+          const fileRows = importAccount === 'TNG Card-Screenshot'
+            ? await parseCardScreenshotFile(f)
+            : await parseScreenshotFile(f);
+          rows = rows.concat(fileRows);
+        } catch (err) {
+          failures.push(f.name + ': ' + (err && err.message ? err.message.split('\n')[0] : err));
+        }
+      }
+      importSubmitBtn.disabled = false;
+      if (!rows.length) {
+        importStatusEl.className = 'status-msg debug';
+        importStatusEl.textContent = failures.length
+          ? `Couldn't recognize any transactions.\n\n${failures.join('\n')}`
+          : 'No spending transactions found in that screenshot.';
+        return;
+      }
+      if (failures.length) {
+        importStatusEl.textContent = `Found ${rows.length} transaction(s), but ${failures.length} screenshot(s) failed:\n${failures.join('\n')}`;
+      }
+      showImportPreview(rows);
+      return;
+    }
+
+    const file = files[0];
+    importStatusEl.textContent = 'Reading file…';
     try {
       if (importAccount === 'PBank') {
         rows = await parseBankACsvFile(file);
       } else if (importAccount === 'HL Bank') {
         rows = await parseBankBCsvFile(file);
-      } else if (importAccount === 'TNG-Screenshot') {
-        rows = await parseScreenshotFile(file);
-      } else if (importAccount === 'TNG Card-Screenshot') {
-        rows = await parseCardScreenshotFile(file);
       } else if (importAccount === 'TNG Card') {
         rows = file.name.toLowerCase().endsWith('.pdf') ? await parseCardPdfFile(file) : await parseCardCsvFile(file);
       } else if (file.name.toLowerCase().endsWith('.pdf')) {
