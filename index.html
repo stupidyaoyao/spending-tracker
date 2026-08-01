@@ -3808,17 +3808,52 @@ function renderImportPreview() {
   });
 }
 
-function showImportPreview(rows) {
-  pendingImportRows = rows;
+// Duplicate detection — a parsed row is treated as a duplicate (and
+// automatically skipped, never shown in the preview) if an existing
+// transaction on the SAME account already has the exact same date, time,
+// amount, and merchant/notes text ("context"). This catches re-importing
+// the same statement twice, or two date ranges that overlap, without you
+// having to spot every repeat by hand. Also catches duplicates WITHIN the
+// same import batch — e.g. picking the same screenshot twice, or two
+// screenshots that both cover part of the same day.
+function importRowContext(r) {
+  return String(r.merchant || r.notes || '').trim().toLowerCase();
+}
+function importRowsMatch(a, b) {
+  return (a.account || 'TNG') === (b.account || 'TNG') &&
+    a.date === b.date &&
+    String(a.time || '') === String(b.time || '') &&
+    Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005 &&
+    importRowContext(a) === importRowContext(b);
+}
+function filterOutDuplicates(rows) {
+  const kept = [];
+  let skippedCount = 0;
+  rows.forEach(r => {
+    const dupExisting = allTxns.some(t => importRowsMatch(t, r));
+    const dupInBatch = kept.some(k => importRowsMatch(k, r));
+    if (dupExisting || dupInBatch) { skippedCount++; return; }
+    kept.push(r);
+  });
+  return { kept, skippedCount };
+}
+
+function showImportPreview(rows, extraNote) {
+  const { kept, skippedCount } = filterOutDuplicates(rows);
+  pendingImportRows = kept;
   importStage = 'preview';
   importPickField.style.display = 'none';
   importPreviewList.style.display = 'flex';
   importBackBtn.style.display = 'block';
   renderImportPreview();
   importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
-  importStatusEl.textContent = pendingImportRows.length
-    ? `Review the ${pendingImportRows.length} transactions below — fix the category if needed, tap ✕ to drop any that look wrong, then Import.`
+  const dupNote = skippedCount
+    ? `Skipped ${skippedCount} likely duplicate${skippedCount > 1 ? 's' : ''} already in your data. `
     : '';
+  const notes = [extraNote, dupNote].filter(Boolean).join(' ');
+  importStatusEl.textContent = pendingImportRows.length
+    ? `${notes}Review the ${pendingImportRows.length} transaction(s) below — fix the category if needed, tap ✕ to drop any that look wrong, then Import.`
+    : `${notes}Nothing new to import — every transaction found was already in your data.`;
 }
 
 importSubmitBtn.onclick = async () => {
@@ -3861,10 +3896,13 @@ importSubmitBtn.onclick = async () => {
           : 'No spending transactions found in that screenshot.';
         return;
       }
-      if (failures.length) {
-        importStatusEl.textContent = `Found ${rows.length} transaction(s), but ${failures.length} screenshot(s) failed:\n${failures.join('\n')}`;
-      }
-      showImportPreview(rows);
+      // showImportPreview() sets its own status text right after this, so
+      // pass the failure note through instead of setting it here directly —
+      // otherwise it would be overwritten before ever being seen.
+      const failNote = failures.length
+        ? `${failures.length} screenshot(s) failed: ${failures.join('; ')}`
+        : '';
+      showImportPreview(rows, failNote);
       return;
     }
 
