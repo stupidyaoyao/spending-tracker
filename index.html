@@ -390,6 +390,8 @@
   .preview-row-dup { opacity: 0.55; }
   .preview-keep { font-size: 12px; color: var(--accent); padding: 0 4px; flex-shrink: 0; white-space: nowrap; }
   .history-section-sublabel { margin: 4px 2px 4px 10px; opacity: 0.8; }
+  .preview-section-toggle { cursor: pointer; user-select: none; }
+  .preview-section-chevron { display: inline-block; width: 10px; }
 
   .mini-charts { display: flex; gap: 10px; margin-bottom: 14px; }
   .mini-charts.zoomed { flex-direction: column; }
@@ -2978,6 +2980,12 @@ let pendingImportReviewLabels = [];
 // held out of pendingImportRows (so Import won't submit them) but still
 // shown in the preview, read-only, with a "Keep anyway" escape hatch.
 let pendingImportDuplicates = [];
+// Whether the duplicates section is collapsed in the preview — starts
+// collapsed each time the import sheet opens, since duplicates aren't
+// something you usually need to look at row-by-row (they're already
+// excluded from Import); the count + "Keep anyway" escape hatch is enough
+// most of the time.
+let importDuplicatesCollapsed = true;
 
 function resetImportSheet() {
   importStage = 'pick';
@@ -2985,6 +2993,7 @@ function resetImportSheet() {
   pendingImportSections = [];
   pendingImportReviewLabels = [];
   pendingImportDuplicates = [];
+  importDuplicatesCollapsed = true;
   importPickField.style.display = 'block';
   document.getElementById('importToolbar').style.display = 'none';
   importPreviewList.style.display = 'none';
@@ -3853,7 +3862,7 @@ function renderImportPreview() {
     // same yellow badge as the TBC flag in History/Review.
     const reviewLabel = section === 'reviewSynced' ? pendingImportReviewLabels[i] : null;
     const reviewBadgeHtml = reviewLabel
-      ? `<span class="tbc-flag" title="Confirms the pending ${escapeHtml(reviewLabel)} review record — check that side too">${escapeHtml(reviewLabel)}</span>`
+      ? `<span class="tbc-flag" title="This import confirms the ${escapeHtml(reviewLabel)} transfer — the other account was already recorded, no need to import it again">${escapeHtml(reviewLabel)}</span>`
       : '';
     return `
     <div class="txn preview-row">
@@ -3909,10 +3918,13 @@ function renderImportPreview() {
   let html = '';
 
   if (pendingImportDuplicates.length) {
+    const chevron = importDuplicatesCollapsed ? '▸' : '▾';
     html += `
       <div class="preview-group">
-        <div class="history-section-label">✕ Already in your data (${pendingImportDuplicates.length}) — not imported</div>
-        ${pendingImportDuplicates.map(dupRowHtml).join('')}
+        <div class="history-section-label preview-section-toggle" id="dupSectionToggle">
+          <span class="preview-section-chevron">${chevron}</span> ✕ Already in your data (${pendingImportDuplicates.length}) — not imported
+        </div>
+        ${importDuplicatesCollapsed ? '' : pendingImportDuplicates.map(dupRowHtml).join('')}
       </div>
     `;
   }
@@ -3929,6 +3941,14 @@ function renderImportPreview() {
   });
 
   importPreviewList.innerHTML = html;
+
+  const dupToggle = document.getElementById('dupSectionToggle');
+  if (dupToggle) {
+    dupToggle.onclick = () => {
+      importDuplicatesCollapsed = !importDuplicatesCollapsed;
+      renderImportPreview();
+    };
+  }
 
   importPreviewList.querySelectorAll('[data-idx]').forEach(el => {
     el.onclick = () => {
