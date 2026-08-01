@@ -783,6 +783,10 @@ const CATEGORY_RULES = [
   { category: 'Car', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP'] },
   { category: 'Car', subTag: 'Service', keywords: ['WORKSHOP', 'BENGKEL', 'TAYAR', 'SERVICE CENTRE', 'AUTO CARE', 'CAR WASH', 'CARWASH'] },
   { category: 'Car', subTag: 'Ride', keywords: ['GRAB', 'MYCAR', 'INDRIVE'] },
+  // Council/traffic compounds (e.g. MBSJ RM80) — most local-council payments
+  // that show up on a bank/e-wallet statement this way are parking or
+  // traffic fines, so this lives under Car rather than as its own category.
+  { category: 'Car', subTag: 'Fine', keywords: ['MBSJ', 'MBPJ', 'MBSA', 'MBI', 'DBKL', 'MPAJ', 'MPS', 'SAMAN', 'COMPOUND'] },
   // "Groceries" was renamed to "Shopping" to also cover online orders (see
   // the new Online subtag below) — not just grocery runs.
   { category: 'Shopping', subTag: 'Convenience Store', keywords: ['MYNEWS', '7-ELEVEN', 'KK MART'] },
@@ -830,6 +834,7 @@ const CATEGORY_OPTIONS = [
   { category: 'Car', subTag: 'Fuel', label: 'Car · Fuel' },
   { category: 'Car', subTag: 'Service', label: 'Car · Service' },
   { category: 'Car', subTag: 'Ride', label: 'Car · Ride' },
+  { category: 'Car', subTag: 'Fine', label: 'Car · Fine' },
   { category: 'Shopping', subTag: 'Convenience Store', label: 'Shopping · Convenience Store' },
   { category: 'Shopping', subTag: 'Hypermarket', label: 'Shopping · Hypermarket' },
   { category: 'Shopping', subTag: 'Online', label: 'Shopping · Online' },
