@@ -149,6 +149,25 @@
   .review-btn { flex: 1; border: none; border-radius: 8px; padding: 7px 0; font-size: 13px; font-weight: 600; cursor: pointer; }
   .review-btn.confirm { background: #1f3d2b; color: #30d158; }
   .review-btn.delete { background: #3d1f22; color: #ff453a; }
+
+  .split-group { background: var(--card); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+  .split-group-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .split-group-name { font-size: 14px; font-weight: 600; }
+  .split-group-net { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .split-group-rows { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .split-group-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+  .split-group-row .sgr-amt.in { color: #30d158; }
+  .split-group-row .sgr-amt.out { color: #ff453a; }
+  .split-group-summary { font-size: 12px; color: var(--muted); margin-top: 8px; border-top: 1px solid #3a3a3c; padding-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .split-group-summary b { color: var(--text); }
+
+  .split-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin: 10px 0; }
+  .split-picker-option { padding: 10px 12px; border-radius: 8px; background: #2c2c2e; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+  .split-picker-option .spo-count { color: var(--muted); font-size: 11px; flex-shrink: 0; margin-left: 8px; }
+  .split-picker-empty { font-size: 12px; color: var(--muted); padding: 2px 0 10px; }
+  .split-picker-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .split-picker-actions .btn { flex: 1; }
+  .split-picker-clear { background: #3d1f22; color: #ff453a; border: none; border-radius: 10px; padding: 12px 0; font-size: 15px; font-weight: 600; cursor: pointer; flex: 1; }
   .page-updated { text-align: center; font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
   /* Back to the original 3-across row for Today/This week/This month —
      All time now lives in its own full-width rectangle below (see
@@ -421,6 +440,7 @@
       <button class="page-tab" data-page="trends">Trends</button>
       <button class="page-tab" data-page="history">History</button>
       <button class="page-tab" data-page="review">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
+      <button class="page-tab" data-page="splits">Splits</button>
     </div>
   </header>
 
@@ -553,6 +573,11 @@
     <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
     <div class="history-list" id="reviewList"></div>
   </div>
+
+  <div id="splitsPage" style="display:none;">
+    <div class="history-section-label" id="splitsSectionLabel">Split groups</div>
+    <div class="history-list" id="splitsList"></div>
+  </div>
 </div>
 
 <div class="fab-row">
@@ -652,6 +677,25 @@
       <div class="status-msg" id="importStatus"></div>
       <button class="btn" id="importSubmit">Read file</button>
       <button class="btn secondary" id="importBack" style="display:none;">Choose a different file</button>
+    </div>
+  </div>
+</div>
+
+<!-- Split/remark picker — opened from the ✎ button on any transaction -->
+<div class="sheet-backdrop" id="splitPickerBackdrop">
+  <div class="sheet">
+    <div class="sheet-inner">
+      <span class="close-x" id="splitPickerClose">✕</span>
+      <h2>Link to a split</h2>
+      <div class="split-picker-list" id="splitPickerList"></div>
+      <div class="field">
+        <label>Or type a new note/split name</label>
+        <input type="text" id="splitPickerInput" placeholder="e.g. Sushi 31/7 split">
+      </div>
+      <div class="split-picker-actions">
+        <button class="btn" id="splitPickerSave">Save</button>
+        <button class="split-picker-clear" id="splitPickerClear">Clear</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1048,6 +1092,7 @@ function renderApp() {
   if (activePage === 'calendar') renderCalendar();
   if (activePage === 'trends') renderTrends();
   if (activePage === 'history') renderHistory();
+  if (activePage === 'splits') renderSplits();
 }
 
 function switchPage(page) {
@@ -1058,10 +1103,12 @@ function switchPage(page) {
   document.getElementById('trendsPage').style.display = page === 'trends' ? '' : 'none';
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
   document.getElementById('reviewPage').style.display = page === 'review' ? '' : 'none';
+  document.getElementById('splitsPage').style.display = page === 'splits' ? '' : 'none';
   if (page === 'calendar') renderCalendar();
   if (page === 'trends') renderTrends();
   if (page === 'history') renderHistory();
   if (page === 'review') renderReviewList();
+  if (page === 'splits') renderSplits();
 }
 document.querySelectorAll('.page-tab').forEach(el => {
   el.onclick = () => switchPage(el.dataset.page);
@@ -2849,19 +2896,13 @@ function attachExtraTagHandlers() {
 
 // Lets you attach a free-text remark to any transaction (e.g. "lunch with
 // Ali", "car aircon regas") — separate from Notes, which holds
-// system/import-derived text. Uses a plain prompt() for a lightweight,
-// one-tap edit rather than an inline text field.
+// system/import-derived text. Also doubles as the split-link note (see
+// groupByRemark below) — opens the split picker sheet instead of a plain
+// prompt() so you can pick an EXISTING split by name (no retyping, no
+// typos that would silently fail to link) or type a brand new note/split.
 function attachRemarkHandlers() {
   document.querySelectorAll('.remark-btn').forEach(el => {
-    el.onclick = async () => {
-      const row = Number(el.dataset.row);
-      const t = allTxns.find(x => x.row === row);
-      const val = window.prompt('Remark for this transaction:', (t && t.remark) || '');
-      if (val === null) return; // cancelled
-      if (t) t.remark = val;
-      await callApi('updateRemark', { row, remark: val });
-      renderApp();
-    };
+    el.onclick = () => openSplitPicker(Number(el.dataset.row));
   });
 }
 
@@ -2891,6 +2932,136 @@ function attachLinkHandlers() {
     el.onclick = () => groupByRemark(el.dataset.remark);
   });
 }
+
+// ---- Splits (remark-linked reimbursement groups) ----
+// The Review tab's "Confirm" button (see renderReviewList) stamps a
+// generic "Confirmed manually on <date>" remark onto whatever you confirm
+// that day — several unrelated confirmations on the same day end up
+// sharing that exact text, which would otherwise look like a bogus "split
+// group" of unrelated transactions. Filtered out of every split-related
+// view below so only genuine split notes show up.
+const CONFIRM_REMARK_RE = /^Confirmed manually on \d{4}-\d{2}-\d{2}$/;
+function isSplitLinkableRemark(remark) {
+  if (!remark) return false;
+  if (remark.indexOf('*TBC') === 0) return false;
+  if (CONFIRM_REMARK_RE.test(remark)) return false;
+  return true;
+}
+
+// Every remark used on 2+ transactions — a real split/link group, as
+// opposed to a one-off personal note nothing else shares yet. Sorted by
+// the group's most recent transaction date, newest first, so both the
+// Splits tab and the picker list lead with what you're most likely
+// looking for.
+function splitGroups() {
+  const byRemark = {};
+  allTxns.forEach(t => {
+    if (!isSplitLinkableRemark(t.remark)) return;
+    (byRemark[t.remark] = byRemark[t.remark] || []).push(t);
+  });
+  const groups = Object.keys(byRemark)
+    .filter(remark => byRemark[remark].length >= 2)
+    .map(remark => {
+      const txns = byRemark[remark].slice().sort((a, b) => txnTimestamp(b) - txnTimestamp(a));
+      let totalOut = 0, totalIn = 0;
+      txns.forEach(t => {
+        const amt = Number(t.amount || 0);
+        if (txnFlow(t) === 'in') totalIn += amt; else totalOut += amt;
+      });
+      return { remark, txns, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date };
+    });
+  groups.sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
+  return groups;
+}
+
+function renderSplits() {
+  const el = document.getElementById('splitsList');
+  const label = document.getElementById('splitsSectionLabel');
+  const groups = splitGroups();
+  if (!groups.length) {
+    label.textContent = 'Split groups';
+    el.innerHTML = '<div class="empty">No splits yet — tap the ✎ note icon on a transaction and link two or more together.</div>';
+    return;
+  }
+  label.textContent = `Split groups (${groups.length})`;
+  el.innerHTML = groups.map(g => {
+    const rowsHtml = g.txns.map(t => {
+      const flow = txnFlow(t);
+      const sign = flow === 'in' ? '+' : '-';
+      return `
+        <div class="split-group-row">
+          <span>${escapeHtml(txnTitle(t))} · ${new Date(t.date).toLocaleDateString()} · ${escapeHtml(t.account || '')}</span>
+          <span class="sgr-amt ${flow}">${sign}RM${Number(t.amount || 0).toFixed(2)}</span>
+        </div>`;
+    }).join('');
+    return `
+      <div class="split-group" data-remark="${escapeHtml(g.remark)}">
+        <div class="split-group-header">
+          <div class="split-group-name">${escapeHtml(g.remark)}</div>
+          <div class="split-group-net">${formatSignedRM(g.net)}</div>
+        </div>
+        <div class="split-group-rows">${rowsHtml}</div>
+        <div class="split-group-summary">
+          <span>You paid: <b>RM${g.totalOut.toFixed(2)}</b></span>
+          <span>Received back: <b>RM${g.totalIn.toFixed(2)}</b></span>
+          <span>Net cost to you: <b>${formatSignedRM(g.net)}</b></span>
+        </div>
+      </div>`;
+  }).join('');
+  el.querySelectorAll('.split-group[data-remark]').forEach(card => {
+    card.onclick = () => groupByRemark(card.dataset.remark);
+  });
+}
+
+// Split/remark picker sheet — opened from the ✎ button on any transaction
+// row. Lists every existing split group name so you can tap one instead of
+// retyping it (a typo would silently create a brand-new, unlinked group
+// instead of joining the real one), plus a free-text field for a new note
+// or a first-time split name, and a Clear button to remove the remark.
+let splitPickerRow = null;
+const splitPickerBackdrop = document.getElementById('splitPickerBackdrop');
+function openSplitPicker(row) {
+  splitPickerRow = row;
+  const t = allTxns.find(x => x.row === row);
+  const currentRemark = (t && isSplitLinkableRemark(t.remark)) ? t.remark : '';
+  document.getElementById('splitPickerInput').value = currentRemark;
+
+  const groups = splitGroups();
+  const listEl = document.getElementById('splitPickerList');
+  if (!groups.length) {
+    listEl.innerHTML = '<div class="split-picker-empty">No existing splits yet — type a new name below.</div>';
+  } else {
+    listEl.innerHTML = groups.map(g => `
+      <div class="split-picker-option" data-remark="${escapeHtml(g.remark)}">
+        <span>${escapeHtml(g.remark)}</span>
+        <span class="spo-count">${g.txns.length} txns · net ${formatSignedRM(g.net)}</span>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.split-picker-option').forEach(opt => {
+      opt.onclick = () => saveSplitPickerRemark(opt.dataset.remark);
+    });
+  }
+  splitPickerBackdrop.classList.add('open');
+}
+function closeSplitPicker() {
+  splitPickerBackdrop.classList.remove('open');
+  splitPickerRow = null;
+}
+async function saveSplitPickerRemark(remark) {
+  const row = splitPickerRow;
+  if (row === null) return;
+  const t = allTxns.find(x => x.row === row);
+  if (t) t.remark = remark;
+  closeSplitPicker();
+  await callApi('updateRemark', { row, remark });
+  renderApp();
+}
+document.getElementById('splitPickerClose').onclick = closeSplitPicker;
+document.getElementById('splitPickerSave').onclick = () => {
+  const val = document.getElementById('splitPickerInput').value.trim();
+  saveSplitPickerRemark(val);
+};
+document.getElementById('splitPickerClear').onclick = () => saveSplitPickerRemark('');
 
 document.getElementById('groupBy').onchange = (e) => { groupMode = e.target.value; render(); };
 document.getElementById('sortBy').onchange = (e) => { sortMode = e.target.value; render(); };
