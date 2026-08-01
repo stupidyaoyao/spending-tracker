@@ -380,6 +380,7 @@
   .empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px; }
 
   .fab-row { position: fixed; bottom: 24px; right: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .fab-row-left { position: fixed; bottom: 24px; left: 16px; display: flex; flex-direction: column; gap: 10px; }
   .fab {
     width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #1a1a1a;
     border: none; font-size: 26px; box-shadow: 0 6px 16px rgba(0,0,0,.4); display: flex;
@@ -633,6 +634,13 @@
 <div class="fab-row">
   <button class="fab secondary" id="importBtn" title="Import">⇪</button>
   <button class="fab" id="addBtn" title="Add">+</button>
+</div>
+
+<!-- Resets every Main-page filter back to "All" (account/category/subtag/
+     search/date range) and jumps to the Main page — a quick way back to the
+     unfiltered view instead of clearing each filter chip one by one. -->
+<div class="fab-row-left">
+  <button class="fab secondary" id="resetFiltersBtn" title="Back to All">↺</button>
 </div>
 
 <!-- Add transaction sheet -->
@@ -990,9 +998,11 @@ function categorize(description, type) {
   if (type === 'Reload') return { category: 'Transfer', subTag: 'Card Reload' };
 
   // Receive from Wallet (someone sent you money) / Cashback (rewards
-  // rebate) are money coming IN, not spending. Filed under Transfer > From
+  // rebate) / DUITNOW_RECEI (a DuitNow transfer received from another
+  // person — TNG's own literal label for the same "received money" case)
+  // are money coming IN, not spending. Filed under Transfer > From
   // Others — no separate "Income" category anymore.
-  if (type === 'Receive from Wallet' || type === 'Cashback') {
+  if (type === 'Receive from Wallet' || type === 'Cashback' || type === 'DUITNOW_RECEI') {
     return { category: 'Transfer', subTag: 'From Others' };
   }
 
@@ -1988,13 +1998,14 @@ function renderHistory() {
   });
 }
 
-// Jumps to a specific transaction on the Main page from a "Recent activity"
-// entry (or anywhere else with a row number) — clears whatever filters
-// would otherwise hide it, scrolls it into view, and flashes it blue so
-// it's easy to spot.
-function jumpToRecord(row) {
-  const t = allTxns.find(x => x.row === row);
-  if (!t) return;
+// Clears every Main-page filter (account/category/subtag/search/custom date
+// range) back to its default "show everything" state, without touching page
+// navigation or the time-scope (Today/Week/Month/All time) pie toggle —
+// those are handled separately by whoever calls this. Used by the
+// bottom-left reset button, the "All time" stat card (see renderTotals()),
+// and jumpToRecord() below (which needs a clean slate before it can
+// guarantee the target row is actually visible).
+function resetMainFilters() {
   activeAccountFilter = 'All';
   activeFilter = 'All';
   activeSubFilter = 'All';
@@ -2004,6 +2015,16 @@ function jumpToRecord(row) {
   mainRangeFrom = null;
   mainRangeTo = null;
   if (typeof renderMainRangeButtons === 'function') renderMainRangeButtons();
+}
+
+// Jumps to a specific transaction on the Main page from a "Recent activity"
+// entry (or anywhere else with a row number) — clears whatever filters
+// would otherwise hide it, scrolls it into view, and flashes it blue so
+// it's easy to spot.
+function jumpToRecord(row) {
+  const t = allTxns.find(x => x.row === row);
+  if (!t) return;
+  resetMainFilters();
   if (groupMode !== 'none') expandedGroups.add(groupKeyFor(t));
   switchPage('main');
   render(); // switchPage() only toggles which page div is visible — it doesn't
@@ -2116,11 +2137,17 @@ function renderTotals(txns, incomeTxns) {
   // affected. "All time" behaves the same as no filter for pie-scoping
   // purposes (see isInTimeFilter() treating 'all' same as null) — it just
   // gets its own explicit scope name so it's directly tappable/highlightable
-  // instead of only reachable by toggling another card off.
+  // instead of only reachable by toggling another card off. "All time"
+  // specifically ALSO resets every Main filter (account/category/subtag/
+  // search/date range) back to default every time it's tapped — same as the
+  // bottom-left reset button (see resetMainFilters()) — since "all time" is
+  // naturally read as "show me literally everything" rather than just a
+  // pie-scope toggle.
   document.querySelectorAll('#totals .total-card, #totalsAll .total-card-all').forEach(el => {
     el.onclick = () => {
       const scope = el.dataset.scope;
       activeTimeFilter = activeTimeFilter === scope ? null : scope;
+      if (scope === 'all') resetMainFilters();
       render();
     };
   });
@@ -3475,6 +3502,11 @@ function resetImportSheet() {
 }
 
 document.getElementById('importBtn').onclick = () => { resetImportSheet(); importBackdrop.classList.add('open'); };
+document.getElementById('resetFiltersBtn').onclick = () => {
+  resetMainFilters();
+  switchPage('main');
+  render();
+};
 document.getElementById('importClose').onclick = () => importBackdrop.classList.remove('open');
 importBackBtn.onclick = resetImportSheet;
 
@@ -3804,7 +3836,14 @@ function normalizeTime(raw) {
   if (h > 23) return '';
   return String(h).padStart(2, '0') + ':' + min;
 }
-const TXN_TYPES = ['DuitNow QR TNGD', 'PayDirect Payment', 'Transfer to Wallet', 'Receive from Wallet', 'RFID Payment', 'DuitNow QR', 'Reload', 'Payment', 'Cashback'];
+// 'DUITNOW_RECEI' (all-caps, underscore — TNG's own printed label, distinct
+// from the "DuitNow QR"/"DuitNow QR TNGD" outgoing-payment types above) is a
+// DuitNow transfer RECEIVED from another person, e.g. "LIM LEONG HOAY" —
+// same real-world meaning as "Receive from Wallet", just a different literal
+// string TNG happens to print for it. Missing this one silently dropped the
+// whole row (see the `if (!dateRaw || !ttype) continue;` skip below), which
+// is how a real RM17.50 incoming transfer went missing from an import.
+const TXN_TYPES = ['DuitNow QR TNGD', 'PayDirect Payment', 'Transfer to Wallet', 'Receive from Wallet', 'DUITNOW_RECEI', 'RFID Payment', 'DuitNow QR', 'Reload', 'Payment', 'Cashback'];
 const FOOTER_PATTERNS = [
   /\*?This is a system generated.*$/i,
   /email\.\s*For further enquiry.*$/i,
