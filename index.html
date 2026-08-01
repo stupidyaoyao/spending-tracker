@@ -1812,6 +1812,9 @@ function jumpToRecord(row) {
   if (typeof renderMainRangeButtons === 'function') renderMainRangeButtons();
   if (groupMode === 'day') expandedDayGroups.add(new Date(t.date).toDateString());
   switchPage('main');
+  render(); // switchPage() only toggles which page div is visible — it doesn't
+  // re-render the Main list, so without this the list would still show
+  // whatever it last rendered (e.g. the target's day-group still collapsed).
   requestAnimationFrame(() => {
     const rowEl = document.querySelector(`.txn[data-row="${row}"]`);
     if (!rowEl) return;
