@@ -386,6 +386,10 @@
   .preview-row .preview-remember { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .preview-row .preview-remember input { width: auto; }
   .preview-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .preview-group { display: flex; flex-direction: column; gap: 8px; }
+  .preview-row-dup { opacity: 0.55; }
+  .preview-keep { font-size: 12px; color: var(--accent); padding: 0 4px; flex-shrink: 0; white-space: nowrap; }
+  .history-section-sublabel { margin: 4px 2px 4px 10px; opacity: 0.8; }
 
   .mini-charts { display: flex; gap: 10px; margin-bottom: 14px; }
   .mini-charts.zoomed { flex-direction: column; }
@@ -2957,10 +2961,22 @@ const importPreviewList = document.getElementById('importPreviewList');
 
 let importStage = 'pick'; // 'pick' | 'preview'
 let pendingImportRows = [];
+// Parallel array to pendingImportRows — pendingImportSections[i] is the
+// status bucket ('reviewSynced' | 'newDate' | 'oldDate' | 'restored') for
+// pendingImportRows[i]. Kept in lockstep whenever pendingImportRows is
+// spliced/pushed so the preview screen can show fixed status sections
+// while Group by/Sort by still reorder rows within a section.
+let pendingImportSections = [];
+// Rows classified as exact duplicates of something already in your data —
+// held out of pendingImportRows (so Import won't submit them) but still
+// shown in the preview, read-only, with a "Keep anyway" escape hatch.
+let pendingImportDuplicates = [];
 
 function resetImportSheet() {
   importStage = 'pick';
   pendingImportRows = [];
+  pendingImportSections = [];
+  pendingImportDuplicates = [];
   importPickField.style.display = 'block';
   document.getElementById('importToolbar').style.display = 'none';
   importPreviewList.style.display = 'none';
@@ -3804,13 +3820,23 @@ function previewGroupKeyFor(r) {
   return '__all__';
 }
 
+// Fixed display order + labels for the status sections the preview screen
+// groups rows into (see classifyImportRows below). "restored" only shows up
+// once you've tapped "Keep anyway" on a duplicate.
+const IMPORT_SECTION_ORDER = ['reviewSynced', 'newDate', 'oldDate', 'restored'];
+const IMPORT_SECTION_LABEL = {
+  reviewSynced: '🔄 Will sync a pending review record',
+  newDate: '🆕 New — first record for this date',
+  oldDate: '➕ New — added to a date you already have',
+  restored: '↩️ Restored (kept anyway)',
+};
+
 function renderImportPreview() {
   // Sorting/grouping only changes what order rows are DISPLAYED in — the
   // underlying pendingImportRows array (and its indices) never gets
   // reordered, since the ✕/category/remember controls below all target a
   // row by its original index into that array.
-  const indexed = pendingImportRows.map((r, i) => ({ r, i }));
-  const sorted = sortPreviewIndexed(indexed);
+  const indexed = pendingImportRows.map((r, i) => ({ r, i, section: pendingImportSections[i] }));
 
   const rowHtml = ({ r, i }) => {
     const { sign, cls: amtClass } = txnSignInfo(r);
@@ -3833,9 +3859,23 @@ function renderImportPreview() {
   `;
   };
 
-  if (importGroupMode === 'none') {
-    importPreviewList.innerHTML = sorted.map(rowHtml).join('');
-  } else {
+  const dupRowHtml = (r, i) => `
+    <div class="txn preview-row preview-row-dup">
+      <div class="preview-top">
+        <div class="dot ${ALL_CATEGORIES.includes(r.category) ? r.category : 'Custom'}"></div>
+        <div class="info">
+          <div class="merchant">${txnTitle(r)}</div>
+          <div class="meta">${r.date} · ${r.time || 'No time record'} · matches an existing record</div>
+        </div>
+        <div>RM${Number(r.amount).toFixed(2)}</div>
+        <span class="preview-keep" data-dup-idx="${i}">Keep anyway</span>
+      </div>
+    </div>
+  `;
+
+  const renderSectionBody = (items) => {
+    const sorted = sortPreviewIndexed(items);
+    if (importGroupMode === 'none') return sorted.map(rowHtml).join('');
     const groups = {};
     const order = [];
     sorted.forEach(item => {
@@ -3843,17 +3883,43 @@ function renderImportPreview() {
       if (!groups[key]) { groups[key] = []; order.push(key); }
       groups[key].push(item);
     });
-    importPreviewList.innerHTML = order.map(key => `
+    return order.map(key => `
       <div class="preview-group">
-        <div class="history-section-label">${escapeHtml(key)}</div>
+        <div class="history-section-label history-section-sublabel">${escapeHtml(key)}</div>
         ${groups[key].map(rowHtml).join('')}
       </div>
     `).join('');
+  };
+
+  let html = '';
+
+  if (pendingImportDuplicates.length) {
+    html += `
+      <div class="preview-group">
+        <div class="history-section-label">✕ Already in your data (${pendingImportDuplicates.length}) — not imported</div>
+        ${pendingImportDuplicates.map(dupRowHtml).join('')}
+      </div>
+    `;
   }
+
+  IMPORT_SECTION_ORDER.forEach(sectionKey => {
+    const items = indexed.filter(it => it.section === sectionKey);
+    if (!items.length) return;
+    html += `
+      <div class="preview-group">
+        <div class="history-section-label">${IMPORT_SECTION_LABEL[sectionKey]} (${items.length})</div>
+        ${renderSectionBody(items)}
+      </div>
+    `;
+  });
+
+  importPreviewList.innerHTML = html;
 
   importPreviewList.querySelectorAll('[data-idx]').forEach(el => {
     el.onclick = () => {
-      pendingImportRows.splice(Number(el.dataset.idx), 1);
+      const idx = Number(el.dataset.idx);
+      pendingImportRows.splice(idx, 1);
+      pendingImportSections.splice(idx, 1);
       renderImportPreview();
       importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
     };
@@ -3872,16 +3938,27 @@ function renderImportPreview() {
       pendingImportRows[idx].rememberMerchant = el.checked;
     };
   });
+  importPreviewList.querySelectorAll('[data-dup-idx]').forEach(el => {
+    el.onclick = () => {
+      const idx = Number(el.dataset.dupIdx);
+      const [row] = pendingImportDuplicates.splice(idx, 1);
+      pendingImportRows.push(row);
+      pendingImportSections.push('restored');
+      renderImportPreview();
+      importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
+    };
+  });
 }
 
-// Duplicate detection — a parsed row is treated as a duplicate (and
-// automatically skipped, never shown in the preview) if an existing
-// transaction on the SAME account already has the exact same date, time,
-// amount, and merchant/notes text ("context"). This catches re-importing
-// the same statement twice, or two date ranges that overlap, without you
-// having to spot every repeat by hand. Also catches duplicates WITHIN the
-// same import batch — e.g. picking the same screenshot twice, or two
-// screenshots that both cover part of the same day.
+// Duplicate detection — a parsed row is treated as a duplicate if an
+// existing transaction on the SAME account already has the exact same
+// date, time, amount, and merchant/notes text ("context"). This catches
+// re-importing the same statement twice, or two date ranges that overlap.
+// Also catches duplicates WITHIN the same import batch — e.g. picking the
+// same screenshot twice, or two screenshots that both cover part of the
+// same day. Duplicates are held out of what gets submitted, but — unlike
+// before — they're still shown in the preview (in their own read-only
+// section) with a "Keep anyway" option, instead of silently vanishing.
 function importRowContext(r) {
   return String(r.merchant || r.notes || '').trim().toLowerCase();
 }
@@ -3892,21 +3969,56 @@ function importRowsMatch(a, b) {
     Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005 &&
     importRowContext(a) === importRowContext(b);
 }
-function filterOutDuplicates(rows) {
-  const kept = [];
-  let skippedCount = 0;
+
+// Mirrors the account+date+amount check the backend's confirmTbcIfMatches_
+// uses to auto-clear a pending "*TBC" review placeholder — deliberately
+// looser than importRowsMatch (no time/context needed) since that's what
+// actually decides whether importing this row will sync a review record
+// instead of adding a brand new one.
+function findReviewMatch(r) {
+  return allTxns.find(t => t.remark && t.remark.indexOf('*TBC') === 0 &&
+    (t.account || 'TNG') === (r.account || 'TNG') &&
+    t.date === r.date &&
+    Math.abs(Number(t.amount || 0) - Number(r.amount || 0)) <= 0.01);
+}
+
+function accountDateKey(account, date) { return (account || 'TNG') + '|' + date; }
+
+// Splits freshly-parsed rows into the buckets the preview screen shows:
+// duplicate (exact match, held back from import), reviewSynced (matches a
+// pending review placeholder — importing it clears that placeholder rather
+// than adding a new row), newDate (first transaction ever seen for that
+// account+date) and oldDate (adds to a date that already has other
+// transactions). The new/old-date split is based on a snapshot of allTxns
+// taken before this batch, so two rows landing on the same brand-new date
+// within the same batch both count as "new date" rather than the second
+// one flipping to "old date".
+function classifyImportRows(rows) {
+  const existingDateKeys = new Set(allTxns.map(t => accountDateKey(t.account, t.date)));
+  const duplicate = [], reviewSynced = [], newDate = [], oldDate = [];
+  const keptSoFar = [];
   rows.forEach(r => {
     const dupExisting = allTxns.some(t => importRowsMatch(t, r));
-    const dupInBatch = kept.some(k => importRowsMatch(k, r));
-    if (dupExisting || dupInBatch) { skippedCount++; return; }
-    kept.push(r);
+    const dupInBatch = keptSoFar.some(k => importRowsMatch(k, r));
+    if (dupExisting || dupInBatch) { duplicate.push(r); return; }
+    keptSoFar.push(r);
+    if (findReviewMatch(r)) { reviewSynced.push(r); return; }
+    if (existingDateKeys.has(accountDateKey(r.account, r.date))) oldDate.push(r);
+    else newDate.push(r);
   });
-  return { kept, skippedCount };
+  return { duplicate, reviewSynced, newDate, oldDate };
 }
 
 function showImportPreview(rows, extraNote) {
-  const { kept, skippedCount } = filterOutDuplicates(rows);
-  pendingImportRows = kept;
+  const { duplicate, reviewSynced, newDate, oldDate } = classifyImportRows(rows);
+  pendingImportDuplicates = duplicate;
+  pendingImportRows = [...reviewSynced, ...newDate, ...oldDate];
+  pendingImportSections = [
+    ...reviewSynced.map(() => 'reviewSynced'),
+    ...newDate.map(() => 'newDate'),
+    ...oldDate.map(() => 'oldDate'),
+  ];
+
   importStage = 'preview';
   importPickField.style.display = 'none';
   document.getElementById('importToolbar').style.display = 'flex';
@@ -3914,8 +4026,8 @@ function showImportPreview(rows, extraNote) {
   importBackBtn.style.display = 'block';
   renderImportPreview();
   importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
-  const dupNote = skippedCount
-    ? `Skipped ${skippedCount} likely duplicate${skippedCount > 1 ? 's' : ''} already in your data. `
+  const dupNote = duplicate.length
+    ? `${duplicate.length} likely duplicate${duplicate.length > 1 ? 's' : ''} already in your data (shown below, not imported unless you keep them). `
     : '';
   const notes = [extraNote, dupNote].filter(Boolean).join(' ');
   importStatusEl.textContent = pendingImportRows.length
