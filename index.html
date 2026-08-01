@@ -74,6 +74,14 @@
     font-size: 13px; font-weight: 500; border: 1px solid transparent;
   }
   .page-tab.active { background: #0a84ff; color: #fff; }
+  .insights-subnav { display: flex; gap: 8px; margin: 4px 0 14px; }
+  .insights-subtab {
+    flex: 1; text-align: center; padding: 8px 0; border-radius: 10px;
+    background: var(--card); color: var(--muted); font-size: 13px; border: none; font-weight: 500;
+  }
+  .insights-subtab.active { background: #1e1e22; color: var(--text); }
+  .history-section-label-row { display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; gap: 8px; }
+  .history-section-label-row .history-section-label { margin: 0; }
   .tab-badge {
     position: absolute; top: -6px; right: -6px; background: #ffb300; color: #1a1a1a;
     font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; line-height: 16px;
@@ -160,9 +168,15 @@
   .split-group-row .sgr-amt.out { color: #ff453a; }
   .split-group-summary { font-size: 12px; color: var(--muted); margin-top: 8px; border-top: 1px solid #3a3a3c; padding-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
   .split-group-summary b { color: var(--text); }
+  .split-group-viewlist { margin-top: 10px; width: 100%; }
 
-  .split-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin: 10px 0; }
-  .split-picker-option { padding: 10px 12px; border-radius: 8px; background: #2c2c2e; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+  .split-picker-list { display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow-y: auto; margin: 10px 0; }
+  .split-picker-option {
+    padding: 14px 14px; border-radius: 10px; background: #2c2c2e; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; font-size: 14px;
+    border: 2px solid transparent;
+  }
+  .split-picker-option.selected { border-color: var(--accent); background: #241c0f; }
   .split-picker-option .spo-count { color: var(--muted); font-size: 11px; flex-shrink: 0; margin-left: 8px; }
   .split-picker-empty { font-size: 12px; color: var(--muted); padding: 2px 0 10px; }
   .split-picker-actions { display: flex; gap: 8px; margin-top: 4px; }
@@ -436,11 +450,9 @@
     </div>
     <div class="page-tabs" id="pageTabs">
       <button class="page-tab active" data-page="main">Main</button>
-      <button class="page-tab" data-page="calendar">Calendar</button>
-      <button class="page-tab" data-page="trends">Trends</button>
+      <button class="page-tab" data-page="insights">Insights</button>
       <button class="page-tab" data-page="history">History</button>
       <button class="page-tab" data-page="review">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
-      <button class="page-tab" data-page="splits">Splits</button>
     </div>
   </header>
 
@@ -493,6 +505,7 @@
         <option value="amount_asc">Sort: Amount low-high</option>
       </select>
       <button class="toolbar-btn" id="mainDateBtn">Date range</button>
+      <button class="toolbar-btn" id="viewSplitsBtnMain">🔗 Splits</button>
     </div>
 
     <div class="trend-range-row" id="mainRangeRow">
@@ -518,65 +531,89 @@
     <div class="list" id="list"><div class="empty">Loading…</div></div>
   </div>
 
-  <div id="calendarPage" style="display:none;">
-    <div class="cal-nav">
-      <button class="cal-nav-btn" id="calPrev">&lsaquo;</button>
-      <span id="calMonthLabel"></span>
-      <button class="cal-nav-btn" id="calNext">&rsaquo;</button>
+  <div id="insightsPage" style="display:none;">
+    <div class="insights-subnav" id="insightsSubnav">
+      <button class="insights-subtab active" data-sub="calendar">Calendar</button>
+      <button class="insights-subtab" data-sub="charts">Charts</button>
     </div>
-    <div class="page-updated" id="calUpdated"></div>
-    <div class="cal-weekdays">
-      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-    </div>
-    <div class="cal-grid" id="calGrid"></div>
-    <div id="calDayPanel"></div>
-  </div>
 
-  <div id="trendsPage" style="display:none;">
-    <div class="page-updated" id="trendsUpdated"></div>
-    <div class="filters" id="trendFilters"></div>
-    <div class="filters subfilters" id="trendSubFilters"></div>
-    <div class="trend-group-toggle" id="trendGroupToggle">
-      <button class="trend-group-btn active" data-group="month">By month</button>
-      <button class="trend-group-btn" data-group="week">By week</button>
-      <button class="trend-group-btn" data-group="day">By day</button>
-      <button class="trend-group-btn" data-group="custom">Custom range</button>
-    </div>
-    <div class="trend-range-row" id="trendRangeRow">
-      <button class="range-date-btn" id="trendFromBtn" data-target="from"></button>
-      <span>to</span>
-      <button class="range-date-btn" id="trendToBtn" data-target="to"></button>
-    </div>
-    <div class="mini-cal-popup" id="miniCalPopup">
-      <div class="mini-cal-head">
-        <button class="cal-nav-btn" id="miniCalPrev">&lsaquo;</button>
-        <span id="miniCalLabel"></span>
-        <button class="cal-nav-btn" id="miniCalNext">&rsaquo;</button>
+    <div id="calendarPage">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" id="calPrev">&lsaquo;</button>
+        <span id="calMonthLabel"></span>
+        <button class="cal-nav-btn" id="calNext">&rsaquo;</button>
       </div>
-      <div class="mini-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
-      <div class="mini-cal-grid" id="miniCalGrid"></div>
+      <div class="page-updated" id="calUpdated"></div>
+      <div class="cal-weekdays">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div id="calDayPanel"></div>
     </div>
-    <div class="trend-card">
-      <div class="trend-card-label" id="trendLabel"></div>
-      <div class="trend-card-value" id="trendValue"></div>
-      <div class="trend-chart-wrap"><canvas id="trendsChart"></canvas></div>
+
+    <div id="trendsPage" style="display:none;">
+      <div class="page-updated" id="trendsUpdated"></div>
+      <div class="filters" id="trendFilters"></div>
+      <div class="filters subfilters" id="trendSubFilters"></div>
+      <div class="trend-group-toggle" id="trendGroupToggle">
+        <button class="trend-group-btn active" data-group="month">By month</button>
+        <button class="trend-group-btn" data-group="week">By week</button>
+        <button class="trend-group-btn" data-group="day">By day</button>
+        <button class="trend-group-btn" data-group="custom">Custom range</button>
+      </div>
+      <div class="trend-range-row" id="trendRangeRow">
+        <button class="range-date-btn" id="trendFromBtn" data-target="from"></button>
+        <span>to</span>
+        <button class="range-date-btn" id="trendToBtn" data-target="to"></button>
+      </div>
+      <div class="mini-cal-popup" id="miniCalPopup">
+        <div class="mini-cal-head">
+          <button class="cal-nav-btn" id="miniCalPrev">&lsaquo;</button>
+          <span id="miniCalLabel"></span>
+          <button class="cal-nav-btn" id="miniCalNext">&rsaquo;</button>
+        </div>
+        <div class="mini-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+        <div class="mini-cal-grid" id="miniCalGrid"></div>
+      </div>
+      <div class="trend-card">
+        <div class="trend-card-label" id="trendLabel"></div>
+        <div class="trend-card-value" id="trendValue"></div>
+        <div class="trend-chart-wrap"><canvas id="trendsChart"></canvas></div>
+      </div>
     </div>
   </div>
 
   <div id="historyPage" style="display:none;">
     <div class="history-summary" id="historySummary"></div>
-    <div class="history-section-label">Recent activity</div>
+    <div class="history-section-label-row">
+      <div class="history-section-label">Recent activity</div>
+      <button class="toolbar-btn" id="viewSplitsBtnHistory">🔗 Splits</button>
+    </div>
     <div class="history-list" id="historyList"><div class="empty">Loading…</div></div>
   </div>
 
   <div id="reviewPage" style="display:none;">
-    <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
+    <div class="history-section-label-row">
+      <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
+      <button class="toolbar-btn" id="viewSplitsBtnReview">🔗 Splits</button>
+    </div>
     <div class="history-list" id="reviewList"></div>
+    <div class="history-section-label" id="unsureSectionLabel">Needs category</div>
+    <div class="list" id="unsureList"></div>
   </div>
+</div>
 
-  <div id="splitsPage" style="display:none;">
-    <div class="history-section-label" id="splitsSectionLabel">Split groups</div>
-    <div class="history-list" id="splitsList"></div>
+<!-- Splits sheet — reachable from Main/History/Review via the 🔗 Splits
+     buttons, and from tapping any remark that links transactions together.
+     Shows either every split group, or (when opened from a specific
+     transaction's remark) just that one group's detail. -->
+<div class="sheet-backdrop" id="splitsBackdrop">
+  <div class="sheet">
+    <div class="sheet-inner">
+      <span class="close-x" id="splitsClose">✕</span>
+      <h2 id="splitsSectionLabel">Split groups</h2>
+      <div class="history-list" id="splitsList"></div>
+    </div>
   </div>
 </div>
 
@@ -689,8 +726,8 @@
       <h2>Link to a split</h2>
       <div class="split-picker-list" id="splitPickerList"></div>
       <div class="field">
-        <label>Or type a new note/split name</label>
-        <input type="text" id="splitPickerInput" placeholder="e.g. Sushi 31/7 split">
+        <label>Or type a new split's name — we'll add "split" for you</label>
+        <input type="text" id="splitPickerInput" placeholder="e.g. Sushi 31/7">
       </div>
       <div class="split-picker-actions">
         <button class="btn" id="splitPickerSave">Save</button>
@@ -1087,28 +1124,40 @@ function renderApp() {
   render();
   // Always refresh the review list/badge, regardless of which page is
   // active — the Review tab's count badge needs to stay current even while
-  // you're looking at Main/Calendar/Trends, not just when you visit it.
+  // you're looking at Main/Insights, not just when you visit it.
   renderReviewList();
-  if (activePage === 'calendar') renderCalendar();
-  if (activePage === 'trends') renderTrends();
+  if (activePage === 'insights') {
+    if (insightsSubPage === 'calendar') renderCalendar(); else renderTrends();
+  }
   if (activePage === 'history') renderHistory();
-  if (activePage === 'splits') renderSplits();
 }
+
+// Insights merges what used to be two separate top-level tabs (Calendar,
+// Trends) into one, toggled internally — the top tab bar was getting
+// crowded with 6 buttons, and these two views are both "look back at
+// spending patterns" rather than "act on something now" like Review.
+let insightsSubPage = 'calendar';
+function switchInsightsSub(sub) {
+  insightsSubPage = sub;
+  document.querySelectorAll('.insights-subtab').forEach(el => el.classList.toggle('active', el.dataset.sub === sub));
+  document.getElementById('calendarPage').style.display = sub === 'calendar' ? '' : 'none';
+  document.getElementById('trendsPage').style.display = sub === 'charts' ? '' : 'none';
+  if (sub === 'calendar') renderCalendar(); else renderTrends();
+}
+document.querySelectorAll('.insights-subtab').forEach(el => {
+  el.onclick = () => switchInsightsSub(el.dataset.sub);
+});
 
 function switchPage(page) {
   activePage = page;
   document.querySelectorAll('.page-tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   document.getElementById('mainPage').style.display = page === 'main' ? '' : 'none';
-  document.getElementById('calendarPage').style.display = page === 'calendar' ? '' : 'none';
-  document.getElementById('trendsPage').style.display = page === 'trends' ? '' : 'none';
+  document.getElementById('insightsPage').style.display = page === 'insights' ? '' : 'none';
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
   document.getElementById('reviewPage').style.display = page === 'review' ? '' : 'none';
-  document.getElementById('splitsPage').style.display = page === 'splits' ? '' : 'none';
-  if (page === 'calendar') renderCalendar();
-  if (page === 'trends') renderTrends();
+  if (page === 'insights') switchInsightsSub(insightsSubPage);
   if (page === 'history') renderHistory();
   if (page === 'review') renderReviewList();
-  if (page === 'splits') renderSplits();
 }
 document.querySelectorAll('.page-tab').forEach(el => {
   el.onclick = () => switchPage(el.dataset.page);
@@ -1769,10 +1818,36 @@ function renderReviewList() {
   const unconfirmed = allTxns.filter(t => t.remark && t.remark.indexOf('*TBC') === 0)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
+  // "Unsure" transactions still count normally everywhere else (Main,
+  // Insights totals/charts) — this section is just a reminder list so they
+  // don't get forgotten, using the same full row (with its category
+  // dropdown) as the Main list so fixing one is a single tap, no separate
+  // screen needed.
+  const unsure = allTxns.filter(t => t.category === 'Unsure')
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
   const badge = document.getElementById('reviewTabBadge');
+  const badgeCount = unconfirmed.length + unsure.length;
   if (badge) {
-    badge.textContent = unconfirmed.length ? String(unconfirmed.length) : '';
-    badge.style.display = unconfirmed.length ? '' : 'none';
+    badge.textContent = badgeCount ? String(badgeCount) : '';
+    badge.style.display = badgeCount ? '' : 'none';
+  }
+
+  const unsureLabel = document.getElementById('unsureSectionLabel');
+  const unsureEl = document.getElementById('unsureList');
+  if (!unsure.length) {
+    unsureLabel.textContent = 'Needs category';
+    unsureEl.innerHTML = '<div class="empty">Nothing marked Unsure right now.</div>';
+  } else {
+    unsureLabel.textContent = `Needs category (${unsure.length})`;
+    unsureEl.innerHTML = unsure.map(renderTxnRow).join('');
+    // Re-bind the shared row handlers so these newly-inserted rows get a
+    // working category dropdown / remark button / remark-link click, same
+    // as every row on the Main list.
+    attachCatSelectHandlers();
+    attachExtraTagHandlers();
+    attachRemarkHandlers();
+    attachLinkHandlers();
   }
 
   el.style.display = '';
@@ -2910,12 +2985,11 @@ function attachRemarkHandlers() {
 // different accounts/categories — e.g. you pay a group lunch on TNG, then
 // each friend's reimbursement lands as a separate Transfer row, maybe in a
 // different account entirely. Rather than a new field, this reuses the
-// existing free-text Remark: put the same note (e.g. "Lunch 7/30 split") on
-// the original payment AND on each reimbursement via the ✎ button, then
-// click that note on any one of them to instantly filter the whole list
-// down to every transaction sharing that exact remark — regardless of
-// account, category, or time filter, all of which get reset to "All" here
-// so nothing hides the rest of the group.
+// existing free-text Remark: put the same note (e.g. "Lunch split") on the
+// original payment AND on each reimbursement via the ✎ button. Clicking
+// that note anywhere (Main, History, Review) opens the Splits sheet showing
+// that one group's paid/received/net detail — groupByRemark (the raw
+// filtered-list view) is still reachable from a button inside that sheet.
 function groupByRemark(remark) {
   if (!remark) return;
   switchPage('main');
@@ -2929,7 +3003,7 @@ function groupByRemark(remark) {
 }
 function attachLinkHandlers() {
   document.querySelectorAll('.remark[data-remark]').forEach(el => {
-    el.onclick = () => groupByRemark(el.dataset.remark);
+    el.onclick = () => openSplitsModal(el.dataset.remark);
   });
 }
 
@@ -2948,76 +3022,110 @@ function isSplitLinkableRemark(remark) {
   return true;
 }
 
-// Every remark used on 2+ transactions — a real split/link group, as
-// opposed to a one-off personal note nothing else shares yet. Sorted by
-// the group's most recent transaction date, newest first, so both the
-// Splits tab and the picker list lead with what you're most likely
-// looking for.
-function splitGroups() {
+// Every remark currently in use, with its member transactions and running
+// paid/received/net totals — including remarks used on just ONE
+// transaction so far. That single-use case matters for the split picker
+// (see openSplitPicker): the moment you name a brand-new split on
+// transaction A, it needs to be pickable when you open transaction B's
+// picker next, even though it isn't a real "group" yet. splitGroups()
+// below is just this filtered down to genuine 2+ groups, for views that
+// should only ever show real links.
+function remarkGroups() {
   const byRemark = {};
   allTxns.forEach(t => {
     if (!isSplitLinkableRemark(t.remark)) return;
     (byRemark[t.remark] = byRemark[t.remark] || []).push(t);
   });
-  const groups = Object.keys(byRemark)
-    .filter(remark => byRemark[remark].length >= 2)
-    .map(remark => {
-      const txns = byRemark[remark].slice().sort((a, b) => txnTimestamp(b) - txnTimestamp(a));
-      let totalOut = 0, totalIn = 0;
-      txns.forEach(t => {
-        const amt = Number(t.amount || 0);
-        if (txnFlow(t) === 'in') totalIn += amt; else totalOut += amt;
-      });
-      return { remark, txns, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date };
+  const list = Object.keys(byRemark).map(remark => {
+    const txns = byRemark[remark].slice().sort((a, b) => txnTimestamp(b) - txnTimestamp(a));
+    let totalOut = 0, totalIn = 0;
+    txns.forEach(t => {
+      const amt = Number(t.amount || 0);
+      if (txnFlow(t) === 'in') totalIn += amt; else totalOut += amt;
     });
-  groups.sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
-  return groups;
+    return { remark, txns, count: txns.length, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date };
+  });
+  list.sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
+  return list;
+}
+function splitGroups() {
+  return remarkGroups().filter(g => g.count >= 2);
 }
 
-function renderSplits() {
-  const el = document.getElementById('splitsList');
-  const label = document.getElementById('splitsSectionLabel');
-  const groups = splitGroups();
-  if (!groups.length) {
-    label.textContent = 'Split groups';
-    el.innerHTML = '<div class="empty">No splits yet — tap the ✎ note icon on a transaction and link two or more together.</div>';
-    return;
-  }
-  label.textContent = `Split groups (${groups.length})`;
-  el.innerHTML = groups.map(g => {
-    const rowsHtml = g.txns.map(t => {
-      const flow = txnFlow(t);
-      const sign = flow === 'in' ? '+' : '-';
-      return `
-        <div class="split-group-row">
-          <span>${escapeHtml(txnTitle(t))} · ${new Date(t.date).toLocaleDateString()} · ${escapeHtml(t.account || '')}</span>
-          <span class="sgr-amt ${flow}">${sign}RM${Number(t.amount || 0).toFixed(2)}</span>
-        </div>`;
-    }).join('');
+function splitGroupCardHtml(g) {
+  const rowsHtml = g.txns.map(t => {
+    const flow = txnFlow(t);
+    const sign = flow === 'in' ? '+' : '-';
     return `
-      <div class="split-group" data-remark="${escapeHtml(g.remark)}">
-        <div class="split-group-header">
-          <div class="split-group-name">${escapeHtml(g.remark)}</div>
-          <div class="split-group-net">${formatSignedRM(g.net)}</div>
-        </div>
-        <div class="split-group-rows">${rowsHtml}</div>
-        <div class="split-group-summary">
-          <span>You paid: <b>RM${g.totalOut.toFixed(2)}</b></span>
-          <span>Received back: <b>RM${g.totalIn.toFixed(2)}</b></span>
-          <span>Net cost to you: <b>${formatSignedRM(g.net)}</b></span>
-        </div>
+      <div class="split-group-row">
+        <span>${escapeHtml(txnTitle(t))} · ${new Date(t.date).toLocaleDateString()} · ${escapeHtml(t.account || '')}</span>
+        <span class="sgr-amt ${flow}">${sign}RM${Number(t.amount || 0).toFixed(2)}</span>
       </div>`;
   }).join('');
-  el.querySelectorAll('.split-group[data-remark]').forEach(card => {
-    card.onclick = () => groupByRemark(card.dataset.remark);
-  });
+  return `
+    <div class="split-group" data-remark="${escapeHtml(g.remark)}">
+      <div class="split-group-header">
+        <div class="split-group-name">${escapeHtml(g.remark)}</div>
+        <div class="split-group-net">${formatSignedRM(g.net)}</div>
+      </div>
+      <div class="split-group-rows">${rowsHtml}</div>
+      <div class="split-group-summary">
+        <span>You paid: <b>RM${g.totalOut.toFixed(2)}</b></span>
+        <span>Received back: <b>RM${g.totalIn.toFixed(2)}</b></span>
+        <span>Net cost to you: <b>${formatSignedRM(g.net)}</b></span>
+      </div>
+      <button class="toolbar-btn split-group-viewlist" data-remark="${escapeHtml(g.remark)}">Show in transaction list →</button>
+    </div>`;
 }
 
+// Powers the Splits sheet, reachable from the 🔗 Splits buttons on
+// Main/History/Review (full browse, filterRemark omitted) and from tapping
+// any linked remark on a transaction row (filterRemark set — jumps
+// straight to that one group's detail instead of making you find it in a
+// list).
+function renderSplitsModal(filterRemark) {
+  const el = document.getElementById('splitsList');
+  const label = document.getElementById('splitsSectionLabel');
+  const groups = filterRemark ? remarkGroups().filter(g => g.remark === filterRemark) : splitGroups();
+  if (!groups.length) {
+    label.textContent = filterRemark || 'Split groups';
+    el.innerHTML = filterRemark
+      ? '<div class="empty">No other transactions linked to this note yet — add the same note to another transaction to form a split.</div>'
+      : '<div class="empty">No splits yet — tap the ✎ note icon on a transaction and link two or more together.</div>';
+    return;
+  }
+  label.textContent = filterRemark || `Split groups (${groups.length})`;
+  el.innerHTML = groups.map(splitGroupCardHtml).join('');
+  el.querySelectorAll('.split-group-viewlist').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      closeSplitsModal();
+      groupByRemark(btn.dataset.remark);
+    };
+  });
+}
+function openSplitsModal(filterRemark) {
+  renderSplitsModal(filterRemark || null);
+  document.getElementById('splitsBackdrop').classList.add('open');
+}
+function closeSplitsModal() {
+  document.getElementById('splitsBackdrop').classList.remove('open');
+}
+document.getElementById('splitsClose').onclick = closeSplitsModal;
+document.getElementById('viewSplitsBtnMain').onclick = () => openSplitsModal();
+document.getElementById('viewSplitsBtnHistory').onclick = () => openSplitsModal();
+document.getElementById('viewSplitsBtnReview').onclick = () => openSplitsModal();
+
 // Split/remark picker sheet — opened from the ✎ button on any transaction
-// row. Lists every existing split group name so you can tap one instead of
-// retyping it (a typo would silently create a brand-new, unlinked group
-// instead of joining the real one), plus a free-text field for a new note
-// or a first-time split name, and a Clear button to remove the remark.
+// row. Lists every existing split name (including ones used on just one
+// transaction so far, see remarkGroups) so you can TAP to select one
+// instead of retyping it — a typo would silently create a brand-new,
+// unlinked group instead of joining the real one. Tapping only selects/
+// highlights it; Save is a separate, deliberate step, so a mis-tap doesn't
+// immediately commit anything. Typing a brand-new name only needs the
+// main word (e.g. "Lunch") — Save appends " split" automatically so every
+// split ends up named consistently, unless the typed text exactly matches
+// an existing split (then it's saved as-is, to actually join that group).
 let splitPickerRow = null;
 const splitPickerBackdrop = document.getElementById('splitPickerBackdrop');
 function openSplitPicker(row) {
@@ -3026,19 +3134,23 @@ function openSplitPicker(row) {
   const currentRemark = (t && isSplitLinkableRemark(t.remark)) ? t.remark : '';
   document.getElementById('splitPickerInput').value = currentRemark;
 
-  const groups = splitGroups();
+  const groups = remarkGroups();
   const listEl = document.getElementById('splitPickerList');
   if (!groups.length) {
     listEl.innerHTML = '<div class="split-picker-empty">No existing splits yet — type a new name below.</div>';
   } else {
     listEl.innerHTML = groups.map(g => `
-      <div class="split-picker-option" data-remark="${escapeHtml(g.remark)}">
+      <div class="split-picker-option${g.remark === currentRemark ? ' selected' : ''}" data-remark="${escapeHtml(g.remark)}">
         <span>${escapeHtml(g.remark)}</span>
-        <span class="spo-count">${g.txns.length} txns · net ${formatSignedRM(g.net)}</span>
+        <span class="spo-count">${g.count >= 2 ? `${g.count} txns · net ${formatSignedRM(g.net)}` : '1 txn so far'}</span>
       </div>
     `).join('');
     listEl.querySelectorAll('.split-picker-option').forEach(opt => {
-      opt.onclick = () => saveSplitPickerRemark(opt.dataset.remark);
+      opt.onclick = () => {
+        listEl.querySelectorAll('.split-picker-option').forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        document.getElementById('splitPickerInput').value = opt.dataset.remark;
+      };
     });
   }
   splitPickerBackdrop.classList.add('open');
@@ -3058,7 +3170,12 @@ async function saveSplitPickerRemark(remark) {
 }
 document.getElementById('splitPickerClose').onclick = closeSplitPicker;
 document.getElementById('splitPickerSave').onclick = () => {
-  const val = document.getElementById('splitPickerInput').value.trim();
+  let val = document.getElementById('splitPickerInput').value.trim();
+  if (val) {
+    const existingNames = remarkGroups().map(g => g.remark);
+    const isExisting = existingNames.includes(val);
+    if (!isExisting && !/\bsplit$/i.test(val)) val = val + ' split';
+  }
   saveSplitPickerRemark(val);
 };
 document.getElementById('splitPickerClear').onclick = () => saveSplitPickerRemark('');
