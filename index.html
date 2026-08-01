@@ -33,6 +33,10 @@
     --housing: #ff7a9c;
     --unsure: #bf5af2;
     --transfer: #8e8e93;
+    /* E-wallet Reload / TNG Card Top-up are still Transfer under the hood,
+       but get their own yellow so they read as "internal transfer" at a
+       glance, distinct from To Others/From Others/Internal's neutral grey. */
+    --reload: #ffcc00;
     --income: #30d158;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -327,6 +331,7 @@
   .dot.Housing { background: var(--housing); }
   .dot.Unsure { background: var(--unsure); }
   .dot.Transfer { background: var(--transfer); }
+  .dot.Reload { background: var(--reload); }
   .dot.Income { background: var(--income); }
   .dot.Custom { background: var(--muted); }
   .txn .info { flex: 1; min-width: 0; }
@@ -351,7 +356,11 @@
     border: 1px dashed #3a3a3c; border-radius: 6px; padding: 3px 4px; max-width: 100%;
   }
   .txn-extratag-select.has-extra { color: var(--accent); border-color: var(--accent); }
-  .cat-select-row { display: flex; flex-wrap: wrap; }
+  .txn-extratag-amount {
+    margin-top: 5px; margin-left: 6px; font-size: 11px; background: var(--bg); color: var(--text);
+    border: 1px dashed var(--accent); border-radius: 6px; padding: 3px 4px; width: 92px;
+  }
+  .cat-select-row { display: flex; flex-wrap: wrap; align-items: center; }
   .txn-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
   .remark-btn {
     background: none; border: none; color: var(--muted); font-size: 15px; padding: 2px 2px;
@@ -426,6 +435,7 @@
   .preview-section-toggle { cursor: pointer; user-select: none; }
   .preview-section-chevron { display: inline-block; width: 10px; }
 
+  .mini-charts-toggle-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
   .mini-charts { display: flex; gap: 10px; margin-bottom: 14px; }
   .mini-charts.zoomed { flex-direction: column; }
   .mini-chart-card { flex: 1; min-width: 0; background: var(--card); border-radius: 16px; padding: 14px 10px; }
@@ -481,6 +491,9 @@
       </div>
     </div>
 
+    <div class="mini-charts-toggle-row">
+      <button class="toolbar-btn" id="miniChartsToggleBtn">Hide account breakdown ▾</button>
+    </div>
     <div class="mini-charts" id="miniCharts"></div>
 
     <div class="filters accountfilters" id="accountfilters"></div>
@@ -754,7 +767,7 @@
 // drifted to an old code version (stuck missing several fixes, including the
 // Transfer/Income categories). Consolidated onto the one deployment that's
 // consistently redeployed going forward, to remove that class of bug.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby95kLVf8_mho2dIxQ4GsncTBLBNIVZ_azjhko5bRhMioXy-r-H6_a_Qv1YA1Si4uUzkA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRudNZs6s441X981A3t7uvHV7RiAB6enG7PB4orjsfujDARbm9kfgjdfmG9usyebXX2Q/exec';
 
 // POST helper. Uses Content-Type: text/plain so the request stays a CORS
 // "simple request" (no OPTIONS preflight) — Apps Script web apps can't
@@ -803,6 +816,12 @@ const CATEGORY_RULES = [
     'GUARDIAN', 'WATSON', 'CARING PHARMACY', 'BIG PHARMACY', 'ALPRO PHARMACY',
     'HEALTH LANE', 'AEON WELLNESS'
   ] },
+  // Grooming — haircuts, salons, spas. Lives under Shopping (things you
+  // spend on yourself) alongside Pharmacies rather than as its own
+  // top-level category.
+  { category: 'Shopping', subTag: 'Personal Care', keywords: [
+    'SALON', 'HAIR', 'BARBER', 'SPA'
+  ] },
   { category: 'Food', keywords: [
     'KOPITIAM', 'RESTORAN', 'RESTAURANT', 'MIXED RICE', 'KITCHEN',
     'BURGER', 'RAMEN', 'CHAGEE', 'LAUK', 'BUN', 'THONG KEE', 'YCS',
@@ -839,6 +858,7 @@ const CATEGORY_OPTIONS = [
   { category: 'Shopping', subTag: 'Hypermarket', label: 'Shopping · Hypermarket' },
   { category: 'Shopping', subTag: 'Online', label: 'Shopping · Online' },
   { category: 'Shopping', subTag: 'Pharmacies', label: 'Shopping · Pharmacies' },
+  { category: 'Shopping', subTag: 'Personal Care', label: 'Shopping · Personal Care' },
   { category: 'Shopping', subTag: '', label: 'Shopping · Other' },
   { category: 'Food', subTag: '', label: 'Food' },
   { category: 'Entertainment', subTag: '', label: 'Entertainment' },
@@ -847,9 +867,7 @@ const CATEGORY_OPTIONS = [
   { category: 'Housing', subTag: 'Water & Electric', label: 'Housing · Water & Electric' },
   { category: 'Housing', subTag: 'WiFi', label: 'Housing · WiFi' },
   { category: 'Housing', subTag: 'Carpark Rent', label: 'Housing · Carpark Rent' },
-  { category: 'Unsure', subTag: 'Invest', label: 'Unsure · Invest' },
-  { category: 'Unsure', subTag: '', label: 'Unsure' },
-  { category: 'Transfer', subTag: 'Card Reload', label: 'Transfer · Card Reload' },
+  { category: 'Transfer', subTag: 'Card Reload', label: 'Transfer · E-wallet Reload' },
   // The physical TNG Card (Enhanced/NFC card) has its OWN balance, separate
   // from the eWallet — RFID toll only ever deducts the eWallet, while
   // parking/non-PayDirect tolls deduct this card. A top-up of this card
@@ -868,6 +886,11 @@ const CATEGORY_OPTIONS = [
   { category: 'Income', subTag: 'Salary', label: 'Income · Salary' },
   { category: 'Income', subTag: 'Interest', label: 'Income · Interest' },
   { category: 'Income', subTag: 'Other', label: 'Income · Other' },
+  // Unsure sits last in the dropdown too — it's the fallback "not categorized
+  // yet" bucket, not something worth scanning past every time you pick a
+  // real category.
+  { category: 'Unsure', subTag: 'Invest', label: 'Unsure · Invest' },
+  { category: 'Unsure', subTag: '', label: 'Unsure' },
 ];
 function optionValue(o) { return o.category + '|' + o.subTag; }
 // "Card Reload" only makes sense for TNG (topping up the TNG eWallet from a
@@ -1013,6 +1036,12 @@ let searchQuery = '';
 // category always shows that category's own subtag breakdown regardless.
 let overallChartMode = 'expense';
 
+// Whether the mini per-account pie row (TNG + Banks — see MINI_PIE_GROUPS)
+// is shown at all. One shared flag rather than one per card, since the two
+// mini pies are meant to expand/collapse together as a single "account
+// breakdown" unit, not independently.
+let miniChartsExpanded = true;
+
 // "Hide balance" — masks just your real current-balance figures (Overall
 // Balance + per-account/Card true balances) for showing the app to someone
 // else without revealing how much money you actually have. Persisted so it
@@ -1041,14 +1070,21 @@ document.querySelectorAll('.chart-mode-btn').forEach(btn => {
     renderCharts();
   };
 });
+document.getElementById('miniChartsToggleBtn').onclick = () => {
+  miniChartsExpanded = !miniChartsExpanded;
+  renderCharts();
+};
 let groupMode = 'day';
 let sortMode = 'date_desc';
-// Which day-group headers (groupMode === 'day' only) are currently expanded
+// Which group headers (any groupMode except 'none') are currently expanded
 // to show their individual transactions — collapsed by default so the list
-// opens as a scannable "date + total" overview, since a single day's total
-// is often what you're checking (e.g. auditing why a month's Expense looks
-// high) without needing every row visible at once.
-let expandedDayGroups = new Set();
+// opens as a scannable "group + total" overview (day/category/merchant all
+// work the same way), since the group's total is often what you're checking
+// (e.g. auditing why a month's Expense looks high) without needing every row
+// visible at once. A single Set shared across group modes — switching modes
+// just means most keys in here no longer match anything on screen, which is
+// harmless.
+let expandedGroups = new Set();
 
 // Which top-level page is showing — Main (the classic list+pie view),
 // Calendar (month heatmap + full day detail), or History (the audit trail
@@ -1323,6 +1359,7 @@ function renderCalDayPanel() {
   panelEl.innerHTML = html;
   attachCatSelectHandlers();
   attachExtraTagHandlers();
+  attachExtraTagAmountHandlers();
   attachRemarkHandlers();
   attachLinkHandlers();
 }
@@ -1827,8 +1864,11 @@ function renderReviewList() {
   // Insights totals/charts) — this section is just a reminder list so they
   // don't get forgotten, using the same full row (with its category
   // dropdown) as the Main list so fixing one is a single tap, no separate
-  // screen needed.
-  const unsure = allTxns.filter(t => t.category === 'Unsure')
+  // screen needed. Transfer > To Others rows are included here too — a
+  // generic "sent to someone" leg is just as much a "figure out what this
+  // actually was" case as Unsure, so it gets the same nudge instead of
+  // quietly sitting under Transfer forever.
+  const unsure = allTxns.filter(t => t.category === 'Unsure' || (t.category === 'Transfer' && t.subTag === 'To Others'))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   const badge = document.getElementById('reviewTabBadge');
@@ -1851,6 +1891,7 @@ function renderReviewList() {
     // as every row on the Main list.
     attachCatSelectHandlers();
     attachExtraTagHandlers();
+    attachExtraTagAmountHandlers();
     attachRemarkHandlers();
     attachLinkHandlers();
   }
@@ -1958,7 +1999,7 @@ function jumpToRecord(row) {
   mainRangeFrom = null;
   mainRangeTo = null;
   if (typeof renderMainRangeButtons === 'function') renderMainRangeButtons();
-  if (groupMode === 'day') expandedDayGroups.add(new Date(t.date).toDateString());
+  if (groupMode !== 'none') expandedGroups.add(groupKeyFor(t));
   switchPage('main');
   render(); // switchPage() only toggles which page div is visible — it doesn't
   // re-render the Main list, so without this the list would still show
@@ -2104,11 +2145,13 @@ function colorFor(key) { return CHART_COLORS[key] || '#8e8e93'; }
 // the category itself is neutral regardless of which subtag.
 const SUBTAG_COLORS = {
   Toll: '#0a84ff', Parking: '#64d2ff', Fuel: '#5e5ce6', Service: '#30d5ff', Ride: '#ff6961',
-  'Convenience Store': '#34c759', Hypermarket: '#30d158', Pharmacies: '#ff2d55',
+  'Convenience Store': '#34c759', Hypermarket: '#30d158', Pharmacies: '#ff2d55', 'Personal Care': '#ff9500',
   Subscription: '#ff6482',
   Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
   Invest: '#ff453a',
-  'Card Reload': '#a1a1a6', 'TNG Card Top-up': '#6e6e73', 'To Others': '#8e8e93', 'From Others': '#636366', 'Internal': '#48484a',
+  // Yellow (matches .dot.Reload) — internal transfers of your own money,
+  // called out distinctly from the neutral greys below.
+  'Card Reload': '#ffcc00', 'TNG Card Top-up': '#ffcc00', 'To Others': '#8e8e93', 'From Others': '#636366', 'Internal': '#48484a',
   Salary: '#30d158', Interest: '#64d2ff', Other: '#bf5af2', Others: '#8e8e93'
 };
 function colorForSub(key) { return SUBTAG_COLORS[key] || '#8e8e93'; }
@@ -2186,9 +2229,10 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
   const isFoodMerchantMode = !opts.incomeMode && activeFilter === 'Food';
   // A Housing row that covers two things at once (e.g. one payment for both
   // Rent + WiFi, see the "+ tag" extraTag feature) still counts once in the
-  // data under its one primary subTag — but for VIEWING here, split its
-  // amount evenly across both slices so the pie doesn't over-attribute the
-  // whole payment to just the primary tag.
+  // data under its one primary subTag — but for VIEWING here, attribute the
+  // exact amount given for the tag (extraTagAmount) to that slice, with the
+  // remainder to the primary subtag. Falls back to an even 50/50 split when
+  // no specific amount was given, same as before this field existed.
   const isHousingSplitMode = !opts.incomeMode && activeFilter === 'Housing';
   const totals = {};
   if (isFoodMerchantMode) {
@@ -2207,8 +2251,10 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
       const amt = spendAmount(t);
       const primary = t.subTag || 'Others';
       if (t.extraTag) {
-        totals[primary] = (totals[primary] || 0) + amt / 2;
-        totals[t.extraTag] = (totals[t.extraTag] || 0) + amt / 2;
+        const hasAmount = t.extraTagAmount !== null && t.extraTagAmount !== undefined && t.extraTagAmount !== '' && t.extraTagAmount > 0 && t.extraTagAmount < amt;
+        const tagAmt = hasAmount ? Number(t.extraTagAmount) : amt / 2;
+        totals[primary] = (totals[primary] || 0) + (amt - tagAmt);
+        totals[t.extraTag] = (totals[t.extraTag] || 0) + tagAmt;
       } else {
         totals[primary] = (totals[primary] || 0) + amt;
       }
@@ -2319,6 +2365,17 @@ function renderCharts() {
       delete chartInstances[id];
     }
   });
+
+  const toggleBtn = document.getElementById('miniChartsToggleBtn');
+  if (toggleBtn) toggleBtn.textContent = miniChartsExpanded ? 'Hide account breakdown ▾' : 'Show account breakdown ▸';
+
+  // Collapsed by the shared toggle above — TNG and Banks hide/show together
+  // as one unit (see miniChartsExpanded).
+  if (!miniChartsExpanded) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
 
   // While a text search is active (including the remark-link "group by
   // note" feature), the per-account mini pies would each get re-scoped down
@@ -2505,7 +2562,10 @@ function renderStatBreakdown(base) {
   el.classList.add('show');
 }
 
-const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Housing', 'Unsure', 'Transfer', 'Income'];
+// Unsure sits last — it's the "needs a real category" bucket, not something
+// you'd usually filter to on purpose, so it shouldn't compete for attention
+// with the real spending categories at the front of the row.
+const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Housing', 'Transfer', 'Income', 'Unsure'];
 
 // Top-level "which real-world account" filter — All / TNG / HL Bank / PBank
 // — a separate dimension from the category filters below it. Which account
@@ -2606,8 +2666,9 @@ function groupKeyFor(t) {
 }
 
 function render() {
-  // Reset here — only the "Group by: Day" branch below turns this back on,
-  // since expand/collapse-all only makes sense for day groups.
+  // Reset here — the grouped branch below (any mode except "None") turns
+  // this back on, since expand/collapse-all only makes sense once rows are
+  // actually grouped into headers.
   document.getElementById('toolbarSecondary').style.display = 'none';
   renderAccountFilters();
   // Account filter (All/TNG/HL Bank/PBank) narrows the pool everything else
@@ -2669,6 +2730,7 @@ function render() {
     document.getElementById('list').innerHTML = html;
     attachCatSelectHandlers();
     attachExtraTagHandlers();
+    attachExtraTagAmountHandlers();
     attachRemarkHandlers();
     attachLinkHandlers();
     return;
@@ -2682,19 +2744,19 @@ function render() {
     groups[key].push(t);
   });
 
-  // Day groups (only) are collapsible — tap the header to reveal that day's
-  // rows. Category/merchant grouping stays always-expanded, since those
-  // groups are usually what you're already narrowing down to on purpose.
-  const isDayMode = groupMode === 'day';
-  if (isDayMode && order.length) {
-    const allExpanded = order.every(k => expandedDayGroups.has(k));
+  // Every grouped mode (Day/Category/Merchant) is collapsible — tap a
+  // header to reveal that group's rows, same behavior regardless of what
+  // it's grouped by.
+  const isCollapsible = groupMode !== 'none';
+  if (isCollapsible && order.length) {
+    const allExpanded = order.every(k => expandedGroups.has(k));
     const secondary = document.getElementById('toolbarSecondary');
     const btn = document.getElementById('expandAllBtn');
     secondary.style.display = '';
     btn.textContent = allExpanded ? 'Collapse all' : 'Expand all';
     btn.onclick = () => {
-      if (allExpanded) expandedDayGroups.clear();
-      else order.forEach(k => expandedDayGroups.add(k));
+      if (allExpanded) expandedGroups.clear();
+      else order.forEach(k => expandedGroups.add(k));
       render();
     };
   }
@@ -2713,11 +2775,11 @@ function render() {
       ? groups[key].filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
       : groups[key];
     const groupTotal = groupSpendTxns.reduce((s, t) => s + spendAmount(t), 0);
-    const expanded = !isDayMode || expandedDayGroups.has(key);
-    const headerClass = isDayMode ? ' collapsible' + (expanded ? '' : ' collapsed') : '';
+    const expanded = !isCollapsible || expandedGroups.has(key);
+    const headerClass = isCollapsible ? ' collapsible' + (expanded ? '' : ' collapsed') : '';
     html += `<div class="day-group">
       <div class="day-header${headerClass}" data-key="${escapeHtml(key)}">
-        <span class="day-header-left">${isDayMode ? '<span class="day-chevron">&#9662;</span>' : ''}<span>${key}</span></span>
+        <span class="day-header-left">${isCollapsible ? '<span class="day-chevron">&#9662;</span>' : ''}<span>${key}</span></span>
         <span class="day-header-total">${formatSignedRM(groupTotal)}</span>
       </div>`;
     if (expanded) {
@@ -2726,18 +2788,19 @@ function render() {
     html += `</div>`;
   });
   document.getElementById('list').innerHTML = html;
-  if (isDayMode) {
+  if (isCollapsible) {
     document.querySelectorAll('.day-header.collapsible').forEach(el => {
       el.onclick = () => {
         const key = el.dataset.key;
-        if (expandedDayGroups.has(key)) expandedDayGroups.delete(key);
-        else expandedDayGroups.add(key);
+        if (expandedGroups.has(key)) expandedGroups.delete(key);
+        else expandedGroups.add(key);
         render();
       };
     });
   }
   attachCatSelectHandlers();
   attachExtraTagHandlers();
+  attachExtraTagAmountHandlers();
   attachRemarkHandlers();
   attachLinkHandlers();
 }
@@ -2891,8 +2954,14 @@ function tbcPairLabel(t) {
   return flow === 'in' ? `${otherShort} > ${mine} TBC` : `${mine} > ${otherShort} TBC`;
 }
 
+// Card Reload (bank -> eWallet) and TNG Card Top-up (eWallet/bank -> physical
+// Card) get their own yellow dot rather than Transfer's default grey — both
+// are internal transfers of your own money, so the yellow flags that at a
+// glance without needing to open the row.
+const RELOAD_SUBTAGS = ['Card Reload', 'TNG Card Top-up'];
 function renderTxnRow(t) {
-  const dotClass = ALL_CATEGORIES.includes(t.category) ? t.category : 'Custom';
+  const isReloadRow = t.category === 'Transfer' && RELOAD_SUBTAGS.includes(t.subTag);
+  const dotClass = isReloadRow ? 'Reload' : (ALL_CATEGORIES.includes(t.category) ? t.category : 'Custom');
   const { sign, cls: amtClass } = txnSignInfo(t);
   // Rows auto-added by the HL Bank <-> TNG reload rule carry a remark
   // starting with "*TBC" until the real bank record shows up and
@@ -2903,7 +2972,12 @@ function renderTxnRow(t) {
   const tbcFlagHtml = isTbc
     ? `<span class="tbc-flag" title="${escapeHtml(t.remark)}">${escapeHtml(tbcPairLabel(t))}</span>`
     : '';
-  const remarkHtml = (t.remark && !isTbc)
+  // The Review tab's "Confirm" button stamps a generic "Confirmed manually
+  // on <date>" remark (see renderReviewList) purely as an internal marker —
+  // it's not a real split/note, so isSplitLinkableRemark() filters it out
+  // here too (same check the Splits feature uses), otherwise it would show
+  // up looking exactly like a real linked split note on the row.
+  const remarkHtml = (t.remark && !isTbc && isSplitLinkableRemark(t.remark))
     ? `<div class="remark" data-remark="${escapeHtml(t.remark)}" title="Click to see every transaction sharing this note">${escapeHtml(t.remark)}</div>`
     : '';
   const hint = transferHint(t);
@@ -2911,6 +2985,12 @@ function renderTxnRow(t) {
   const extraOpts = extraTagOptionsHtml(t.category, t.subTag, t.extraTag);
   const extraSelectHtml = extraOpts
     ? `<select class="txn-extratag-select${t.extraTag ? ' has-extra' : ''}" data-row="${t.row}">${extraOpts}</select>`
+    : '';
+  // Only shown once a "+ tag" is actually picked — lets you say exactly how
+  // much of this payment is for the tag (e.g. RM100 of a RM1500 Rent payment
+  // is really WiFi) instead of always assuming an even 50/50 split.
+  const extraAmountHtml = (extraOpts && t.extraTag)
+    ? `<input type="number" class="txn-extratag-amount" data-row="${t.row}" step="0.01" min="0" placeholder="RM for + ${escapeHtml(t.extraTag)}" title="How much of this payment is for the + tag — leave blank to split it evenly" value="${(t.extraTagAmount !== null && t.extraTagAmount !== undefined && t.extraTagAmount !== '') ? t.extraTagAmount : ''}">`
     : '';
   return `
     <div class="txn" data-row="${t.row}">
@@ -2923,6 +3003,7 @@ function renderTxnRow(t) {
         <div class="cat-select-row">
           <select class="txn-cat-select" data-row="${t.row}">${categoryOptionsHtml(t.category, t.subTag, t.account)}</select>
           ${extraSelectHtml}
+          ${extraAmountHtml}
         </div>
       </div>
       <div class="txn-actions">
@@ -2966,10 +3047,43 @@ function attachExtraTagHandlers() {
       const row = Number(el.dataset.row);
       const extraTag = el.value;
       const t = allTxns.find(x => x.row === row);
-      if (t) t.extraTag = extraTag;
+      // Picking a different tag (or clearing it) invalidates whatever amount
+      // was set for the OLD tag, so reset it — the amount input reappears
+      // blank (splits 50/50 by default) until a new amount is entered for
+      // this tag specifically.
+      if (t) { t.extraTag = extraTag; t.extraTagAmount = null; }
       el.disabled = true;
-      await callApi('updateExtraTag', { row, extraTag });
+      await callApi('updateExtraTag', { row, extraTag, extraTagAmount: '' });
       renderApp();
+    };
+  });
+}
+
+// How much of this transaction's total actually belongs to the "+ tag"
+// (secondary subtag) rather than the primary one — e.g. a Housing > Rent
+// payment of RM1500 that also covers RM100 of WiFi should attribute RM100 to
+// WiFi and RM1400 to Rent, not split 50/50. Left blank, the pie/breakdown
+// views (see isHousingSplitMode) fall back to an even 50/50 split, same as
+// before this field existed. See updateExtraTag (Code.gs) for the backend
+// side — stored in its own column so it survives independently of the tag
+// name itself.
+function attachExtraTagAmountHandlers() {
+  document.querySelectorAll('.txn-extratag-amount').forEach(el => {
+    el.onchange = async () => {
+      const row = Number(el.dataset.row);
+      const t = allTxns.find(x => x.row === row);
+      if (!t) return;
+      const raw = el.value.trim();
+      let amt = raw === '' ? null : Math.max(0, Number(raw) || 0);
+      // Can't attribute more (or all) of the payment to the tag than the
+      // row is actually worth — that would leave nothing for the primary
+      // subtag, which doesn't make sense. Falls back to the 50/50 default
+      // instead of silently clamping to a confusing edge value.
+      const total = Number(t.amount || 0);
+      if (amt !== null && (amt <= 0 || amt >= total)) amt = null;
+      t.extraTagAmount = amt;
+      el.value = amt !== null ? amt : '';
+      await callApi('updateExtraTag', { row, extraTag: t.extraTag, extraTagAmount: amt !== null ? amt : '' });
     };
   });
 }
@@ -3690,6 +3804,19 @@ function parsePdfPageItems(items) {
 
     let merchant = cleanMerchant((cols.description || []).join(' '));
     if (!merchant) merchant = ttype;
+    // The "details" column (x 455-650) was being parsed into `cols` but
+    // never actually read anywhere — for a "Transfer to Wallet"/"Receive
+    // from Wallet" row where the Description column just says the generic
+    // "FUND TRANSFER" (no name available there), this Details column is
+    // where TNG prints the actual identifying info (e.g. the recipient's
+    // name/reference), so a row that would otherwise show as a bare "Fund
+    // Transfer" with no further context now carries that detail too.
+    const details = cleanMerchant((cols.details || []).join(' '));
+    if (details && /^FUND TRANSFER$/i.test(merchant)) {
+      merchant = details;
+    } else if (details && details.toUpperCase() !== merchant.toUpperCase()) {
+      merchant = merchant + ' - ' + details;
+    }
 
     const dm = dateRaw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     const date = dm ? `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}` : dateRaw;
