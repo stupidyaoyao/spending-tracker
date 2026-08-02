@@ -3250,7 +3250,12 @@ function accountPairOther_(t) {
   if (RELOAD_SUBTAGS.includes(t.subTag) && t.account === 'TNG Card') return 'TNG';
   return null;
 }
-const TBC_ACCOUNT_SHORT = { 'TNG': 'TNG', 'HL Bank': 'HL', 'PBank': 'P', 'TNG Card': 'Card' };
+// "Card" used to be short for the TNG Card account here, but that reads as
+// ambiguous next to a reload — is "Card" the bank card that funded the
+// reload, or the physical TNG Card being topped up? Renamed so the two are
+// never confused: the linked bank account is always "BANK", the physical
+// TNG Card is always "CARD".
+const TBC_ACCOUNT_SHORT = { 'TNG': 'TNG', 'HL Bank': 'BANK', 'PBank': 'P', 'TNG Card': 'CARD' };
 // Falls back to plain "TBC" if accountPairOther_ doesn't recognize the shape
 // (e.g. an old/manually-added TBC row).
 function tbcPairLabel(t) {
