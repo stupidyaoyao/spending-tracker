@@ -3189,12 +3189,15 @@ function normalizedSubTag(category, subTag) {
 const RELOAD_SYNC_GRACE_DAYS = 2;
 const RELOAD_SYNC_MATCH_WINDOW_DAYS = 3; // HL Bank debit may post up to this many days after the TNG-side reload
 const RELOAD_SYNC_EXPIRE_DAYS = 14;
+// Both arguments must be plain "yyyy-mm-dd" date-only strings (like t.date
+// already is) — mixing a date-only string with a full Date object here
+// would parse one as UTC midnight and the other as local midnight, silently
+// skewing the result by up to a day depending on timezone.
 function daysBetween_(dateA, dateB) {
   return Math.round((new Date(dateB) - new Date(dateA)) / 86400000);
 }
 function pendingReloadSyncTxns() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date().toISOString().slice(0, 10);
   const candidates = allTxns
     .filter(t => t.account === 'TNG' && t.category === 'Transfer' && t.subTag === 'Card Reload')
     .sort((a, b) => (a.date || '').localeCompare(b.date || '')); // earliest reload gets first claim on a bank leg
