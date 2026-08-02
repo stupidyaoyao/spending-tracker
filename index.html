@@ -3039,6 +3039,15 @@ function txnFlow(t) {
   if (t.category === 'Income') return 'in';
   if (t.category === 'Transfer') {
     if (t.subTag === 'To Others') return 'out';
+    // The TNG eWallet's own "Card Reload" leg is money LEAVING the wallet
+    // to fund the physical Card — the literal "Card Reload" merchant text
+    // (from the CARD RELOAD keyword match) always means this specific
+    // wallet-to-Card leg, never a generic external top-up, so it's an
+    // outflow here even though every other Transfer subtag defaults to
+    // inflow. Confirmed by cross-checking against the matching TNG Card
+    // "TNG Card Top-up" leg, which is genuinely the inbound side — see the
+    // 2026-08-02 TNG balance-mismatch investigation.
+    if (t.account === 'TNG' && t.merchant === 'Card Reload') return 'out';
     return 'in';
   }
   return 'out';
@@ -4625,7 +4634,17 @@ function parseScreenshotLines(lines) {
     }
     if (!amtMatch) continue; // couldn't find an amount on this row — skip it
 
-    const amount = parseFloat(amtMatch[1].replace(/[^0-9.]/g, ''));
+    // Preserve the screenshot's own +/- sign as the ground truth for this
+    // row's direction, instead of leaving it to be guessed later purely
+    // from category/type — a "Reload"-typed row isn't always money coming
+    // IN (e.g. "Touch 'n Go Sdn Bhd - EV2 OTA Reload -RM100.00" is really an
+    // outflow), and the old amount-parsing here silently discarded the sign
+    // character along with the "RM" prefix. See the 2026-08-02 TNG
+    // balance-mismatch investigation for the real screenshot this was found
+    // against.
+    const rawAmt = amtMatch[1].trim();
+    const flow = rawAmt.startsWith('-') ? 'out' : (rawAmt.startsWith('+') ? 'in' : '');
+    const amount = parseFloat(rawAmt.replace(/[^0-9.]/g, ''));
     let merchant = merchantLine.slice(0, amtMatch.index).trim();
 
     let type = '';
@@ -4645,7 +4664,7 @@ function parseScreenshotLines(lines) {
       }
     }
 
-    records.push({ date, time, amount, merchant, type });
+    records.push({ date, time, amount, merchant, type, flow });
   }
   return records;
 }
@@ -4664,12 +4683,17 @@ function parseCardScreenshotLines(lines) {
     if (!amtMatch) continue;
     const merchant = lines[i].slice(0, amtMatch.index).trim();
     if (!merchant) continue;
-    const amount = parseFloat(amtMatch[1].replace(/[^0-9.]/g, ''));
+    // Preserve the screenshot's own sign as the ground-truth direction (see
+    // the matching comment in parseScreenshotLines above) rather than
+    // discarding it and guessing later from category/type alone.
+    const rawAmt = amtMatch[1].trim();
+    const flow = rawAmt.startsWith('-') ? 'out' : (rawAmt.startsWith('+') ? 'in' : '');
+    const amount = parseFloat(rawAmt.replace(/[^0-9.]/g, ''));
     const day = dm[1].padStart(2, '0');
     const mon = dm[2].padStart(2, '0');
     const year = dm[3];
     const time = `${dm[4].padStart(2, '0')}:${dm[5]}`;
-    records.push({ date: `${year}-${mon}-${day}`, time, amount, merchant, type: '' });
+    records.push({ date: `${year}-${mon}-${day}`, time, amount, merchant, type: '', flow });
     i++; // the date line was consumed as part of this record, don't rescan it
   }
   return records;
@@ -4718,7 +4742,13 @@ async function parseScreenshotFile(file) {
       date: r.date, time: r.time || '', amount: r.amount,
       category: guess.category, subTag: guess.subTag,
       merchant: r.merchant, source: 'TNG Screenshot Import', notes: r.type, type: r.type,
-      account: 'TNG'
+      account: 'TNG',
+      // Ground truth from the screenshot's own +/- sign, so a row whose
+      // type/category alone would default the wrong way (e.g. a "Reload"-
+      // typed line that's actually an outflow) still gets the right
+      // direction. Left unset if the OCR line had no clear sign, so
+      // txnFlow() falls back to its usual category-based guess.
+      ...(r.flow ? { flow: r.flow } : {})
     });
   });
   rows.__balance = records.__balance;
@@ -4772,7 +4802,8 @@ async function parseCardScreenshotFile(file) {
       date: r.date, time: r.time || '', amount: r.amount,
       category: guess.category, subTag: guess.subTag,
       merchant: r.merchant, source: 'TNG Card Screenshot Import', notes: r.type, type: r.type,
-      account: 'TNG Card'
+      account: 'TNG Card',
+      ...(r.flow ? { flow: r.flow } : {})
     });
   });
   rows.__balance = records.__balance;
