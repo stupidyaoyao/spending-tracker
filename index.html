@@ -2232,9 +2232,16 @@ const SUBTAG_COLORS = {
   Subscription: '#ff6482',
   Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
   Invest: '#ff453a',
-  // Yellow (matches .dot.Reload) — internal transfers of your own money,
-  // called out distinctly from the neutral greys below.
-  'Card Reload': '#ffcc00', 'TNG Card Top-up': '#ffcc00', 'To Others': '#8e8e93', 'From Others': '#636366', 'Internal': '#48484a',
+  // Yellow (matches .dot.Reload) — any movement of money between your OWN
+  // accounts, called out distinctly from To Others/From Others (money
+  // actually going to/from someone else) below. "Internal" used to be its
+  // own dark grey here, which made a Card Reload/TNG Card Top-up row visibly
+  // change color the moment it got matched and renamed to Internal — as if
+  // it had become a fundamentally different kind of transaction, when it's
+  // really the exact same "moved money between my own accounts" concept,
+  // just now confirmed. All three share this yellow instead.
+  'Card Reload': '#ffcc00', 'TNG Card Top-up': '#ffcc00', 'Internal': '#ffcc00',
+  'To Others': '#8e8e93', 'From Others': '#636366',
   Salary: '#30d158', Interest: '#64d2ff', Other: '#bf5af2', Others: '#8e8e93'
 };
 function colorForSub(key) { return SUBTAG_COLORS[key] || '#8e8e93'; }
