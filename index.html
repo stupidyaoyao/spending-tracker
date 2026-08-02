@@ -629,6 +629,8 @@
       <button class="toolbar-btn" id="viewSplitsBtnReview">🔗 Splits</button>
     </div>
     <div class="history-list" id="reviewList"></div>
+    <div class="history-section-label" id="awaitingSyncSectionLabel">Awaiting bank sync</div>
+    <div class="list" id="awaitingSyncList"></div>
     <div class="history-section-label" id="unsureSectionLabel">Needs category</div>
     <div class="list" id="unsureList"></div>
   </div>
@@ -1194,6 +1196,7 @@ async function loadData() {
 // text) call render() directly instead, since those never touch Calendar
 // or History.
 function renderApp() {
+  refreshPendingReloadSync();
   render();
   // Always refresh the review list/badge, regardless of which page is
   // active — the Review tab's count badge needs to stay current even while
@@ -1914,11 +1917,31 @@ function renderReviewList() {
   const unsure = allTxns.filter(t => t.category === 'Unsure' || (t.category === 'Transfer' && t.subTag === 'To Others'))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
+  // Live-computed, not stored — see pendingReloadSyncTxns()/
+  // refreshPendingReloadSync() (called from renderApp() before this runs).
+  const awaitingSync = pendingReloadSyncCache.slice()
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
   const badge = document.getElementById('reviewTabBadge');
-  const badgeCount = unconfirmed.length + unsure.length;
+  const badgeCount = unconfirmed.length + unsure.length + awaitingSync.length;
   if (badge) {
     badge.textContent = badgeCount ? String(badgeCount) : '';
     badge.style.display = badgeCount ? '' : 'none';
+  }
+
+  const awaitingSyncLabel = document.getElementById('awaitingSyncSectionLabel');
+  const awaitingSyncEl = document.getElementById('awaitingSyncList');
+  if (!awaitingSync.length) {
+    awaitingSyncLabel.textContent = 'Awaiting bank sync';
+    awaitingSyncEl.innerHTML = '<div class="empty">Nothing waiting on a bank statement right now.</div>';
+  } else {
+    awaitingSyncLabel.textContent = `Awaiting bank sync (${awaitingSync.length})`;
+    awaitingSyncEl.innerHTML = awaitingSync.map(renderTxnRow).join('');
+    attachCatSelectHandlers();
+    attachExtraTagHandlers();
+    attachExtraTagAmountHandlers();
+    attachRemarkHandlers();
+    attachLinkHandlers();
   }
 
   const unsureLabel = document.getElementById('unsureSectionLabel');
@@ -3140,6 +3163,68 @@ function normalizedSubTag(category, subTag) {
   return subTag;
 }
 
+// A "Card Reload" row on the TNG account is genuinely ambiguous by design
+// (see Code.gs renameCardTopUps()) — it's either a real eWallet reload
+// sourced from HL Bank (which should eventually show up as a matching HL
+// Bank "To TNG (Wallet Reload)" debit), or a physical TNG Card top-up,
+// which by TNG's own docs never touches the eWallet/HL Bank at all. This
+// used to require manually eyeballing HL Bank statements row-by-row to
+// tell the two apart (see the "Match TNG Card Reload rows against HL Bank
+// Internal legs" work) — instead, this recomputes the same distinction
+// live, straight from whatever's actually been imported so far, every time
+// the data reloads:
+//  - Too fresh (within RELOAD_SYNC_GRACE_DAYS): the bank debit probably
+//    just hasn't posted yet — say nothing, avoid crying wolf on a brand
+//    new reload.
+//  - Past the grace period but still within RELOAD_SYNC_EXPIRE_DAYS with
+//    no match found: flag it "Awaiting HL Bank" — importing a newer HL
+//    Bank statement should clear this on its own.
+//  - Past the expiry window with still no match: stop flagging it —  by
+//    elimination it's almost certainly a physical Card top-up that will
+//    never get an HL Bank leg, so continuing to flag it forever would just
+//    be permanent noise.
+// This never rewrites the sheet's raw subTag either way (unlike the old
+// manual "confirm one, then sweep the rest" process) — purely a live,
+// recomputed view, so it can never get stuck out of sync with reality.
+const RELOAD_SYNC_GRACE_DAYS = 2;
+const RELOAD_SYNC_MATCH_WINDOW_DAYS = 3; // HL Bank debit may post up to this many days after the TNG-side reload
+const RELOAD_SYNC_EXPIRE_DAYS = 14;
+function daysBetween_(dateA, dateB) {
+  return Math.round((new Date(dateB) - new Date(dateA)) / 86400000);
+}
+function pendingReloadSyncTxns() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const candidates = allTxns
+    .filter(t => t.account === 'TNG' && t.category === 'Transfer' && t.subTag === 'Card Reload')
+    .sort((a, b) => (a.date || '').localeCompare(b.date || '')); // earliest reload gets first claim on a bank leg
+  if (!candidates.length) return [];
+  const bankLegs = allTxns.filter(t =>
+    t.account === 'HL Bank' && t.subTag === 'Internal' && /To TNG/i.test(t.merchant || ''));
+  const usedBankRows = new Set();
+  const pending = [];
+  candidates.forEach(t => {
+    const ageDays = daysBetween_(t.date, today);
+    if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
+    const match = bankLegs.find(b => {
+      if (usedBankRows.has(b.row)) return false;
+      if (Math.abs(Number(b.amount || 0) - Number(t.amount || 0)) >= 0.01) return false;
+      const diff = daysBetween_(t.date, b.date);
+      return diff >= -1 && diff <= RELOAD_SYNC_MATCH_WINDOW_DAYS;
+    });
+    if (match) { usedBankRows.add(match.row); return; }
+    pending.push(t);
+  });
+  return pending;
+}
+// Recomputed once per data load/refresh (see renderApp()) rather than
+// inside renderTxnRow() itself, since it scans the whole dataset — doing
+// that per-row during a render would be wasteful for a list of any size.
+let pendingReloadSyncCache = [];
+function refreshPendingReloadSync() {
+  pendingReloadSyncCache = pendingReloadSyncTxns();
+}
+
 // Which two accounts a Transfer row moves money between, e.g. "HL Bank" or
 // "TNG Card" as the OTHER side of t.account — derived from the row's own
 // account + subTag + merchant (set by whichever Code.gs reconcile/import
@@ -3196,10 +3281,19 @@ function renderTxnRow(t) {
   const tbcFlagHtml = isTbc
     ? `<span class="tbc-flag" title="${escapeHtml(t.remark)}">${escapeHtml(tbcPairLabel(t))}</span>`
     : '';
-  // Reload rows that AREN'T a TBC placeholder still get the small yellow
-  // account-pair badge (see reloadPairLabel) so folding them into Internal
-  // doesn't lose the at-a-glance top-up direction the old yellow dot gave.
-  const reloadLabel = (!isTbc && isReloadRow) ? reloadPairLabel(t) : null;
+  // A "Card Reload" row still waiting on a matching HL Bank debit (see
+  // pendingReloadSyncTxns()) gets its own badge instead of the plain
+  // reload-direction one below — more useful at a glance than "TNG > Card"
+  // for a row that might not even BE a Card top-up yet.
+  const isPendingSync = pendingReloadSyncCache.some(x => x.row === t.row);
+  const pendingSyncFlagHtml = isPendingSync
+    ? `<span class="tbc-flag" title="No matching HL Bank debit found yet — this usually posts within a few days; re-import a newer HL Bank statement once it does.">Awaiting HL Bank</span>`
+    : '';
+  // Reload rows that AREN'T a TBC placeholder or awaiting-sync still get the
+  // small yellow account-pair badge (see reloadPairLabel) so folding them
+  // into Internal doesn't lose the at-a-glance top-up direction the old
+  // yellow dot gave.
+  const reloadLabel = (!isTbc && !isPendingSync && isReloadRow) ? reloadPairLabel(t) : null;
   const reloadFlagHtml = reloadLabel
     ? `<span class="tbc-flag" title="Internal · ${escapeHtml(reloadLabel)}">${escapeHtml(reloadLabel)}</span>`
     : '';
@@ -3238,7 +3332,7 @@ function renderTxnRow(t) {
     <div class="txn" data-row="${t.row}">
       <div class="dot ${dotClass}"></div>
       <div class="info">
-        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}</div>
+        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}</div>
         ${hintHtml}
         <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
         ${remarkHtml}
