@@ -3722,6 +3722,14 @@ let pendingImportSections = [];
 // side of a transfer this import is confirming, same badge style as the
 // TBC flag already used in History/Review.
 let pendingImportReviewLabels = [];
+// Parallel array too — pendingImportReviewRows[i] is the actual matched
+// "*TBC" placeholder transaction (not just its label) that
+// pendingImportRows[i] will confirm, or null. On successful import, that
+// placeholder gets deleted so the confirmed real record doesn't sit next to
+// it as a permanent duplicate — see the 2026-07-10/07-29 duplicate
+// investigation, where an old placeholder never got cleaned up after the
+// real import arrived.
+let pendingImportReviewRows = [];
 // Rows classified as exact duplicates of something already in your data —
 // held out of pendingImportRows (so Import won't submit them) but still
 // shown in the preview, read-only, with a "Keep anyway" escape hatch.
@@ -3738,6 +3746,7 @@ function resetImportSheet() {
   pendingImportRows = [];
   pendingImportSections = [];
   pendingImportReviewLabels = [];
+  pendingImportReviewRows = [];
   pendingImportDuplicates = [];
   importDuplicatesCollapsed = true;
   importPickField.style.display = 'block';
@@ -4778,6 +4787,7 @@ function renderImportPreview() {
       pendingImportRows.splice(idx, 1);
       pendingImportSections.splice(idx, 1);
       pendingImportReviewLabels.splice(idx, 1);
+      pendingImportReviewRows.splice(idx, 1);
       renderImportPreview();
       importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
     };
@@ -4803,6 +4813,7 @@ function renderImportPreview() {
       pendingImportRows.push(row);
       pendingImportSections.push('restored');
       pendingImportReviewLabels.push(null);
+      pendingImportReviewRows.push(null);
       renderImportPreview();
       importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
     };
@@ -4821,11 +4832,23 @@ function renderImportPreview() {
 function importRowContext(r) {
   return String(r.merchant || r.notes || '').trim().toLowerCase();
 }
+// Reload/top-up rows are the one case where two DIFFERENT import pipelines
+// legitimately describe the exact same real-world event with different
+// merchant/notes text (e.g. "TNG Import" vs "TNG Screenshot Import" vs "TNG
+// PDF Import" all recording the same reload) — sometimes without a time at
+// all. Requiring an exact text+time match let the same reload back in twice
+// (see the 2026-07-10/07-29 duplicate investigation), so for these, account
+// + date + amount alone is enough to call it a duplicate.
+function isReloadishImportRow(r) {
+  return r.type === 'Reload' || (r.category === 'Transfer' && RELOAD_SUBTAGS.includes(r.subTag));
+}
 function importRowsMatch(a, b) {
-  return (a.account || 'TNG') === (b.account || 'TNG') &&
-    a.date === b.date &&
-    String(a.time || '') === String(b.time || '') &&
-    Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005 &&
+  const sameAccount = (a.account || 'TNG') === (b.account || 'TNG');
+  const sameDate = a.date === b.date;
+  const sameAmount = Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
+  if (!sameAccount || !sameDate || !sameAmount) return false;
+  if (isReloadishImportRow(a) && isReloadishImportRow(b)) return true;
+  return String(a.time || '') === String(b.time || '') &&
     importRowContext(a) === importRowContext(b);
 }
 
@@ -4854,7 +4877,7 @@ function accountDateKey(account, date) { return (account || 'TNG') + '|' + date;
 // one flipping to "old date".
 function classifyImportRows(rows) {
   const existingDateKeys = new Set(allTxns.map(t => accountDateKey(t.account, t.date)));
-  const duplicate = [], reviewSynced = [], reviewSyncedLabels = [], newDate = [], oldDate = [];
+  const duplicate = [], reviewSynced = [], reviewSyncedLabels = [], reviewSyncedMatches = [], newDate = [], oldDate = [];
   const keptSoFar = [];
   rows.forEach(r => {
     const dupExisting = allTxns.some(t => importRowsMatch(t, r));
@@ -4862,15 +4885,20 @@ function classifyImportRows(rows) {
     if (dupExisting || dupInBatch) { duplicate.push(r); return; }
     keptSoFar.push(r);
     const reviewMatch = findReviewMatch(r);
-    if (reviewMatch) { reviewSynced.push(r); reviewSyncedLabels.push(tbcPairLabel(reviewMatch)); return; }
+    if (reviewMatch) {
+      reviewSynced.push(r);
+      reviewSyncedLabels.push(tbcPairLabel(reviewMatch));
+      reviewSyncedMatches.push(reviewMatch);
+      return;
+    }
     if (existingDateKeys.has(accountDateKey(r.account, r.date))) oldDate.push(r);
     else newDate.push(r);
   });
-  return { duplicate, reviewSynced, reviewSyncedLabels, newDate, oldDate };
+  return { duplicate, reviewSynced, reviewSyncedLabels, reviewSyncedMatches, newDate, oldDate };
 }
 
 function showImportPreview(rows, extraNote) {
-  const { duplicate, reviewSynced, reviewSyncedLabels, newDate, oldDate } = classifyImportRows(rows);
+  const { duplicate, reviewSynced, reviewSyncedLabels, reviewSyncedMatches, newDate, oldDate } = classifyImportRows(rows);
   pendingImportDuplicates = duplicate;
   pendingImportRows = [...reviewSynced, ...newDate, ...oldDate];
   pendingImportSections = [
@@ -4880,6 +4908,11 @@ function showImportPreview(rows, extraNote) {
   ];
   pendingImportReviewLabels = [
     ...reviewSyncedLabels,
+    ...newDate.map(() => null),
+    ...oldDate.map(() => null),
+  ];
+  pendingImportReviewRows = [
+    ...reviewSyncedMatches,
     ...newDate.map(() => null),
     ...oldDate.map(() => null),
   ];
@@ -4996,6 +5029,18 @@ importSubmitBtn.onclick = async () => {
   importSubmitBtn.disabled = true;
   try {
     await callApi('import', { rows: pendingImportRows });
+    // Rows that synced a pending "*TBC" placeholder are now duplicated by
+    // the real record we just imported — delete the placeholder so it
+    // doesn't sit there forever as a permanent duplicate (this is exactly
+    // how the 2026-07-10/07-29 duplicates happened: a placeholder that got
+    // a "Confirmed via..." remark but was never actually removed once the
+    // real import arrived). Highest row number first so deleting one
+    // doesn't shift the sheet position of another still queued for deletion.
+    const staleRows = [...new Set(pendingImportReviewRows.filter(Boolean).map(t => t.row))]
+      .sort((a, b) => b - a);
+    for (const row of staleRows) {
+      try { await callApi('deleteTransaction', { row }); } catch (e) { /* best-effort cleanup */ }
+    }
     importStatusEl.textContent = `Imported ${pendingImportRows.length} transactions.`;
     setTimeout(() => { importBackdrop.classList.remove('open'); loadData(); }, 800);
   } catch (err) {
