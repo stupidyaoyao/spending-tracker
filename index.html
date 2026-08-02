@@ -466,11 +466,16 @@
   .mini-chart-truebalance.positive { color: #30d158; }
   .mini-chart-truebalance.negative { color: #ff453a; }
   .mini-chart-updated { text-align: center; font-size: 11px; color: var(--muted); opacity: 0.7; margin-top: 2px; }
+  .balance-alert-banner { display: none; flex-direction: column; gap: 6px; background: #ffcc00; color: #111; padding: 10px 14px; font-size: 13px; font-weight: 600; }
+  .balance-alert-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .balance-alert-item span { line-height: 1.3; }
+  .balance-alert-dismiss { background: none; border: none; color: #111; font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 6px; flex-shrink: 0; }
 </style>
 </head>
 <body>
 
 <div id="app">
+  <div id="balanceAlertBanner" class="balance-alert-banner"></div>
   <header>
     <div class="header-top">
       <h1>Spending</h1>
@@ -954,6 +959,13 @@ let merchantRules = [];
 // balance. See trueBalanceFor() below for how this combines with allTxns.
 let accountBalances = [];
 
+// Unresolved balance mismatches — [{ account, computedBalance, reportedBalance,
+// diff, checkedAt }, ...], loaded from the BalanceAlerts sheet. Populated
+// whenever a "balance screenshot" (eWallet home / Card page) is parsed and
+// doesn't match trueBalanceFor(account); drives the yellow "!" banner shown
+// at the top of every page. See renderBalanceBanner() below.
+let balanceAlerts = [];
+
 // Real running balance for one account: the anchor you gave (asOfBalance,
 // as of asOfDate) plus every transaction on that account dated AFTER the
 // anchor, summed by its REAL flow direction across every category — unlike
@@ -1182,6 +1194,7 @@ async function loadData() {
     merchantRules = data.merchantRules || [];
     accountBalances = data.accountBalances || [];
     activityLog = data.activityLog || [];
+    balanceAlerts = data.balanceAlerts || [];
   } catch (err) {
     document.getElementById('list').innerHTML = '<div class="empty">Error loading data. Check your connection.</div>';
     return;
@@ -1195,8 +1208,36 @@ async function loadData() {
 // Pure view-state changes (switching a filter chip, sort order, search
 // text) call render() directly instead, since those never touch Calendar
 // or History.
+// Yellow "!" banner shown at the very top of the app (above the page tabs,
+// so it's visible on Main/Insights/History/Review alike) whenever a
+// balance-screenshot check found a mismatch. See recordBalanceAlert in
+// Code.gs for how alerts get written/cleared.
+function renderBalanceBanner() {
+  const el = document.getElementById('balanceAlertBanner');
+  if (!el) return;
+  if (!balanceAlerts.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'flex';
+  el.innerHTML = balanceAlerts.map(a => {
+    const sign = a.diff > 0 ? '+' : '';
+    return `<div class="balance-alert-item">
+      <span>⚠️ <strong>${escapeHtml(a.account)}</strong> balance mismatch — app shows RM${a.computedBalance.toFixed(2)}, real is RM${a.reportedBalance.toFixed(2)} (${sign}RM${a.diff.toFixed(2)})</span>
+      <button class="balance-alert-dismiss" data-account="${escapeHtml(a.account)}" title="Dismiss">✕</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.balance-alert-dismiss').forEach(btn => {
+    btn.onclick = async () => {
+      const account = btn.getAttribute('data-account');
+      btn.disabled = true;
+      await callApi('resolveBalanceAlert', { account });
+      balanceAlerts = balanceAlerts.filter(a => a.account !== account);
+      renderBalanceBanner();
+    };
+  });
+}
+
 function renderApp() {
   refreshPendingReloadSync();
+  renderBalanceBanner();
   render();
   // Always refresh the review list/badge, regardless of which page is
   // active — the Review tab's count badge needs to stay current even while
@@ -4500,6 +4541,41 @@ const SCREENSHOT_MONTHS = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06
 const TOLL_HIGHWAY_PREFIX = { 'AWAN BESAR': 'KESAS', 'PLAZA LOKE YEW': 'BESRAYA' };
 const SCREENSHOT_TYPE_RE = /^[A-Za-z][A-Za-z0-9 ()\/.,:-]{2,}$/;
 
+// TNG Card's own "Transaction History" rows are laid out the opposite way
+// round from the eWallet's Activity screen: merchant/type + amount comes
+// FIRST, then a full date+time stamp on the line below it — "02/08/2026
+// 16:36:34" (DD/MM/YYYY HH:MM:SS), not the eWallet's compact "02 Aug,
+// 16:36" leading line. Confirmed against a real Card screenshot.
+const CARD_DATE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::\d{2})?\s*$/;
+
+// The eWallet home screen ("Total asset RM234.72") and the Card page (a
+// standalone "RM124.24" under the card graphic, no label at all once OCR'd)
+// both show a single running balance near the top — used for the
+// balance-mismatch check, independent of whether any transaction rows were
+// also found on the same screenshot.
+const TOTAL_ASSET_RE = /total\s*asset/i;
+const BALANCE_LINE_RE = /^RM\s?([\d,]+\.\d{2})$/i;
+
+function extractScreenshotBalance(lines) {
+  for (let i = 0; i < lines.length; i++) {
+    if (TOTAL_ASSET_RE.test(lines[i])) {
+      let m = lines[i].match(/RM\s?([\d,]+\.\d{2})/i);
+      if (!m && lines[i + 1]) m = lines[i + 1].match(/RM\s?([\d,]+\.\d{2})/i);
+      if (m) return parseFloat(m[1].replace(/,/g, ''));
+    }
+  }
+  // Fallback: a standalone "RM123.45" line with nothing else on it, seen
+  // before any transaction row starts — this is how the Card page's balance
+  // widget reads once OCR'd, with no "Total asset" label attached to it.
+  const firstRowIdx = lines.findIndex(l => SCREENSHOT_DATE_RE.test(l) || CARD_DATE_RE.test(l));
+  const searchEnd = firstRowIdx === -1 ? lines.length : firstRowIdx;
+  for (let i = 0; i < searchEnd; i++) {
+    const m = lines[i].match(BALANCE_LINE_RE);
+    if (m) return parseFloat(m[1].replace(/,/g, ''));
+  }
+  return null;
+}
+
 // The line right after a merchant+amount line is usually the payment method
 // ("PayDirect Payment", "DuitNow QR TNGD"), sometimes with a "+11 points" /
 // "0 points" badge merged onto the same OCR line — strip that off. Returns
@@ -4574,7 +4650,32 @@ function parseScreenshotLines(lines) {
   return records;
 }
 
-async function extractScreenshotRecords(file) {
+// Card history rows: merchant/type + amount line, then the date+time line
+// right below it (see CARD_DATE_RE above) — the reverse order from the
+// eWallet parser, and a full DD/MM/YYYY HH:MM:SS timestamp instead of a
+// compact "DD Mon, HH:MM" one. There's no separate payment-method line in
+// this layout, so `type` is always ''.
+function parseCardScreenshotLines(lines) {
+  const records = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    const dm = lines[i + 1].match(CARD_DATE_RE);
+    if (!dm) continue;
+    const amtMatch = lines[i].match(/([+-]?RM\s?[\d,]+\.\d{2})\s*$/i);
+    if (!amtMatch) continue;
+    const merchant = lines[i].slice(0, amtMatch.index).trim();
+    if (!merchant) continue;
+    const amount = parseFloat(amtMatch[1].replace(/[^0-9.]/g, ''));
+    const day = dm[1].padStart(2, '0');
+    const mon = dm[2].padStart(2, '0');
+    const year = dm[3];
+    const time = `${dm[4].padStart(2, '0')}:${dm[5]}`;
+    records.push({ date: `${year}-${mon}-${day}`, time, amount, merchant, type: '' });
+    i++; // the date line was consumed as part of this record, don't rescan it
+  }
+  return records;
+}
+
+async function extractScreenshotRecords(file, lineParserFn) {
   if (!window.Tesseract) throw new Error('OCR library failed to load — check your connection and try again.');
   const worker = await Tesseract.createWorker('eng');
   let lines;
@@ -4585,14 +4686,24 @@ async function extractScreenshotRecords(file) {
   } finally {
     await worker.terminate();
   }
-  const records = parseScreenshotLines(lines);
+  const records = (lineParserFn || parseScreenshotLines)(lines);
   records.__rawLines = lines;
+  records.__balance = extractScreenshotBalance(lines);
   return records;
 }
 
 async function parseScreenshotFile(file) {
   const records = await extractScreenshotRecords(file);
   if (!records.length) {
+    // No transactions, but the eWallet home screen has no transaction list
+    // at all — if it DID carry a "Total asset" balance, that's a valid,
+    // successful read (a balance-only check), not a failure.
+    if (records.__balance != null) {
+      const rows = [];
+      rows.__balance = records.__balance;
+      rows.__account = 'TNG';
+      return rows;
+    }
     const rawLines = (records.__rawLines || []).join('\n') || '(none)';
     const err = new Error(`Couldn't recognize any transactions in that screenshot.\n\nRecognized text:\n${rawLines}`);
     err.diagnostic = true;
@@ -4610,17 +4721,24 @@ async function parseScreenshotFile(file) {
       account: 'TNG'
     });
   });
+  rows.__balance = records.__balance;
+  rows.__account = 'TNG';
   return rows;
 }
 
-// Best-effort — there's no confirmed screenshot format for the physical
-// Card yet (unlike the eWallet's well-tested "Activity" screen), so this
-// reuses the exact same OCR line parser on the assumption a Card history
-// screen follows the same date/merchant+amount/type row layout. Test
-// against a real screenshot and adjust if the format turns out different.
+// Reads the TNG Card app's "Transaction History" screen (see
+// parseCardScreenshotLines above for the real row layout, confirmed against
+// an actual Card screenshot) and/or the Card balance widget at the top of
+// the same page.
 async function parseCardScreenshotFile(file) {
-  const records = await extractScreenshotRecords(file);
+  const records = await extractScreenshotRecords(file, parseCardScreenshotLines);
   if (!records.length) {
+    if (records.__balance != null) {
+      const rows = [];
+      rows.__balance = records.__balance;
+      rows.__account = 'TNG Card';
+      return rows;
+    }
     const rawLines = (records.__rawLines || []).join('\n') || '(none)';
     const err = new Error(`Couldn't recognize any transactions in that screenshot.\n\nRecognized text:\n${rawLines}`);
     err.diagnostic = true;
@@ -4629,7 +4747,7 @@ async function parseCardScreenshotFile(file) {
   const rows = [];
   records.forEach(r => {
     if (isInImportExcludeWindow(r.date)) return;
-    const isReload = /Reload/i.test(r.type) || /^Reload$/i.test(r.merchant);
+    const isReload = /Reload/i.test(r.type) || /Reload/i.test(r.merchant);
     if (isReload) {
       rows.push({
         date: r.date, time: r.time || '', amount: r.amount,
@@ -4639,7 +4757,17 @@ async function parseCardScreenshotFile(file) {
       });
       return;
     }
-    const guess = categorize(r.merchant, r.type) || { category: 'Car', subTag: 'Parking' };
+    // The Card app only ever labels a row with a generic type like "Toll
+    // Payment" or "Parking" rather than a specific plaza/merchant name, so
+    // categorize()'s keyword match (built for the eWallet's real merchant
+    // text) usually won't fire here — check the generic label directly
+    // before falling back to Unsure.
+    let guess = categorize(r.merchant, r.type);
+    if (!guess) {
+      if (/toll/i.test(r.merchant)) guess = { category: 'Car', subTag: 'Toll' };
+      else if (/park/i.test(r.merchant)) guess = { category: 'Car', subTag: 'Parking' };
+      else guess = { category: 'Unsure', subTag: '' };
+    }
     rows.push({
       date: r.date, time: r.time || '', amount: r.amount,
       category: guess.category, subTag: guess.subTag,
@@ -4647,6 +4775,8 @@ async function parseCardScreenshotFile(file) {
       account: 'TNG Card'
     });
   });
+  rows.__balance = records.__balance;
+  rows.__account = 'TNG Card';
   return rows;
 }
 
@@ -4954,8 +5084,12 @@ importSubmitBtn.onclick = async () => {
       // Multiple screenshots can be picked at once (e.g. a day's worth of
       // TNG activity) — read each one in turn and merge everything found
       // into a single preview list. One bad/unreadable screenshot doesn't
-      // block the rest; its error just gets listed at the end.
+      // block the rest; its error just gets listed at the end. A
+      // "balance screenshot" (eWallet home / Card page) carries no
+      // transactions of its own — it's tracked separately in
+      // balanceChecks and reconciled against trueBalanceFor() below.
       const failures = [];
+      const balanceChecks = [];
       for (let i = 0; i < files.length; i++) {
         importStatusEl.textContent = files.length > 1
           ? `Reading screenshot ${i + 1} of ${files.length}… (OCR can take 10-30s each)`
@@ -4965,25 +5099,60 @@ importSubmitBtn.onclick = async () => {
           const fileRows = importAccount === 'TNG Card-Screenshot'
             ? await parseCardScreenshotFile(f)
             : await parseScreenshotFile(f);
+          if (fileRows.__balance != null) {
+            balanceChecks.push({ account: fileRows.__account, reported: fileRows.__balance });
+          }
           rows = rows.concat(fileRows);
         } catch (err) {
           failures.push(f.name + ': ' + (err && err.message ? err.message.split('\n')[0] : err));
         }
       }
       importSubmitBtn.disabled = false;
+
+      // Reconcile any balance(s) read off the screenshots against what the
+      // tracker currently computes for that account, and persist the result
+      // so the yellow "!" banner (see renderBalanceBanner) reflects it on
+      // every page, not just right after this import.
+      let balanceNote = '';
+      if (balanceChecks.length) {
+        const results = [];
+        for (const bc of balanceChecks) {
+          const computed = trueBalanceFor(bc.account);
+          if (computed === null) {
+            results.push(`${bc.account}: no starting balance set yet, can't compare.`);
+            continue;
+          }
+          const res = await callApi('recordBalanceAlert', { account: bc.account, computedBalance: computed, reportedBalance: bc.reported });
+          balanceAlerts = balanceAlerts.filter(a => a.account !== bc.account);
+          if (res && res.mismatch) {
+            const sign = res.diff > 0 ? '+' : '';
+            balanceAlerts.push({ account: bc.account, computedBalance: computed, reportedBalance: bc.reported, diff: res.diff, checkedAt: new Date().toISOString() });
+            results.push(`⚠️ ${bc.account} mismatch — app shows RM${computed.toFixed(2)}, real is RM${bc.reported.toFixed(2)} (${sign}RM${res.diff.toFixed(2)})`);
+          } else {
+            results.push(`✅ ${bc.account} balance matches (RM${bc.reported.toFixed(2)})`);
+          }
+        }
+        renderBalanceBanner();
+        balanceNote = results.join(' ');
+      }
+
       if (!rows.length) {
-        importStatusEl.className = 'status-msg debug';
-        importStatusEl.textContent = failures.length
-          ? `Couldn't recognize any transactions.\n\n${failures.join('\n')}`
-          : 'No spending transactions found in that screenshot.';
+        if (balanceNote) {
+          importStatusEl.className = 'status-msg';
+          importStatusEl.textContent = balanceNote + (failures.length ? `\n\n${failures.length} screenshot(s) failed: ${failures.join('; ')}` : '');
+        } else {
+          importStatusEl.className = 'status-msg debug';
+          importStatusEl.textContent = failures.length
+            ? `Couldn't recognize any transactions.\n\n${failures.join('\n')}`
+            : 'No spending transactions found in that screenshot.';
+        }
         return;
       }
       // showImportPreview() sets its own status text right after this, so
-      // pass the failure note through instead of setting it here directly —
-      // otherwise it would be overwritten before ever being seen.
-      const failNote = failures.length
-        ? `${failures.length} screenshot(s) failed: ${failures.join('; ')}`
-        : '';
+      // pass the failure/balance note through instead of setting it here
+      // directly — otherwise it would be overwritten before ever being seen.
+      const failNote = [balanceNote, failures.length ? `${failures.length} screenshot(s) failed: ${failures.join('; ')}` : '']
+        .filter(Boolean).join(' ');
       showImportPreview(rows, failNote);
       return;
     }
