@@ -636,6 +636,7 @@
   <div id="reviewPage" style="display:none;">
     <div class="history-section-label-row">
       <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
+      <button class="toolbar-btn" id="reconcileBtn">🔎 Reconcile</button>
       <button class="toolbar-btn" id="viewSplitsBtnReview">🔗 Splits</button>
     </div>
     <div class="history-list" id="reviewList"></div>
@@ -764,6 +765,44 @@
       <div class="status-msg" id="importStatus"></div>
       <button class="btn" id="importSubmit">Read file</button>
       <button class="btn secondary" id="importBack" style="display:none;">Choose a different file</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reconcile sheet: upload the real eWallet/Card statement PDF, diff it
+     against everything already tracked for that date range, and show three
+     checkbox-reviewable buckets — Missing (in the statement, not tracked),
+     Phantom (tracked, but not really in the statement) and Wrong sign (both
+     have it, but in/out direction disagrees) — before applying anything.
+     Built for the weekly (Sat/Sun) and monthly (1st) statement-check
+     reminder, so that check can be a few clicks in-app instead of a manual
+     line-by-line read of the PDF each time (see the 2026-08-02/08-03 TNG
+     balance-mismatch and TNG Card lag investigations this replaces). -->
+<div class="sheet-backdrop" id="reconcileBackdrop">
+  <div class="sheet">
+    <div class="sheet-inner">
+      <span class="close-x" id="reconcileClose">✕</span>
+      <h2>Reconcile against statement</h2>
+
+      <div class="field" id="reconcileAccountField">
+        <label>Statement</label>
+        <select id="reconcileAccount">
+          <option value="TNG">TNG eWallet (PDF)</option>
+          <option value="TNG Card">TNG Card (PDF)</option>
+        </select>
+      </div>
+
+      <div class="field" id="reconcilePickField">
+        <label>Statement file</label>
+        <input type="file" id="reconcileFile" accept=".pdf">
+      </div>
+
+      <div class="preview-list" id="reconcilePreviewList" style="display:none;"></div>
+
+      <div class="status-msg" id="reconcileStatus"></div>
+      <button class="btn" id="reconcileSubmit">Check statement</button>
+      <button class="btn secondary" id="reconcileApply" style="display:none;">Apply selected fixes</button>
+      <button class="btn secondary" id="reconcileBack" style="display:none;">Choose a different file</button>
     </div>
   </div>
 </div>
@@ -5317,6 +5356,204 @@ importSubmitBtn.onclick = async () => {
   } catch (err) {
     importStatusEl.textContent = 'Import failed — try again.';
     importSubmitBtn.disabled = false;
+  }
+};
+
+// ---- Reconcile against statement ----
+// Diffs a freshly-parsed statement (same parsePdfFile/parseCardPdfFile used
+// by normal import) against everything already tracked for that account
+// within the statement's own date range, using the exact same
+// importRowsMatch()/txnFlow() logic the normal import preview already
+// relies on. Three outcomes, same as the manual reconciliations done by
+// hand on 2026-08-02/08-03: "missing" (real, not tracked — add it),
+// "phantom" (tracked, but not really on the statement — delete it), and
+// "wrongSign" (tracked, but the in/out direction disagrees with the
+// statement — flip it). Nothing here mutates data by itself; it only
+// builds the list the Apply button acts on once the user reviews it.
+const reconcileBackdrop = document.getElementById('reconcileBackdrop');
+const reconcileStatusEl = document.getElementById('reconcileStatus');
+const reconcileSubmitBtn = document.getElementById('reconcileSubmit');
+const reconcileApplyBtn = document.getElementById('reconcileApply');
+const reconcileBackBtn = document.getElementById('reconcileBack');
+const reconcilePickField = document.getElementById('reconcilePickField');
+const reconcilePreviewList = document.getElementById('reconcilePreviewList');
+
+let reconcileItems = []; // flat list: { type: 'missing'|'phantom'|'wrongSign', checked, ...payload }
+
+function resetReconcileSheet() {
+  reconcileItems = [];
+  reconcilePickField.style.display = 'block';
+  reconcilePreviewList.style.display = 'none';
+  reconcilePreviewList.innerHTML = '';
+  reconcileApplyBtn.style.display = 'none';
+  reconcileBackBtn.style.display = 'none';
+  reconcileSubmitBtn.style.display = 'inline-block';
+  reconcileSubmitBtn.textContent = 'Check statement';
+  reconcileSubmitBtn.disabled = false;
+  reconcileStatusEl.className = 'status-msg';
+  reconcileStatusEl.textContent = '';
+  document.getElementById('reconcileFile').value = '';
+}
+
+document.getElementById('reconcileBtn').onclick = () => {
+  resetReconcileSheet();
+  reconcileBackdrop.classList.add('open');
+};
+document.getElementById('reconcileClose').onclick = () => reconcileBackdrop.classList.remove('open');
+reconcileBackBtn.onclick = resetReconcileSheet;
+
+function reconcileAgainstStatement(account, parsedRows) {
+  const dates = parsedRows.map(r => r.date).sort();
+  const minDate = dates[0];
+  const maxDate = dates[dates.length - 1];
+  const existingInScope = allTxns.filter(t =>
+    (t.account || 'TNG') === account && t.date >= minDate && t.date <= maxDate);
+  const usedRows = new Set();
+  const missing = [];
+  const wrongSign = [];
+  parsedRows.forEach(rec => {
+    const match = existingInScope.find(t => !usedRows.has(t.row) && importRowsMatch(t, rec));
+    if (!match) { missing.push(rec); return; }
+    usedRows.add(match.row);
+    const expectedFlow = txnFlow(rec);
+    const actualFlow = txnFlow(match);
+    if (expectedFlow !== actualFlow) wrongSign.push({ existing: match, correctFlow: expectedFlow, rec });
+  });
+  const phantom = existingInScope.filter(t => !usedRows.has(t.row));
+  return { account, minDate, maxDate, missing, wrongSign, phantom };
+}
+
+function reconcileItemRowHtml(idx, opts) {
+  const { category, merchant, date, time, note, amount, flow } = opts;
+  const sign = flow === 'in' ? '+' : '-';
+  const amtClass = flow === 'in' ? 'amount in' : 'amount';
+  return `
+    <div class="txn preview-row">
+      <div class="preview-top">
+        <input type="checkbox" data-recon-idx="${idx}" checked style="width:auto;flex-shrink:0;">
+        <div class="dot ${ALL_CATEGORIES.includes(category) ? category : 'Custom'}"></div>
+        <div class="info">
+          <div class="merchant">${escapeHtml(merchant)}</div>
+          <div class="meta">${date} · ${time || 'No time record'} · ${escapeHtml(note)}</div>
+        </div>
+        <div class="${amtClass}">${sign}RM${Number(amount).toFixed(2)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderReconcilePreview(result) {
+  reconcileItems = [];
+  result.missing.forEach(rec => reconcileItems.push({ type: 'missing', checked: true, rec }));
+  result.phantom.forEach(txn => reconcileItems.push({ type: 'phantom', checked: true, txn }));
+  result.wrongSign.forEach(w => reconcileItems.push({ type: 'wrongSign', checked: true, ...w }));
+
+  if (!reconcileItems.length) {
+    reconcilePreviewList.style.display = 'none';
+    reconcileStatusEl.textContent = `No differences found for ${result.minDate} to ${result.maxDate} — your tracker already matches this statement.`;
+    reconcileApplyBtn.style.display = 'none';
+    reconcileBackBtn.style.display = 'inline-block';
+    return;
+  }
+
+  let html = '';
+  const missingIdx = reconcileItems.map((it, i) => it.type === 'missing' ? i : -1).filter(i => i >= 0);
+  const phantomIdx = reconcileItems.map((it, i) => it.type === 'phantom' ? i : -1).filter(i => i >= 0);
+  const wrongIdx = reconcileItems.map((it, i) => it.type === 'wrongSign' ? i : -1).filter(i => i >= 0);
+
+  if (missingIdx.length) {
+    html += `<div class="preview-group"><div class="history-section-label">On the statement, not tracked (${missingIdx.length})</div>`;
+    html += missingIdx.map(i => {
+      const rec = reconcileItems[i].rec;
+      return reconcileItemRowHtml(i, {
+        category: rec.category, merchant: txnTitle(rec), date: rec.date, time: rec.time,
+        note: rec.notes || rec.type || '', amount: rec.amount, flow: txnFlow(rec)
+      });
+    }).join('');
+    html += `</div>`;
+  }
+  if (wrongIdx.length) {
+    html += `<div class="preview-group"><div class="history-section-label">Tracked with the wrong in/out direction (${wrongIdx.length})</div>`;
+    html += wrongIdx.map(i => {
+      const { existing, correctFlow } = reconcileItems[i];
+      return reconcileItemRowHtml(i, {
+        category: existing.category, merchant: txnTitle(existing), date: existing.date, time: existing.time,
+        note: `currently ${txnFlow(existing) === 'in' ? 'IN' : 'OUT'}, statement shows ${correctFlow === 'in' ? 'IN' : 'OUT'}`,
+        amount: existing.amount, flow: correctFlow
+      });
+    }).join('');
+    html += `</div>`;
+  }
+  if (phantomIdx.length) {
+    html += `<div class="preview-group"><div class="history-section-label">Tracked, but not on the statement (${phantomIdx.length})</div>`;
+    html += phantomIdx.map(i => {
+      const txn = reconcileItems[i].txn;
+      return reconcileItemRowHtml(i, {
+        category: txn.category, merchant: txnTitle(txn), date: txn.date, time: txn.time,
+        note: 'not found in statement — will be deleted', amount: txn.amount, flow: txnFlow(txn)
+      });
+    }).join('');
+    html += `</div>`;
+  }
+
+  reconcilePreviewList.innerHTML = html;
+  reconcilePreviewList.style.display = 'block';
+  reconcilePreviewList.querySelectorAll('[data-recon-idx]').forEach(el => {
+    el.onchange = () => { reconcileItems[Number(el.dataset.reconIdx)].checked = el.checked; };
+  });
+  reconcileStatusEl.textContent = `${result.minDate} to ${result.maxDate} — review below, then apply.`;
+  reconcileApplyBtn.style.display = 'inline-block';
+  reconcileBackBtn.style.display = 'inline-block';
+}
+
+reconcileSubmitBtn.onclick = async () => {
+  const account = document.getElementById('reconcileAccount').value;
+  const file = document.getElementById('reconcileFile').files[0];
+  if (!file) { reconcileStatusEl.textContent = 'Pick a statement PDF first.'; return; }
+  reconcileSubmitBtn.disabled = true;
+  reconcileStatusEl.textContent = 'Reading statement…';
+  try {
+    const parsedRows = account === 'TNG Card' ? await parseCardPdfFile(file) : await parsePdfFile(file);
+    if (!parsedRows.length) {
+      reconcileStatusEl.textContent = "Couldn't find any transactions in that PDF.";
+      reconcileSubmitBtn.disabled = false;
+      return;
+    }
+    const result = reconcileAgainstStatement(account, parsedRows);
+    reconcilePickField.style.display = 'none';
+    reconcileSubmitBtn.style.display = 'none';
+    renderReconcilePreview(result);
+  } catch (err) {
+    reconcileStatusEl.textContent = err.message || 'Could not read that file — try again.';
+    reconcileSubmitBtn.disabled = false;
+  }
+};
+
+reconcileApplyBtn.onclick = async () => {
+  reconcileApplyBtn.disabled = true;
+  reconcileStatusEl.textContent = 'Applying…';
+  try {
+    const toAdd = reconcileItems.filter(it => it.type === 'missing' && it.checked);
+    for (const it of toAdd) {
+      await callApi('add', { row: it.rec });
+    }
+    const toFix = reconcileItems.filter(it => it.type === 'wrongSign' && it.checked);
+    for (const it of toFix) {
+      await callApi('updateFlow', { row: it.existing.row, flow: it.correctFlow });
+    }
+    // Deletes go last, highest row number first, so removing one phantom
+    // row never shifts the sheet-row number of another phantom still
+    // waiting to be deleted in this same batch.
+    const toDelete = reconcileItems.filter(it => it.type === 'phantom' && it.checked)
+      .map(it => it.txn.row).sort((a, b) => b - a);
+    for (const row of toDelete) {
+      await callApi('deleteTransaction', { row });
+    }
+    reconcileStatusEl.textContent = `Applied ${toAdd.length + toFix.length + toDelete.length} change(s) — refreshing…`;
+    setTimeout(() => { reconcileBackdrop.classList.remove('open'); loadData(); }, 800);
+  } catch (err) {
+    reconcileStatusEl.textContent = 'Apply failed — try again.';
+    reconcileApplyBtn.disabled = false;
   }
 };
 
