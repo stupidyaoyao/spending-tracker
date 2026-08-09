@@ -445,6 +445,10 @@
   .preview-row select { width: 100%; padding: 8px; border-radius: 8px; border: none; background: #2c2c2e; color: var(--text); font-size: 13px; }
   .preview-row .preview-remember { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .preview-row .preview-remember input { width: auto; }
+  /* Same "remember this merchant" checkbox style, reused outside the import
+     preview — on Review-tab rows (see renderTxnRow's opts.reviewMode). */
+  .review-remember { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .review-remember input { width: auto; }
   .preview-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
   .preview-group { display: flex; flex-direction: column; gap: 8px; }
   .preview-row-dup { opacity: 0.55; }
@@ -636,7 +640,6 @@
   <div id="reviewPage" style="display:none;">
     <div class="history-section-label-row">
       <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
-      <button class="toolbar-btn" id="reconcileBtn">🔎 Reconcile</button>
       <button class="toolbar-btn" id="viewSplitsBtnReview">🔗 Splits</button>
     </div>
     <div class="history-list" id="reviewList"></div>
@@ -765,44 +768,6 @@
       <div class="status-msg" id="importStatus"></div>
       <button class="btn" id="importSubmit">Read file</button>
       <button class="btn secondary" id="importBack" style="display:none;">Choose a different file</button>
-    </div>
-  </div>
-</div>
-
-<!-- Reconcile sheet: upload the real eWallet/Card statement PDF, diff it
-     against everything already tracked for that date range, and show three
-     checkbox-reviewable buckets — Missing (in the statement, not tracked),
-     Phantom (tracked, but not really in the statement) and Wrong sign (both
-     have it, but in/out direction disagrees) — before applying anything.
-     Built for the weekly (Sat/Sun) and monthly (1st) statement-check
-     reminder, so that check can be a few clicks in-app instead of a manual
-     line-by-line read of the PDF each time (see the 2026-08-02/08-03 TNG
-     balance-mismatch and TNG Card lag investigations this replaces). -->
-<div class="sheet-backdrop" id="reconcileBackdrop">
-  <div class="sheet">
-    <div class="sheet-inner">
-      <span class="close-x" id="reconcileClose">✕</span>
-      <h2>Reconcile against statement</h2>
-
-      <div class="field" id="reconcileAccountField">
-        <label>Statement</label>
-        <select id="reconcileAccount">
-          <option value="TNG">TNG eWallet (PDF)</option>
-          <option value="TNG Card">TNG Card (PDF)</option>
-        </select>
-      </div>
-
-      <div class="field" id="reconcilePickField">
-        <label>Statement file</label>
-        <input type="file" id="reconcileFile" accept=".pdf">
-      </div>
-
-      <div class="preview-list" id="reconcilePreviewList" style="display:none;"></div>
-
-      <div class="status-msg" id="reconcileStatus"></div>
-      <button class="btn" id="reconcileSubmit">Check statement</button>
-      <button class="btn secondary" id="reconcileApply" style="display:none;">Apply selected fixes</button>
-      <button class="btn secondary" id="reconcileBack" style="display:none;">Choose a different file</button>
     </div>
   </div>
 </div>
@@ -2059,9 +2024,19 @@ function renderReviewList() {
   // screen needed. Transfer > To Others rows are included here too — a
   // generic "sent to someone" leg is just as much a "figure out what this
   // actually was" case as Unsure, so it gets the same nudge instead of
-  // quietly sitting under Transfer forever.
-  const unsure = allTxns.filter(t => t.category === 'Unsure' || (t.category === 'Transfer' && t.subTag === 'To Others'))
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  // quietly sitting under Transfer forever. UNLIKE Unsure, a To Others row
+  // drops off this list once it has a real remark attached (via the new
+  // "Confirm transfer" button below, or the existing ✎ split-link one) —
+  // that remark IS the answer to "who was this actually for", so once it's
+  // there the row has been reviewed and doesn't need to keep nagging.
+  const unsure = allTxns.filter(t => {
+    if (t.category === 'Unsure') return true;
+    if (t.category === 'Transfer' && t.subTag === 'To Others') {
+      const hasRealRemark = !!t.remark && t.remark.indexOf('*TBC') !== 0;
+      return !hasRealRemark;
+    }
+    return false;
+  }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   // Live-computed, not stored — see pendingReloadSyncTxns()/
   // refreshPendingReloadSync() (called from renderApp() before this runs).
@@ -2097,15 +2072,18 @@ function renderReviewList() {
     unsureEl.innerHTML = '<div class="empty">Nothing marked Unsure right now.</div>';
   } else {
     unsureLabel.textContent = `Needs category (${unsure.length})`;
-    unsureEl.innerHTML = unsure.map(renderTxnRow).join('');
+    unsureEl.innerHTML = unsure.map(t => renderTxnRow(t, { reviewMode: true })).join('');
     // Re-bind the shared row handlers so these newly-inserted rows get a
     // working category dropdown / remark button / remark-link click, same
-    // as every row on the Main list.
+    // as every row on the Main list — plus the two Review-only extras
+    // (remember-merchant checkbox, Confirm-transfer button).
     attachCatSelectHandlers();
     attachExtraTagHandlers();
     attachExtraTagAmountHandlers();
     attachRemarkHandlers();
     attachLinkHandlers();
+    attachReviewRememberHandlers();
+    attachReviewConfirmHandlers();
   }
 
   el.style.display = '';
@@ -3436,7 +3414,8 @@ function reloadPairLabel(t) {
   return flow === 'in' ? `${otherShort} > ${mine}` : `${mine} > ${otherShort}`;
 }
 
-function renderTxnRow(t) {
+function renderTxnRow(t, opts) {
+  opts = opts || {};
   const isReloadRow = t.category === 'Transfer' && RELOAD_SUBTAGS.includes(t.subTag);
   // Reload rows render exactly like every other Transfer row now (plain
   // grey dot) — the reloadFlagHtml badge below is what distinguishes them.
@@ -3498,6 +3477,25 @@ function renderTxnRow(t) {
   // (which opens "Link to a split", see openSplitPicker) doesn't apply and
   // is hidden here rather than shown for a feature that can't make sense.
   const remarkBtnHtml = isReloadRow ? '' : `<button class="remark-btn${t.remark ? ' has-remark' : ''}" data-row="${t.row}" title="Add/edit remark">✎</button>`;
+  // Review-tab-only extras (opts.reviewMode), shown under the category
+  // picker: a "remember this merchant" checkbox — mirrors the one already on
+  // the Add/Import forms, but was missing here, so fixing an Unsure row by
+  // hand in Review never actually saved a rule and the same merchant kept
+  // coming back as Unsure every import. And for a Transfer > To Others row
+  // specifically, a one-tap "Confirm transfer" button that requires typing a
+  // remark (who/what it was for) — see renderReviewList()'s filter, which
+  // now drops a To Others row out of the review list once it has any real
+  // remark, so this button (or the existing ✎ split-link one) is what
+  // actually clears it.
+  const isToOthers = t.category === 'Transfer' && t.subTag === 'To Others';
+  const reviewRememberHtml = opts.reviewMode
+    ? `<label class="preview-remember review-remember">
+        <input type="checkbox" class="review-remember-check" data-row="${t.row}"> Always categorize "${escapeHtml(t.merchant || '')}" this way
+      </label>`
+    : '';
+  const reviewConfirmHtml = (opts.reviewMode && isToOthers)
+    ? `<div class="review-actions"><button class="review-btn confirm review-confirm-btn" data-row="${t.row}">Confirm transfer (add remark)</button></div>`
+    : '';
   return `
     <div class="txn" data-row="${t.row}">
       <div class="dot ${dotClass}"></div>
@@ -3511,6 +3509,8 @@ function renderTxnRow(t) {
           ${extraSelectHtml}
           ${extraAmountHtml}
         </div>
+        ${reviewRememberHtml}
+        ${reviewConfirmHtml}
       </div>
       <div class="txn-actions">
         <div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
@@ -3535,7 +3535,55 @@ function attachCatSelectHandlers() {
       el.disabled = true;
       await callApi('updateCategory', { row, category, subTag });
       if (hadExtraTag) await callApi('updateExtraTag', { row, extraTag: '' });
+      // Review tab only: if "Always categorize this merchant" is ticked for
+      // this same row, saving the new category here also saves it as a
+      // merchant rule, so the next import of this merchant is guessed right
+      // the first time instead of landing back in Unsure.
+      const rememberEl = document.querySelector(`.review-remember-check[data-row="${row}"]`);
+      if (rememberEl && rememberEl.checked && t && t.merchant) {
+        await callApi('saveMerchantRule', { rule: { merchant: t.merchant, category, subTag } });
+      }
       renderApp();
+    };
+  });
+}
+
+// Review tab only — ticking "Always categorize X this way" next to a row
+// that ISN'T being recategorized right now (its category is already fine,
+// you just want the rule saved for next time) saves immediately using
+// whatever category/subTag the row currently has. If you tick this THEN
+// change the category dropdown, attachCatSelectHandlers' own check above
+// re-saves with the new value, so either order works.
+function attachReviewRememberHandlers() {
+  document.querySelectorAll('.review-remember-check').forEach(el => {
+    el.onchange = async () => {
+      if (!el.checked) return;
+      const row = Number(el.dataset.row);
+      const t = allTxns.find(x => x.row === row);
+      if (!t || !t.merchant) return;
+      await callApi('saveMerchantRule', { rule: { merchant: t.merchant, category: t.category, subTag: t.subTag } });
+    };
+  });
+}
+
+// Review tab only — the one-tap alternative to opening the full Splits
+// picker (✎) for a Transfer > To Others row: type who/what it was for,
+// stamp it as the row's remark, and it drops out of the "Needs category"
+// list (see renderReviewList's unsure filter). A required, non-empty remark
+// is enforced here since a blank confirm would defeat the point of this
+// review step in the first place.
+function attachReviewConfirmHandlers() {
+  document.querySelectorAll('.review-confirm-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const row = Number(btn.dataset.row);
+      const remark = prompt('Who/what was this transfer for? (required to confirm)');
+      if (remark === null) return;
+      const trimmed = remark.trim();
+      if (!trimmed) { alert('A remark is required to confirm this transfer.'); return; }
+      btn.disabled = true;
+      btn.textContent = 'Confirming…';
+      await callApi('updateRemark', { row, remark: trimmed });
+      await loadData();
     };
   });
 }
@@ -4950,6 +4998,30 @@ const IMPORT_SECTION_LABEL = {
   restored: '↩️ Restored (kept anyway)',
 };
 
+// Ticking "Always categorize X this way" on one import-preview row should
+// fix every other occurrence of that same merchant IN THIS SAME BATCH too —
+// not just save a rule for future imports. Without this, a statement with
+// "000" showing up 5 times would need the category picked 5 separate
+// times even though the very first tick already said "always this way".
+// Re-renders the whole preview afterward so the other rows' dropdowns (and
+// their own remember-checkboxes, which mirror rememberMerchant) visibly
+// update too.
+function applyCategoryToMerchantSiblings(idx) {
+  const source = pendingImportRows[idx];
+  const target = (source.merchant || '').trim().toUpperCase();
+  if (!target) return;
+  let changed = 0;
+  pendingImportRows.forEach((r, i) => {
+    if (i === idx) return;
+    if ((r.merchant || '').trim().toUpperCase() === target) {
+      r.category = source.category;
+      r.subTag = source.subTag;
+      changed++;
+    }
+  });
+  if (changed) renderImportPreview();
+}
+
 function renderImportPreview() {
   // Sorting/grouping only changes what order rows are DISPLAYED in — the
   // underlying pendingImportRows array (and its indices) never gets
@@ -4979,7 +5051,7 @@ function renderImportPreview() {
       </div>
       <select data-cat-idx="${i}">${categoryOptionsHtml(r.category, r.subTag, r.account)}</select>
       <label class="preview-remember">
-        <input type="checkbox" data-remember-idx="${i}"> Always categorize "${r.merchant}" this way
+        <input type="checkbox" data-remember-idx="${i}"${r.rememberMerchant ? ' checked' : ''}> Always categorize "${r.merchant}" this way
       </label>
     </div>
   `;
@@ -5069,12 +5141,19 @@ function renderImportPreview() {
       const [category, subTag] = el.value.split('|');
       pendingImportRows[idx].category = category;
       pendingImportRows[idx].subTag = subTag;
+      // If "Always categorize this merchant" is already ticked for this row,
+      // changing the category here should immediately carry over to every
+      // other row in THIS SAME import batch with the same merchant too —
+      // otherwise you'd have to fix each occurrence of "000" one by one even
+      // though you've already said they should all go the same way.
+      if (pendingImportRows[idx].rememberMerchant) applyCategoryToMerchantSiblings(idx);
     };
   });
   importPreviewList.querySelectorAll('[data-remember-idx]').forEach(el => {
     el.onchange = () => {
       const idx = Number(el.dataset.rememberIdx);
       pendingImportRows[idx].rememberMerchant = el.checked;
+      if (el.checked) applyCategoryToMerchantSiblings(idx);
     };
   });
   importPreviewList.querySelectorAll('[data-dup-idx]').forEach(el => {
@@ -5119,8 +5198,25 @@ function importRowsMatch(a, b) {
   const sameAmount = Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
   if (!sameAccount || !sameDate || !sameAmount) return false;
   if (isReloadishImportRow(a) && isReloadishImportRow(b)) return true;
-  return String(a.time || '') === String(b.time || '') &&
-    importRowContext(a) === importRowContext(b);
+  if (importRowContext(a) !== importRowContext(b)) return false;
+  // Only enforce an exact time match when BOTH sides actually have a time
+  // recorded. The eWallet PDF only ever prints a real clock time in the
+  // "PayDirect Payment" row type (tolls/parking) — for every other type
+  // (Payment, DuitNow QR, Transfer to Wallet, Receive from Wallet...) its
+  // Details column is just an opaque reference code, so parsePdfFile leaves
+  // r.time blank for those. A row that was originally captured a different
+  // way (e.g. a screenshot import, which DOES show a real clock time for
+  // every row) can carry a time value that the statement-parsed version of
+  // the exact same transaction will never have — requiring both to match
+  // exactly was flagging real, already-tracked transactions as "not found
+  // in statement" (and vice versa, as a phantom "new" row) purely because
+  // one side's time was empty. See the 2026-08-09 Reconcile tool
+  // false-positive report (SMART PARKING / Sung Gong / NH Trade / The Ice
+  // Cream Bar all wrongly listed as phantom).
+  const aTime = String(a.time || '');
+  const bTime = String(b.time || '');
+  if (aTime && bTime && aTime !== bTime) return false;
+  return true;
 }
 
 // Mirrors the account+date+amount check the backend's confirmTbcIfMatches_
@@ -5356,204 +5452,6 @@ importSubmitBtn.onclick = async () => {
   } catch (err) {
     importStatusEl.textContent = 'Import failed — try again.';
     importSubmitBtn.disabled = false;
-  }
-};
-
-// ---- Reconcile against statement ----
-// Diffs a freshly-parsed statement (same parsePdfFile/parseCardPdfFile used
-// by normal import) against everything already tracked for that account
-// within the statement's own date range, using the exact same
-// importRowsMatch()/txnFlow() logic the normal import preview already
-// relies on. Three outcomes, same as the manual reconciliations done by
-// hand on 2026-08-02/08-03: "missing" (real, not tracked — add it),
-// "phantom" (tracked, but not really on the statement — delete it), and
-// "wrongSign" (tracked, but the in/out direction disagrees with the
-// statement — flip it). Nothing here mutates data by itself; it only
-// builds the list the Apply button acts on once the user reviews it.
-const reconcileBackdrop = document.getElementById('reconcileBackdrop');
-const reconcileStatusEl = document.getElementById('reconcileStatus');
-const reconcileSubmitBtn = document.getElementById('reconcileSubmit');
-const reconcileApplyBtn = document.getElementById('reconcileApply');
-const reconcileBackBtn = document.getElementById('reconcileBack');
-const reconcilePickField = document.getElementById('reconcilePickField');
-const reconcilePreviewList = document.getElementById('reconcilePreviewList');
-
-let reconcileItems = []; // flat list: { type: 'missing'|'phantom'|'wrongSign', checked, ...payload }
-
-function resetReconcileSheet() {
-  reconcileItems = [];
-  reconcilePickField.style.display = 'block';
-  reconcilePreviewList.style.display = 'none';
-  reconcilePreviewList.innerHTML = '';
-  reconcileApplyBtn.style.display = 'none';
-  reconcileBackBtn.style.display = 'none';
-  reconcileSubmitBtn.style.display = 'inline-block';
-  reconcileSubmitBtn.textContent = 'Check statement';
-  reconcileSubmitBtn.disabled = false;
-  reconcileStatusEl.className = 'status-msg';
-  reconcileStatusEl.textContent = '';
-  document.getElementById('reconcileFile').value = '';
-}
-
-document.getElementById('reconcileBtn').onclick = () => {
-  resetReconcileSheet();
-  reconcileBackdrop.classList.add('open');
-};
-document.getElementById('reconcileClose').onclick = () => reconcileBackdrop.classList.remove('open');
-reconcileBackBtn.onclick = resetReconcileSheet;
-
-function reconcileAgainstStatement(account, parsedRows) {
-  const dates = parsedRows.map(r => r.date).sort();
-  const minDate = dates[0];
-  const maxDate = dates[dates.length - 1];
-  const existingInScope = allTxns.filter(t =>
-    (t.account || 'TNG') === account && t.date >= minDate && t.date <= maxDate);
-  const usedRows = new Set();
-  const missing = [];
-  const wrongSign = [];
-  parsedRows.forEach(rec => {
-    const match = existingInScope.find(t => !usedRows.has(t.row) && importRowsMatch(t, rec));
-    if (!match) { missing.push(rec); return; }
-    usedRows.add(match.row);
-    const expectedFlow = txnFlow(rec);
-    const actualFlow = txnFlow(match);
-    if (expectedFlow !== actualFlow) wrongSign.push({ existing: match, correctFlow: expectedFlow, rec });
-  });
-  const phantom = existingInScope.filter(t => !usedRows.has(t.row));
-  return { account, minDate, maxDate, missing, wrongSign, phantom };
-}
-
-function reconcileItemRowHtml(idx, opts) {
-  const { category, merchant, date, time, note, amount, flow } = opts;
-  const sign = flow === 'in' ? '+' : '-';
-  const amtClass = flow === 'in' ? 'amount in' : 'amount';
-  return `
-    <div class="txn preview-row">
-      <div class="preview-top">
-        <input type="checkbox" data-recon-idx="${idx}" checked style="width:auto;flex-shrink:0;">
-        <div class="dot ${ALL_CATEGORIES.includes(category) ? category : 'Custom'}"></div>
-        <div class="info">
-          <div class="merchant">${escapeHtml(merchant)}</div>
-          <div class="meta">${date} · ${time || 'No time record'} · ${escapeHtml(note)}</div>
-        </div>
-        <div class="${amtClass}">${sign}RM${Number(amount).toFixed(2)}</div>
-      </div>
-    </div>
-  `;
-}
-
-function renderReconcilePreview(result) {
-  reconcileItems = [];
-  result.missing.forEach(rec => reconcileItems.push({ type: 'missing', checked: true, rec }));
-  result.phantom.forEach(txn => reconcileItems.push({ type: 'phantom', checked: true, txn }));
-  result.wrongSign.forEach(w => reconcileItems.push({ type: 'wrongSign', checked: true, ...w }));
-
-  if (!reconcileItems.length) {
-    reconcilePreviewList.style.display = 'none';
-    reconcileStatusEl.textContent = `No differences found for ${result.minDate} to ${result.maxDate} — your tracker already matches this statement.`;
-    reconcileApplyBtn.style.display = 'none';
-    reconcileBackBtn.style.display = 'inline-block';
-    return;
-  }
-
-  let html = '';
-  const missingIdx = reconcileItems.map((it, i) => it.type === 'missing' ? i : -1).filter(i => i >= 0);
-  const phantomIdx = reconcileItems.map((it, i) => it.type === 'phantom' ? i : -1).filter(i => i >= 0);
-  const wrongIdx = reconcileItems.map((it, i) => it.type === 'wrongSign' ? i : -1).filter(i => i >= 0);
-
-  if (missingIdx.length) {
-    html += `<div class="preview-group"><div class="history-section-label">On the statement, not tracked (${missingIdx.length})</div>`;
-    html += missingIdx.map(i => {
-      const rec = reconcileItems[i].rec;
-      return reconcileItemRowHtml(i, {
-        category: rec.category, merchant: txnTitle(rec), date: rec.date, time: rec.time,
-        note: rec.notes || rec.type || '', amount: rec.amount, flow: txnFlow(rec)
-      });
-    }).join('');
-    html += `</div>`;
-  }
-  if (wrongIdx.length) {
-    html += `<div class="preview-group"><div class="history-section-label">Tracked with the wrong in/out direction (${wrongIdx.length})</div>`;
-    html += wrongIdx.map(i => {
-      const { existing, correctFlow } = reconcileItems[i];
-      return reconcileItemRowHtml(i, {
-        category: existing.category, merchant: txnTitle(existing), date: existing.date, time: existing.time,
-        note: `currently ${txnFlow(existing) === 'in' ? 'IN' : 'OUT'}, statement shows ${correctFlow === 'in' ? 'IN' : 'OUT'}`,
-        amount: existing.amount, flow: correctFlow
-      });
-    }).join('');
-    html += `</div>`;
-  }
-  if (phantomIdx.length) {
-    html += `<div class="preview-group"><div class="history-section-label">Tracked, but not on the statement (${phantomIdx.length})</div>`;
-    html += phantomIdx.map(i => {
-      const txn = reconcileItems[i].txn;
-      return reconcileItemRowHtml(i, {
-        category: txn.category, merchant: txnTitle(txn), date: txn.date, time: txn.time,
-        note: 'not found in statement — will be deleted', amount: txn.amount, flow: txnFlow(txn)
-      });
-    }).join('');
-    html += `</div>`;
-  }
-
-  reconcilePreviewList.innerHTML = html;
-  reconcilePreviewList.style.display = 'block';
-  reconcilePreviewList.querySelectorAll('[data-recon-idx]').forEach(el => {
-    el.onchange = () => { reconcileItems[Number(el.dataset.reconIdx)].checked = el.checked; };
-  });
-  reconcileStatusEl.textContent = `${result.minDate} to ${result.maxDate} — review below, then apply.`;
-  reconcileApplyBtn.style.display = 'inline-block';
-  reconcileBackBtn.style.display = 'inline-block';
-}
-
-reconcileSubmitBtn.onclick = async () => {
-  const account = document.getElementById('reconcileAccount').value;
-  const file = document.getElementById('reconcileFile').files[0];
-  if (!file) { reconcileStatusEl.textContent = 'Pick a statement PDF first.'; return; }
-  reconcileSubmitBtn.disabled = true;
-  reconcileStatusEl.textContent = 'Reading statement…';
-  try {
-    const parsedRows = account === 'TNG Card' ? await parseCardPdfFile(file) : await parsePdfFile(file);
-    if (!parsedRows.length) {
-      reconcileStatusEl.textContent = "Couldn't find any transactions in that PDF.";
-      reconcileSubmitBtn.disabled = false;
-      return;
-    }
-    const result = reconcileAgainstStatement(account, parsedRows);
-    reconcilePickField.style.display = 'none';
-    reconcileSubmitBtn.style.display = 'none';
-    renderReconcilePreview(result);
-  } catch (err) {
-    reconcileStatusEl.textContent = err.message || 'Could not read that file — try again.';
-    reconcileSubmitBtn.disabled = false;
-  }
-};
-
-reconcileApplyBtn.onclick = async () => {
-  reconcileApplyBtn.disabled = true;
-  reconcileStatusEl.textContent = 'Applying…';
-  try {
-    const toAdd = reconcileItems.filter(it => it.type === 'missing' && it.checked);
-    for (const it of toAdd) {
-      await callApi('add', { row: it.rec });
-    }
-    const toFix = reconcileItems.filter(it => it.type === 'wrongSign' && it.checked);
-    for (const it of toFix) {
-      await callApi('updateFlow', { row: it.existing.row, flow: it.correctFlow });
-    }
-    // Deletes go last, highest row number first, so removing one phantom
-    // row never shifts the sheet-row number of another phantom still
-    // waiting to be deleted in this same batch.
-    const toDelete = reconcileItems.filter(it => it.type === 'phantom' && it.checked)
-      .map(it => it.txn.row).sort((a, b) => b - a);
-    for (const row of toDelete) {
-      await callApi('deleteTransaction', { row });
-    }
-    reconcileStatusEl.textContent = `Applied ${toAdd.length + toFix.length + toDelete.length} change(s) — refreshing…`;
-    setTimeout(() => { reconcileBackdrop.classList.remove('open'); loadData(); }, 800);
-  } catch (err) {
-    reconcileStatusEl.textContent = 'Apply failed — try again.';
-    reconcileApplyBtn.disabled = false;
   }
 };
 
