@@ -476,14 +476,20 @@
      blurred (blur is still used for the owner's own "hide balance" toggle
      elsewhere) — a guest should never see the figures at all, not even a
      blurred hint of their shape/length. */
-  body.view-only.hide-balance #statBalance,
   body.view-only.hide-balance .mini-chart-truebalance,
-  body.view-only.hide-balance #statIncome,
   body.view-only.hide-balance .txn .amount.in,
-  body.view-only.hide-balance #statBreakdown.breakdown-balance,
-  body.view-only.hide-balance #statBreakdown.breakdown-income,
   body.view-only.hide-balance .total-all-value.income {
     filter: none;
+    display: none !important;
+  }
+  /* The Income and Balance stat blocks in the Overall-chart HUD are removed
+     entirely for guests — not just their value blurred, but the whole
+     label+value+click-to-open-breakdown block, so there's no "Income" text
+     and no way to tap into an income/balance breakdown. .chart-stats .stat
+     is flex:1 + text-align:center, so with only the Expense block left it
+     naturally stretches to fill the row and lands dead center. */
+  body.view-only .chart-stats .stat[data-stat="income"],
+  body.view-only .chart-stats .stat[data-stat="balance"] {
     display: none !important;
   }
   input[type=file] { color: var(--muted); }
@@ -2651,9 +2657,12 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
 // month/all-time) via chartTxnsFor()/statsFor().
 function renderCharts() {
   const modeToggleEl = document.getElementById('chartModeToggle');
-  if (modeToggleEl) modeToggleEl.style.display = activeFilter === 'All' ? 'flex' : 'none';
+  // Guests in view-only mode never get an Expense/Income switch on the
+  // Overall chart — only Expense renders, matching the Income stat/label
+  // being removed from the HUD above it.
+  if (modeToggleEl) modeToggleEl.style.display = (!VIEW_ONLY && activeFilter === 'All') ? 'flex' : 'none';
 
-  if (activeFilter === 'All' && overallChartMode === 'income') {
+  if (!VIEW_ONLY && activeFilter === 'All' && overallChartMode === 'income') {
     renderChartOn('chart', incomeTxnsFor(allTxns), 'All', {
       titleEl: 'chartTitle', totalEl: 'chartTotal', legend: true, pie: true, incomeMode: true
     });
