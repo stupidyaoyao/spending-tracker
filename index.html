@@ -451,6 +451,7 @@
   .view-only-badge { display: none; text-align: center; font-size: 12px; color: var(--muted); background: var(--card); border-radius: 999px; padding: 6px 14px; margin: 0 0 10px; width: fit-content; margin-left: auto; margin-right: auto; }
   body.view-only .view-only-badge { display: block; }
   body.view-only #hideNumbersBtn,
+  body.view-only #shareViewLinkBtn,
   body.view-only .fab-row,
   body.view-only .fab-row-left,
   body.view-only .toolbar-btn,
@@ -470,6 +471,20 @@
   body.view-only .txn-extratag-amount {
     pointer-events: none;
     opacity: 0.8;
+  }
+  /* In shared view-only mode, balances are hidden outright instead of just
+     blurred (blur is still used for the owner's own "hide balance" toggle
+     elsewhere) — a guest should never see the figures at all, not even a
+     blurred hint of their shape/length. */
+  body.view-only.hide-balance #statBalance,
+  body.view-only.hide-balance .mini-chart-truebalance,
+  body.view-only.hide-balance #statIncome,
+  body.view-only.hide-balance .txn .amount.in,
+  body.view-only.hide-balance #statBreakdown.breakdown-balance,
+  body.view-only.hide-balance #statBreakdown.breakdown-income,
+  body.view-only.hide-balance .total-all-value.income {
+    filter: none;
+    display: none !important;
   }
   input[type=file] { color: var(--muted); }
   .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -527,6 +542,7 @@
   <header>
     <div class="header-top">
       <h1>Spending</h1>
+      <button class="icon-btn" id="shareViewLinkBtn" title="Copy read-only share link" aria-label="Copy read-only share link">🔗</button>
       <button class="icon-btn" id="hideNumbersBtn" title="Hide balance" aria-label="Hide balance">👁️</button>
     </div>
     <div class="page-tabs" id="pageTabs">
@@ -1175,6 +1191,41 @@ document.getElementById('hideNumbersBtn').onclick = () => {
   applyBalanceHidden();
 };
 applyBalanceHidden();
+
+// "Copy read-only share link" — builds the same ?mode=view URL that
+// callApi()/CSS above already treat as a locked-down, read-only session,
+// and puts it on the clipboard so it's easy to send to friends/family.
+// Hidden itself under body.view-only (see CSS) so a guest never sees it.
+const shareViewLinkBtn = document.getElementById('shareViewLinkBtn');
+if (shareViewLinkBtn) {
+  shareViewLinkBtn.onclick = async () => {
+    const shareUrl = location.origin + location.pathname + '?mode=view';
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      copied = true;
+    } catch (e) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = shareUrl;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        copied = true;
+      } catch (e2) { copied = false; }
+    }
+    const original = shareViewLinkBtn.textContent;
+    shareViewLinkBtn.textContent = copied ? '✅' : '⚠️';
+    shareViewLinkBtn.title = copied ? 'Link copied!' : shareUrl;
+    setTimeout(() => {
+      shareViewLinkBtn.textContent = original;
+      shareViewLinkBtn.title = 'Copy read-only share link';
+    }, 1500);
+  };
+}
 
 document.querySelectorAll('.chart-mode-btn').forEach(btn => {
   btn.onclick = () => {
