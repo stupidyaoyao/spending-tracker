@@ -442,6 +442,7 @@
   .inline-loading { display: none; align-items: center; justify-content: center; gap: 10px; margin: 10px 0; font-size: 13px; color: var(--muted); }
   .inline-loading.show { display: flex; }
   .inline-loading .spinner { width: 18px; height: 18px; border-width: 2px; flex-shrink: 0; }
+  .inline-loading .import-loading-icon { font-size: 16px; line-height: 1; flex-shrink: 0; }
   /* Read-only "shared view" mode (?mode=view) — hides every control that
      leads to a mutating action (add, edit, delete, import, remark/split,
      merchant rules, the balance-hide toggle itself) so the page is pure
@@ -826,7 +827,7 @@
 
       <div class="preview-list" id="importPreviewList" style="display:none;"></div>
 
-      <div class="inline-loading" id="importLoading"><span class="spinner"></span><span id="importLoadingText">Reading…</span></div>
+      <div class="inline-loading" id="importLoading"><span class="import-loading-icon">📄</span><span class="spinner"></span><span id="importLoadingText">Reading…</span></div>
       <div class="status-msg" id="importStatus"></div>
       <button class="btn" id="importSubmit">Read file</button>
       <button class="btn secondary" id="importBack" style="display:none;">Choose a different file</button>
@@ -3451,11 +3452,28 @@ function pendingReloadSyncTxns() {
     .filter(t => t.account === 'TNG' && t.category === 'Transfer' && t.subTag === 'Card Reload')
     .sort((a, b) => (a.date || '').localeCompare(b.date || '')); // earliest reload gets first claim on a bank leg
   if (!candidates.length) return [];
+  // A "Card Reload" row that already has a matching TNG Card-account leg
+  // (same amount, same day — e.g. the OTA-reload records pulled from a TNG
+  // Card PDF/CSV/screenshot import) is a wallet-to-physical-card transfer,
+  // not a bank-funded eWallet top-up. No bank money moves in a wallet-to-
+  // card transfer, so it will NEVER show up as an HL Bank debit — checking
+  // it against HL Bank at all was a false alarm (see the "Touch 'n Go Sdn
+  // Bhd - EV2 OTA" investigation). Match against the TNG Card side FIRST,
+  // before even looking at HL Bank or the age window below, so these never
+  // get flagged regardless of how old they are.
+  const cardLegs = allTxns.filter(t => t.account === 'TNG Card' && RELOAD_SUBTAGS.includes(t.subTag));
+  const usedCardRows = new Set();
   const bankLegs = allTxns.filter(t =>
     t.account === 'HL Bank' && t.subTag === 'Internal' && /To TNG/i.test(t.merchant || ''));
   const usedBankRows = new Set();
   const pending = [];
   candidates.forEach(t => {
+    const cardMatch = cardLegs.find(c => {
+      if (usedCardRows.has(c.row)) return false;
+      if (Math.abs(Number(c.amount || 0) - Number(t.amount || 0)) >= 0.01) return false;
+      return c.date === t.date;
+    });
+    if (cardMatch) { usedCardRows.add(cardMatch.row); return; }
     const ageDays = daysBetween_(t.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
     const match = bankLegs.find(b => {
