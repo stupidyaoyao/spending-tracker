@@ -2341,22 +2341,31 @@ function startOfWeek(d) {
   r.setHours(0,0,0,0);
   return r;
 }
+// The Monday that started the week *before* the one containing d — used by
+// the "Last week" card/filter (see renderTotals()/isInTimeFilter()), which
+// replaced the old "This week" (current, still-in-progress week) card.
+function startOfLastWeek(d) {
+  const r = startOfWeek(d);
+  r.setDate(r.getDate() - 7);
+  return r;
+}
 
 // Which time window the pies (big + mini) are scoped to — null means all
-// time (no scoping). Set by tapping one of the Today/This week/This month
-// cards below; tapping the already-active one clears it back to all time.
-let activeTimeFilter = 'all'; // null | 'today' | 'week' | 'month' | 'all' — the
-// "All time" card is now the first thing on the Main page, and defaults to
-// active, so the pie charts open showing your whole history rather than
-// just this month. Tap Today/This week/This month to narrow it, tap
-// whichever card is active to go back to all-time.
+// time (no scoping). Set by tapping one of the Last week/This month/All
+// time cards below; tapping the already-active one clears it back to null
+// (all time, same effect as the "All time" card).
+let activeTimeFilter = 'month'; // null | 'week' | 'month' | 'all' — defaults
+// to "This month" on load (most people want "how am I doing this month" at
+// a glance), rather than the whole history. Tap Last week/All time to
+// switch, tap whichever card is active to go back to unscoped (all time).
 
 function isInTimeFilter(t) {
   if (!activeTimeFilter) return true;
   const now = new Date();
   const d = new Date(t.date);
-  if (activeTimeFilter === 'today') return isSameDay(d, now);
-  if (activeTimeFilter === 'week') return d >= startOfWeek(now);
+  // 'week' now means the calendar week *before* the current one ("Last
+  // week"), not the still-in-progress current week.
+  if (activeTimeFilter === 'week') return d >= startOfLastWeek(now) && d < startOfWeek(now);
   if (activeTimeFilter === 'month') return d >= new Date(now.getFullYear(), now.getMonth(), 1);
   return true;
 }
@@ -2380,62 +2389,42 @@ function lastUpdatedLabel(base) {
 
 function renderTotals(txns, incomeTxns) {
   const now = new Date();
-  const weekStart = startOfWeek(now);
+  const lastWeekStart = startOfLastWeek(now);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const sum = (filterFn) => txns.filter(filterFn).reduce((s, t) => s + expenseTotalAmount(t), 0);
 
-  const today = sum(t => isSameDay(new Date(t.date), now));
-  const week = sum(t => new Date(t.date) >= weekStart);
+  const lastWeekEnd = new Date(lastWeekStart); lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
+  const week = sum(t => { const d = new Date(t.date); return d >= lastWeekStart && d <= lastWeekEnd; });
   const month = sum(t => new Date(t.date) >= monthStart);
   const allTime = sum(() => true);
-  // All time also shows its Income total (unlike Today/Week/Month, which
-  // stay pure-expense to match the compact card style) — incomeTxns is the
-  // same account/category/search/date-range-filtered pool as txns, just
-  // without the Income-category exclusion, passed in from render(). Only
-  // meaningful on the "All categories" view, same as the Overall Expense/
-  // Income split above it.
-  const allTimeIncome = (incomeTxns || []).reduce((s, t) => s + Number(t.amount || 0), 0);
 
-  const todayDateLabel = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
   const fmtShort = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const weekRangeLabel = `${fmtShort(weekStart)} - ${fmtShort(weekEnd)}`;
+  const weekRangeLabel = `${fmtShort(lastWeekStart)} - ${fmtShort(lastWeekEnd)}`;
 
   const cardActive = (scope) => activeTimeFilter === scope ? ' active' : '';
+  // Three equal-size cards in one row: Last week, This month, All time.
+  // "All time" used to get its own larger standalone rectangle with a
+  // separate Expense/Income split — it's now just a third quick-pick here,
+  // matching the compact single-net-value style of the other two (its
+  // Income figure is still visible the normal way: via the Overall
+  // Expense/Income stat row above once "All time" is the active scope).
   document.getElementById('totals').innerHTML = `
-    <div class="total-card${cardActive('today')}" data-scope="today"><div class="label">Today</div><div class="value">${formatSignedRM(today)}</div><div class="sub">${todayDateLabel}</div><div class="sub">${lastUpdatedLabel()}</div></div>
-    <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">This week</div><div class="value">${formatSignedRM(week)}</div><div class="sub">${weekRangeLabel}</div></div>
+    <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">Last week</div><div class="value">${formatSignedRM(week)}</div><div class="sub">${weekRangeLabel}</div></div>
     <div class="total-card${cardActive('month')}" data-scope="month"><div class="label">This month</div><div class="value">${formatSignedRM(month)}</div></div>
+    <div class="total-card${cardActive('all')}" data-scope="all"><div class="label">All time</div><div class="value">${formatSignedRM(allTime)}</div></div>
   `;
-  // All time gets its own wide rectangle below, showing Expense (red) and
-  // Income (green) side by side at the same size — rather than being
-  // squeezed into a 4th card with a single net number, it now answers the
-  // same question the Overall Expense/Income split does, just for all-time
-  // instead of whichever period is selected there.
-  document.getElementById('totalsAll').innerHTML = `
-    <div class="total-card-all${cardActive('all')}" data-scope="all">
-      <div class="label">All time</div>
-      <div class="total-all-row">
-        <div class="total-all-col"><span class="total-all-label">Expense</span><span class="total-all-value expense">${formatSignedRM(allTime)}</span></div>
-        <div class="total-all-col"><span class="total-all-label">Income</span><span class="total-all-value income">+RM${allTimeIncome.toFixed(2)}</span></div>
-      </div>
-    </div>
-  `;
+  document.getElementById('totalsAll').innerHTML = '';
   // Tapping a card scopes the pies (big + mini, see renderCharts()) to that
   // period; tapping the same card again clears back to all-time. This is
   // purely a pie-scoping control — the totals cards themselves always show
   // their own fixed period regardless, and the transaction list below isn't
-  // affected. "All time" behaves the same as no filter for pie-scoping
-  // purposes (see isInTimeFilter() treating 'all' same as null) — it just
-  // gets its own explicit scope name so it's directly tappable/highlightable
-  // instead of only reachable by toggling another card off. "All time"
-  // specifically ALSO resets every Main filter (account/category/subtag/
-  // search/date range) back to default every time it's tapped — same as the
-  // bottom-left reset button (see resetMainFilters()) — since "all time" is
-  // naturally read as "show me literally everything" rather than just a
-  // pie-scope toggle.
-  document.querySelectorAll('#totals .total-card, #totalsAll .total-card-all').forEach(el => {
+  // affected. "All time" specifically ALSO resets every Main filter
+  // (account/category/subtag/search/date range) back to default every time
+  // it's tapped — same as the bottom-left reset button (see
+  // resetMainFilters()) — since "all time" is naturally read as "show me
+  // literally everything" rather than just a pie-scope toggle.
+  document.querySelectorAll('#totals .total-card').forEach(el => {
     el.onclick = () => {
       const scope = el.dataset.scope;
       activeTimeFilter = activeTimeFilter === scope ? null : scope;
