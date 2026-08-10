@@ -433,6 +433,44 @@
   .sheet-inner { position: relative; }
   .status-msg { text-align: center; font-size: 13px; color: var(--muted); margin: 8px 0; white-space: pre-wrap; }
   .status-msg.debug { text-align: left; font-family: ui-monospace, monospace; font-size: 11px; background: #2c2c2e; padding: 10px; border-radius: 8px; max-height: 220px; overflow-y: auto; }
+  /* Visible "something is happening" cue while a file is being read/parsed
+     or an import is being committed — the existing importStatus text alone
+     (small grey caption) was easy to miss, especially on slower PDF/OCR
+     reads, making the app look frozen. Sits above the text status and is
+     shown/hidden independently of it via .show, so none of the existing
+     importStatusEl.textContent assignments needed to change. */
+  .inline-loading { display: none; align-items: center; justify-content: center; gap: 10px; margin: 10px 0; font-size: 13px; color: var(--muted); }
+  .inline-loading.show { display: flex; }
+  .inline-loading .spinner { width: 18px; height: 18px; border-width: 2px; flex-shrink: 0; }
+  /* Read-only "shared view" mode (?mode=view) — hides every control that
+     leads to a mutating action (add, edit, delete, import, remark/split,
+     merchant rules, the balance-hide toggle itself) so the page is pure
+     browsing. callApi() also refuses to POST in this mode regardless of
+     what's visible, so this CSS is about a clean read-only *experience*,
+     not the only thing standing between a visitor and a write. */
+  .view-only-badge { display: none; text-align: center; font-size: 12px; color: var(--muted); background: var(--card); border-radius: 999px; padding: 6px 14px; margin: 0 0 10px; width: fit-content; margin-left: auto; margin-right: auto; }
+  body.view-only .view-only-badge { display: block; }
+  body.view-only #hideNumbersBtn,
+  body.view-only .fab-row,
+  body.view-only .fab-row-left,
+  body.view-only .toolbar-btn,
+  body.view-only .remark-btn,
+  body.view-only .review-actions,
+  body.view-only .review-remember,
+  body.view-only .preview-remember,
+  body.view-only .balance-alert-dismiss,
+  body.view-only .statement-reminder-dismiss {
+    display: none !important;
+  }
+  /* Category/tag selects stay visible (they're the only place the category
+     name is shown as text — the colored dot alone isn't readable without
+     memorizing the palette), just made inert so nothing can be changed. */
+  body.view-only .txn-cat-select,
+  body.view-only .txn-extratag-select,
+  body.view-only .txn-extratag-amount {
+    pointer-events: none;
+    opacity: 0.8;
+  }
   input[type=file] { color: var(--muted); }
   .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
   .checkbox-row input { width: auto; }
@@ -483,6 +521,7 @@
 <body>
 
 <div id="app">
+  <div class="view-only-badge">🔒 Shared view — read only</div>
   <div id="balanceAlertBanner" class="balance-alert-banner"></div>
   <div id="statementReminderBanner" class="statement-reminder-banner"></div>
   <header>
@@ -765,6 +804,7 @@
 
       <div class="preview-list" id="importPreviewList" style="display:none;"></div>
 
+      <div class="inline-loading" id="importLoading"><span class="spinner"></span><span id="importLoadingText">Reading…</span></div>
       <div class="status-msg" id="importStatus"></div>
       <button class="btn" id="importSubmit">Read file</button>
       <button class="btn secondary" id="importBack" style="display:none;">Choose a different file</button>
@@ -810,10 +850,26 @@
 // consistently redeployed going forward, to remove that class of bug.
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRudNZs6s441X981A3t7uvHV7RiAB6enG7PB4orjsfujDARbm9kfgjdfmG9usyebXX2Q/exec';
 
+// Read-only "shared view" mode — opened via a link like
+// ".../spending-tracker/?mode=view", meant for handing to friends/family
+// who should be able to browse but never see real balances or change
+// anything. Checked once at load (query string doesn't change without a
+// full navigation, so this doesn't need to be reactive). callApi() below is
+// the single chokepoint every mutating action goes through (add/update/
+// delete/import/saveMerchantRule/etc. — loadData() itself uses a plain
+// fetch(), not callApi()), so blocking writes there is a real safety net
+// independent of whether every single mutating button also got hidden by
+// the body.view-only CSS further down.
+const VIEW_ONLY = new URLSearchParams(location.search).get('mode') === 'view';
+
 // POST helper. Uses Content-Type: text/plain so the request stays a CORS
 // "simple request" (no OPTIONS preflight) — Apps Script web apps can't
 // answer custom preflight requests.
 async function callApi(action, extra) {
+  if (VIEW_ONLY) {
+    console.warn('Shared view is read-only — blocked action:', action);
+    return { ok: false, viewOnly: true };
+  }
   const res = await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1101,7 +1157,8 @@ let miniChartsExpanded = true;
 // Balance + per-account/Card true balances) for showing the app to someone
 // else without revealing how much money you actually have. Persisted so it
 // stays off/on across visits rather than resetting every reload.
-let balanceHidden = localStorage.getItem('balanceHidden') === '1';
+let balanceHidden = VIEW_ONLY ? true : localStorage.getItem('balanceHidden') === '1';
+if (VIEW_ONLY) document.body.classList.add('view-only');
 function applyBalanceHidden() {
   document.body.classList.toggle('hide-balance', balanceHidden);
   const btn = document.getElementById('hideNumbersBtn');
@@ -1112,6 +1169,7 @@ function applyBalanceHidden() {
   }
 }
 document.getElementById('hideNumbersBtn').onclick = () => {
+  if (VIEW_ONLY) return;
   balanceHidden = !balanceHidden;
   localStorage.setItem('balanceHidden', balanceHidden ? '1' : '0');
   applyBalanceHidden();
@@ -1224,6 +1282,7 @@ async function loadData() {
 function renderBalanceBanner() {
   const el = document.getElementById('balanceAlertBanner');
   if (!el) return;
+  if (VIEW_ONLY) { el.style.display = 'none'; el.innerHTML = ''; return; }
   if (!balanceAlerts.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'flex';
   el.innerHTML = balanceAlerts.map(a => {
@@ -1265,6 +1324,7 @@ function getWeekendId(d) {
 function renderStatementReminder() {
   const el = document.getElementById('statementReminderBanner');
   if (!el) return;
+  if (VIEW_ONLY) { el.style.display = 'none'; el.innerHTML = ''; return; }
   const today = new Date();
   const items = [];
 
@@ -3911,6 +3971,15 @@ document.getElementById('fSubmit').onclick = async () => {
 const importBackdrop = document.getElementById('importBackdrop');
 const importStatusEl = document.getElementById('importStatus');
 const importSubmitBtn = document.getElementById('importSubmit');
+const importLoadingEl = document.getElementById('importLoading');
+const importLoadingTextEl = document.getElementById('importLoadingText');
+function showImportLoading(text) {
+  importLoadingTextEl.textContent = text || 'Reading…';
+  importLoadingEl.classList.add('show');
+}
+function hideImportLoading() {
+  importLoadingEl.classList.remove('show');
+}
 const importBackBtn = document.getElementById('importBack');
 const importPickField = document.getElementById('importPickField');
 const importPreviewList = document.getElementById('importPreviewList');
@@ -3965,6 +4034,7 @@ function resetImportSheet() {
   importSubmitBtn.textContent = 'Read file';
   importStatusEl.className = 'status-msg';
   importStatusEl.textContent = '';
+  hideImportLoading();
   document.getElementById('fFile').value = '';
 }
 
@@ -5323,9 +5393,11 @@ importSubmitBtn.onclick = async () => {
       const failures = [];
       const balanceChecks = [];
       for (let i = 0; i < files.length; i++) {
-        importStatusEl.textContent = files.length > 1
+        const loadingMsg = files.length > 1
           ? `Reading screenshot ${i + 1} of ${files.length}… (OCR can take 10-30s each)`
           : 'Reading screenshot… (OCR can take 10-30s, especially the first time)';
+        importStatusEl.textContent = loadingMsg;
+        showImportLoading(loadingMsg);
         const f = files[i];
         try {
           const fileRows = importAccount === 'TNG Card-Screenshot'
@@ -5340,6 +5412,7 @@ importSubmitBtn.onclick = async () => {
         }
       }
       importSubmitBtn.disabled = false;
+      hideImportLoading();
 
       // Reconcile any balance(s) read off the screenshots against what the
       // tracker currently computes for that account, and persist the result
@@ -5391,6 +5464,7 @@ importSubmitBtn.onclick = async () => {
 
     const file = files[0];
     importStatusEl.textContent = 'Reading file…';
+    showImportLoading('Reading file…');
     try {
       if (importAccount === 'PBank') {
         rows = await parseBankACsvFile(file);
@@ -5412,9 +5486,11 @@ importSubmitBtn.onclick = async () => {
         importStatusEl.textContent = 'Could not read file: ' + (err && err.message ? err.message : err);
       }
       importSubmitBtn.disabled = false;
+      hideImportLoading();
       return;
     }
     importSubmitBtn.disabled = false;
+    hideImportLoading();
 
     if (!rows.length) { importStatusEl.textContent = 'No spending transactions found in that file.'; return; }
     // parsePdfFile() (TNG eWallet PDF only) attaches __possibleMissed — real
@@ -5432,6 +5508,7 @@ importSubmitBtn.onclick = async () => {
   // importStage === 'preview' -> actually commit
   if (!pendingImportRows.length) { importStatusEl.textContent = 'Nothing left to import.'; return; }
   importStatusEl.textContent = `Importing ${pendingImportRows.length} transactions…`;
+  showImportLoading(`Importing ${pendingImportRows.length} transactions…`);
   importSubmitBtn.disabled = true;
   try {
     await callApi('import', { rows: pendingImportRows });
@@ -5448,9 +5525,11 @@ importSubmitBtn.onclick = async () => {
       try { await callApi('deleteTransaction', { row }); } catch (e) { /* best-effort cleanup */ }
     }
     importStatusEl.textContent = `Imported ${pendingImportRows.length} transactions.`;
+    hideImportLoading();
     setTimeout(() => { importBackdrop.classList.remove('open'); loadData(); }, 800);
   } catch (err) {
     importStatusEl.textContent = 'Import failed — try again.';
+    hideImportLoading();
     importSubmitBtn.disabled = false;
   }
 };
