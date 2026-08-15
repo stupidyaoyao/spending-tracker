@@ -164,7 +164,12 @@
 
   .split-group { background: var(--card); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
   .split-group-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .month-header { cursor: default; }
+  .month-summary-row { display: flex; gap: 16px; padding: 10px 12px; font-size: 13px; }
+  .month-summary-expense { color: #ff453a; }
+  .month-summary-income { color: #32d74b; }
   .split-group-name { font-size: 14px; font-weight: 600; }
+  .split-group-daterange { font-size: 11px; color: var(--muted, #888); margin-top: 2px; }
   .split-group-net { font-size: 14px; font-weight: 700; flex-shrink: 0; }
   .split-group-rows { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
   .split-group-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
@@ -359,12 +364,7 @@
     color: #1a1a1a; font-size: 10px; font-weight: 800; margin-left: 5px;
     vertical-align: middle; flex-shrink: 0; cursor: default; white-space: nowrap;
   }
-  .tbc-flag.flagged-flag { background: #ff453a; color: #fff; }
-  .flag-btn {
-    background: none; border: none; color: var(--muted); font-size: 13px; padding: 2px 2px;
-    cursor: pointer; line-height: 1; opacity: 0.5;
-  }
-  .flag-btn.is-flagged { opacity: 1; }
+  .tbc-flag.synced-flag { background: #30d158; color: #08300f; cursor: pointer; }
   .txn .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .txn .amount { font-size: 15px; font-weight: 700; color: #ff453a; }
   .txn .amount.in { color: #30d158; }
@@ -463,7 +463,6 @@
   body.view-only .fab-row-left,
   body.view-only .toolbar-btn,
   body.view-only .remark-btn,
-  body.view-only .flag-btn,
   body.view-only .review-actions,
   body.view-only .review-remember,
   body.view-only .preview-remember,
@@ -610,6 +609,7 @@
         <option value="day">Group by: Day</option>
         <option value="category">Group by: Category</option>
         <option value="merchant">Group by: Merchant</option>
+        <option value="month">Group by: Month</option>
         <option value="none">Group by: None</option>
       </select>
       <select id="sortBy">
@@ -704,6 +704,10 @@
     <div id="splitsInsightsPage" style="display:none;">
       <div class="history-section-label-row">
         <div class="history-section-label" id="splitsInsightsLabel">Split groups</div>
+        <select id="splitsSortBy" class="toolbar-btn" style="display:none;">
+          <option value="date">Sort: Newest first</option>
+          <option value="amount">Sort: Amount</option>
+        </select>
         <button class="toolbar-btn" id="splitsInsightsBackBtn" style="display:none;">← All splits</button>
       </div>
       <div class="history-list" id="splitsInsightsList"></div>
@@ -1176,7 +1180,10 @@ let overallChartMode = 'expense';
 // is shown at all. One shared flag rather than one per card, since the two
 // mini pies are meant to expand/collapse together as a single "account
 // breakdown" unit, not independently.
-let miniChartsExpanded = true;
+// Starts collapsed — the account breakdown is a drill-down detail, not
+// something to show on every page load; tap "Show account breakdown ▸" to
+// reveal it.
+let miniChartsExpanded = false;
 
 // "Hide balance" — masks just your real current-balance figures (Overall
 // Balance + per-account/Card true balances) for showing the app to someone
@@ -1326,7 +1333,26 @@ async function loadData() {
     document.getElementById('list').innerHTML = '<div class="empty">Error loading data. Check your connection.</div>';
     return;
   }
+  seedRecentDayExpansion();
   renderApp();
+}
+
+// Opens the Main list to a useful default on first load: the last 7 days'
+// worth of day-groups start expanded, everything older stays collapsed
+// (expandedGroups otherwise starts fully empty — see its declaration).
+// Only seeds day-mode keys (toDateString), since that's the default
+// groupMode; switching to Category/Merchant just won't match these keys,
+// which is harmless the same way any other stale key is (see the comment
+// on expandedGroups). Runs once per page load, not on every data refresh,
+// so it never fights a user's own collapse/expand choices mid-session.
+function seedRecentDayExpansion() {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - 6); // today + 6 prior days = last 7 days
+  allTxns.forEach(t => {
+    const d = new Date(t.date);
+    if (d >= cutoff) expandedGroups.add(d.toDateString());
+  });
 }
 
 // Keeps whichever page(s) show live data in sync after any real mutation
@@ -2328,6 +2354,14 @@ function jumpToRecord(row) {
   const t = allTxns.find(x => x.row === row);
   if (!t) return;
   resetMainFilters();
+  // Month view never renders individual transaction rows (summary cards
+  // only — see render()), so a jump target would have nowhere to land.
+  // Drop to Day grouping so the target row actually exists to scroll to.
+  if (groupMode === 'month') {
+    groupMode = 'day';
+    const groupBySel = document.getElementById('groupBy');
+    if (groupBySel) groupBySel.value = 'day';
+  }
   if (groupMode !== 'none') expandedGroups.add(groupKeyFor(t));
   switchPage('main');
   render(); // switchPage() only toggles which page div is visible — it doesn't
@@ -3143,6 +3177,50 @@ function render() {
     return;
   }
 
+  // Month view is summary-only by design — one card per month with just its
+  // Expense/Income totals, no per-transaction drill-down at all (not even
+  // expandable). It reuses whatever filters (account/category/search/date
+  // range) already narrowed `sorted` above, same as every other groupMode —
+  // it just buckets by calendar month (YYYY-MM) instead of day/category/
+  // merchant. See jumpToRecord() for why it drops back to Day grouping
+  // before scrolling to a specific row (there's nothing to scroll to here).
+  if (groupMode === 'month') {
+    const secondary = document.getElementById('toolbarSecondary');
+    if (secondary) secondary.style.display = 'none';
+    const monthGroups = {};
+    const monthOrder = [];
+    sorted.forEach(t => {
+      const key = (t.date || '').slice(0, 7);
+      if (!monthGroups[key]) { monthGroups[key] = []; monthOrder.push(key); }
+      monthGroups[key].push(t);
+    });
+    let html = '';
+    monthOrder.forEach(key => {
+      const txns = monthGroups[key];
+      const expense = txns
+        .filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
+        .reduce((s, t) => s + expenseTotalAmount(t), 0);
+      const income = txns
+        .filter(t => t.category === 'Income')
+        .reduce((s, t) => s + Number(t.amount || 0), 0);
+      const label = key
+        ? new Date(key + '-01T00:00:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+        : 'Unknown month';
+      html += `<div class="day-group">
+        <div class="day-header month-header">
+          <span class="day-header-left"><span>${escapeHtml(label)}</span></span>
+        </div>
+        <div class="month-summary-row">
+          <span class="month-summary-expense">Expense: <b>RM${expense.toFixed(2)}</b></span>
+          <span class="month-summary-income">Income: <b>RM${income.toFixed(2)}</b></span>
+        </div>
+      </div>`;
+    });
+    document.getElementById('list').innerHTML = html + alsoTaggedHtml;
+    attachAlsoTaggedHandlers();
+    return;
+  }
+
   const groups = {};
   const order = [];
   sorted.forEach(t => {
@@ -3488,21 +3566,23 @@ function amountEq_(a, b) {
 // 2026-08 audit, this resolved several false "orphan" rows the naive
 // version produced purely from processing order.
 function closestPairMatch_(listA, listB, maxDays) {
-  const pairs = [];
+  const candidates = [];
   listA.forEach(a => listB.forEach(b => {
     if (!amountEq_(a.amount, b.amount)) return;
     const dist = Math.abs(daysBetween_(a.date, b.date));
     if (dist > maxDays) return;
-    pairs.push({ a, b, dist });
+    candidates.push({ a, b, dist });
   }));
-  pairs.sort((p, q) => p.dist - q.dist);
+  candidates.sort((p, q) => p.dist - q.dist);
   const usedA = new Set(), usedB = new Set();
-  pairs.forEach(p => {
+  const pairs = [];
+  candidates.forEach(p => {
     if (usedA.has(p.a.row) || usedB.has(p.b.row)) return;
     usedA.add(p.a.row);
     usedB.add(p.b.row);
+    pairs.push(p);
   });
-  return { usedA, usedB };
+  return { usedA, usedB, pairs };
 }
 // Finds every Internal-transfer leg — on EITHER side — that's missing its
 // counterpart on the neighboring account, across the two hops that matter:
@@ -3521,11 +3601,21 @@ function closestPairMatch_(listA, listB, maxDays) {
 // chain from both ends so an orphan on ANY side gets caught, not just a
 // TNG-side one.
 //
-// Returns [{ row, txn, awaiting }] — awaiting is the account name that
-// still needs to show a matching leg for this row to be considered synced.
+// Returns { gaps, matches } — gaps: [{ row, txn, awaiting }] (awaiting is
+// the account name that still needs to show a matching leg for this row to
+// be considered synced). matches: [{ row, account, counterpartRow,
+// counterpartAccount }] one entry per side of every successfully-matched
+// pair, used to power the green "Synced" badge (see renderTxnRow) so a
+// confirmed row can link straight to its counterpart instead of just
+// showing a generic checkmark.
 function internalSyncGaps() {
   const today = new Date().toISOString().slice(0, 10);
   const gaps = [];
+  const matches = [];
+  const addMatch = (a, b) => {
+    matches.push({ row: a.row, account: a.account, counterpartRow: b.row, counterpartAccount: b.account });
+    matches.push({ row: b.row, account: b.account, counterpartRow: a.row, counterpartAccount: a.account });
+  };
 
   // ---- TNG <-> TNG Card (same-day pre-filter only; unaffected by the fix
   // above, kept exactly as it worked before) ----
@@ -3537,7 +3627,7 @@ function internalSyncGaps() {
   const tngMatchedToCard = new Set();
   tngRows.forEach(t => {
     const m = cardLegs.find(c => !usedCardRows.has(c.row) && amountEq_(c.amount, t.amount) && c.date === t.date);
-    if (m) { usedCardRows.add(m.row); tngMatchedToCard.add(t.row); }
+    if (m) { usedCardRows.add(m.row); tngMatchedToCard.add(t.row); addMatch(t, m); }
   });
 
   // ---- HL Bank "To TNG (Wallet Reload)" <-> remaining TNG rows ----
@@ -3545,6 +3635,7 @@ function internalSyncGaps() {
     .filter(t => t.account === 'HL Bank' && t.category === 'Transfer' && t.subTag === 'Internal' && /to tng/i.test(t.merchant || ''));
   const tngRemaining = tngRows.filter(t => !tngMatchedToCard.has(t.row));
   const m1 = closestPairMatch_(tngRemaining, hlToTng, RELOAD_SYNC_MATCH_WINDOW_DAYS);
+  m1.pairs.forEach(p => addMatch(p.a, p.b));
   tngRemaining.forEach(t => {
     if (m1.usedA.has(t.row)) return;
     const ageDays = daysBetween_(t.date, today);
@@ -3569,6 +3660,7 @@ function internalSyncGaps() {
   const hlPbankSide = allTxns
     .filter(t => t.account === 'HL Bank' && t.category === 'Transfer' && t.subTag === 'Internal' && /pbank/i.test(t.merchant || ''));
   const m2 = closestPairMatch_(pbankRows, hlPbankSide, RELOAD_SYNC_MATCH_WINDOW_DAYS);
+  m2.pairs.forEach(p => addMatch(p.a, p.b));
   pbankRows.forEach(t => {
     if (m2.usedA.has(t.row)) return;
     const ageDays = daysBetween_(t.date, today);
@@ -3582,14 +3674,21 @@ function internalSyncGaps() {
     gaps.push({ row: b.row, txn: b, awaiting: 'PBank' });
   });
 
-  return gaps;
+  return { gaps, matches };
 }
 // Recomputed once per data load/refresh (see renderApp()) rather than
 // inside renderTxnRow() itself, since it scans the whole dataset — doing
 // that per-row during a render would be wasteful for a list of any size.
 let pendingReloadSyncCache = [];
+// row -> { counterpartRow, counterpartAccount } for every Internal-transfer
+// row that already has a matched counterpart — powers the green "Synced"
+// badge (see renderTxnRow).
+let internalSyncMatchCache = {};
 function refreshPendingReloadSync() {
-  pendingReloadSyncCache = internalSyncGaps();
+  const result = internalSyncGaps();
+  pendingReloadSyncCache = result.gaps;
+  internalSyncMatchCache = {};
+  result.matches.forEach(m => { internalSyncMatchCache[m.row] = m; });
 }
 
 // Which two accounts a Transfer row moves money between, e.g. "HL Bank" or
@@ -3678,19 +3777,18 @@ function renderTxnRow(t, opts) {
   // internalSyncGaps() and confirmTbcIfMatches_() (Code.gs). There's no
   // manual "confirm" step for these, by design (the account-to-account
   // chain — PBank -> HL Bank -> TNG -> TNG Card — is deterministic enough
-  // not to need one). This flag button is just an escape hatch: if an
-  // auto-match ever looks wrong, tap it to mark the row so it's easy to
-  // spot and bring up directly instead of it silently sitting there wrong.
-  // Only offered once a row is actually in its "resolved" state (not a TBC
-  // placeholder or still-pending-sync row — those aren't matched yet, so
-  // there's nothing to dispute).
+  // not to need one). Once a row is resolved (matched, not a TBC placeholder
+  // or still-pending-sync), it gets a clickable green "Synced" badge naming
+  // its counterpart account — tapping it jumps straight to that counterpart
+  // record (see jumpToRecord) so it's easy to visually confirm which two
+  // records are actually linked. This replaced an earlier manual 🚩
+  // "flag as wrong" escape hatch — with the badge now pointing straight at
+  // the counterpart record, spotting/checking a bad match no longer needs a
+  // separate flagging step.
   const isInternalRow = t.category === 'Transfer' && (RELOAD_SUBTAGS.includes(t.subTag) || t.subTag === 'Internal');
-  const isFlagged = !!(t.remark && t.remark.indexOf('*FLAGGED*') === 0);
-  const flaggedFlagHtml = isFlagged
-    ? `<span class="tbc-flag flagged-flag" title="${escapeHtml(t.remark)}">Flagged</span>`
-    : '';
-  const flagBtnHtml = (isInternalRow && !isTbc && !isPendingSync)
-    ? `<button class="flag-btn${isFlagged ? ' is-flagged' : ''}" data-row="${t.row}" title="${isFlagged ? 'Flagged as possibly wrong — tap to unflag' : 'Flag this auto-match as possibly wrong'}">🚩</button>`
+  const syncMatch = isInternalRow ? internalSyncMatchCache[t.row] : null;
+  const syncedFlagHtml = (syncMatch && !isTbc && !isPendingSync)
+    ? `<span class="tbc-flag synced-flag" data-row="${syncMatch.counterpartRow}" title="Matched with ${escapeHtml(syncMatch.counterpartAccount)} — tap to view that record">✓ Synced with ${escapeHtml(syncMatch.counterpartAccount)}</span>`
     : '';
   // The Review tab's "Confirm" button stamps a generic "Confirmed manually
   // on <date>" remark (see renderReviewList) purely as an internal marker —
@@ -3748,7 +3846,7 @@ function renderTxnRow(t, opts) {
     <div class="txn" data-row="${t.row}">
       <div class="dot ${dotClass}"></div>
       <div class="info">
-        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${flaggedFlagHtml}${flagBtnHtml}</div>
+        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${syncedFlagHtml}</div>
         ${hintHtml}
         ${typeHintHtml}
         <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
@@ -3938,21 +4036,18 @@ function attachRemarkHandlers() {
   });
 }
 
-// Toggle the 🚩 flag on an Internal-transfer row (see flagBtnHtml in
-// renderTxnRow) — overwrites the remark field with a "*FLAGGED*" marker (or
-// clears it back to empty to unflag). These rows never carry a real remark
-// otherwise (no Splits/TBC use on Internal legs), so this doesn't collide
-// with anything.
+// Wires up the green "✓ Synced with X" badge (see syncedFlagHtml in
+// renderTxnRow) — tapping it jumps straight to the matched counterpart
+// record via jumpToRecord, so you can visually confirm which two records
+// are actually linked instead of just trusting a generic checkmark.
+// Replaced the old manual 🚩 "flag as wrong" button — pointing directly at
+// the counterpart record makes spotting a bad auto-match easier than a
+// flag ever did.
 function attachFlagHandlers() {
-  document.querySelectorAll('.flag-btn').forEach(el => {
-    el.onclick = async () => {
-      const row = Number(el.dataset.row);
-      const t = allTxns.find(x => x.row === row);
-      const isFlagged = !!(t && t.remark && t.remark.indexOf('*FLAGGED*') === 0);
-      const newRemark = isFlagged ? '' : `*FLAGGED* possible wrong auto-match (${new Date().toISOString().slice(0, 10)})`;
-      el.disabled = true;
-      await callApi('updateRemark', { row, remark: newRemark });
-      await loadData();
+  document.querySelectorAll('.synced-flag').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      jumpToRecord(Number(el.dataset.row));
     };
   });
 }
@@ -3999,7 +4094,6 @@ const CONFIRM_REMARK_RE = /^Confirmed .+ on \d{4}-\d{2}-\d{2}$/;
 function isSplitLinkableRemark(remark) {
   if (!remark) return false;
   if (remark.indexOf('*TBC') === 0) return false;
-  if (remark.indexOf('*FLAGGED*') === 0) return false;
   if (CONFIRM_REMARK_RE.test(remark)) return false;
   return true;
 }
@@ -4025,7 +4119,7 @@ function remarkGroups() {
       const amt = Number(t.amount || 0);
       if (txnFlow(t) === 'in') totalIn += amt; else totalOut += amt;
     });
-    return { remark, txns, count: txns.length, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date };
+    return { remark, txns, count: txns.length, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date, firstDate: txns[txns.length - 1].date };
   });
   list.sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
   return list;
@@ -4044,10 +4138,16 @@ function splitGroupCardHtml(g) {
         <span class="sgr-amt ${flow}">${sign}RM${Number(t.amount || 0).toFixed(2)}</span>
       </div>`;
   }).join('');
+  const dateRangeText = g.firstDate === g.lastDate
+    ? new Date(g.firstDate).toLocaleDateString()
+    : `${new Date(g.firstDate).toLocaleDateString()} – ${new Date(g.lastDate).toLocaleDateString()}`;
   return `
     <div class="split-group" data-remark="${escapeHtml(g.remark)}">
       <div class="split-group-header">
-        <div class="split-group-name">${escapeHtml(g.remark)}</div>
+        <div>
+          <div class="split-group-name">${escapeHtml(g.remark)}</div>
+          <div class="split-group-daterange">${dateRangeText}</div>
+        </div>
         <div class="split-group-net">${formatSignedRM(g.net)}</div>
       </div>
       <div class="split-group-rows">${rowsHtml}</div>
@@ -4066,18 +4166,32 @@ function splitGroupCardHtml(g) {
 // attachLinkHandlers) still jumps straight to one group's detail via
 // openSplitsInsights(remark), same as the modal used to.
 let splitsFilterRemark = null;
+// Persists across re-renders so switching sort order doesn't reset when
+// paging away and back to the Splits tab.
+let splitsSortBy = 'date';
 function renderSplitsInsights(filterRemark) {
   const el = document.getElementById('splitsInsightsList');
   const label = document.getElementById('splitsInsightsLabel');
   const backBtn = document.getElementById('splitsInsightsBackBtn');
+  const sortSel = document.getElementById('splitsSortBy');
   backBtn.style.display = filterRemark ? '' : 'none';
   const groups = filterRemark ? remarkGroups().filter(g => g.remark === filterRemark) : splitGroups();
+  // Sort control only makes sense on the full-browse view — a single
+  // filtered group has nothing to sort against.
+  sortSel.style.display = (!filterRemark && groups.length > 1) ? '' : 'none';
   if (!groups.length) {
     label.textContent = filterRemark || 'Split groups';
     el.innerHTML = filterRemark
       ? '<div class="empty">No other transactions linked to this note yet — add the same note to another transaction to form a split.</div>'
       : '<div class="empty">No splits yet — tap the ✎ note icon on a transaction and link two or more together.</div>';
     return;
+  }
+  if (!filterRemark) {
+    if (splitsSortBy === 'amount') {
+      groups.sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+    } else {
+      groups.sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
+    }
   }
   label.textContent = filterRemark || `Split groups (${groups.length})`;
   el.innerHTML = groups.map(splitGroupCardHtml).join('');
@@ -4099,6 +4213,10 @@ function openSplitsInsights(filterRemark) {
 document.getElementById('splitsInsightsBackBtn').onclick = () => {
   splitsFilterRemark = null;
   renderSplitsInsights(null);
+};
+document.getElementById('splitsSortBy').onchange = (e) => {
+  splitsSortBy = e.target.value;
+  renderSplitsInsights(splitsFilterRemark);
 };
 
 // Split/remark picker sheet — opened from the ✎ button on any transaction
