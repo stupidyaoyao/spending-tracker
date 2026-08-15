@@ -359,6 +359,12 @@
     color: #1a1a1a; font-size: 10px; font-weight: 800; margin-left: 5px;
     vertical-align: middle; flex-shrink: 0; cursor: default; white-space: nowrap;
   }
+  .tbc-flag.flagged-flag { background: #ff453a; color: #fff; }
+  .flag-btn {
+    background: none; border: none; color: var(--muted); font-size: 13px; padding: 2px 2px;
+    cursor: pointer; line-height: 1; opacity: 0.5;
+  }
+  .flag-btn.is-flagged { opacity: 1; }
   .txn .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .txn .amount { font-size: 15px; font-weight: 700; color: #ff453a; }
   .txn .amount.in { color: #30d158; }
@@ -457,6 +463,7 @@
   body.view-only .fab-row-left,
   body.view-only .toolbar-btn,
   body.view-only .remark-btn,
+  body.view-only .flag-btn,
   body.view-only .review-actions,
   body.view-only .review-remember,
   body.view-only .preview-remember,
@@ -612,7 +619,6 @@
         <option value="amount_asc">Sort: Amount low-high</option>
       </select>
       <button class="toolbar-btn" id="mainDateBtn">Date range</button>
-      <button class="toolbar-btn" id="viewSplitsBtnMain">🔗 Splits</button>
     </div>
 
     <div class="trend-range-row" id="mainRangeRow">
@@ -642,6 +648,7 @@
     <div class="insights-subnav" id="insightsSubnav">
       <button class="insights-subtab active" data-sub="calendar">Calendar</button>
       <button class="insights-subtab" data-sub="charts">Charts</button>
+      <button class="insights-subtab" data-sub="splits">Splits</button>
     </div>
 
     <div id="calendarPage">
@@ -688,13 +695,25 @@
         <div class="trend-chart-wrap"><canvas id="trendsChart"></canvas></div>
       </div>
     </div>
+
+    <!-- Splits — every remark-linked reimbursement group, permanently
+         browsable here instead of the old popup reachable from Main/
+         History/Review. Tapping a shared note on any transaction row still
+         jumps straight here, filtered to that one group (see
+         attachLinkHandlers/openSplitsInsights). -->
+    <div id="splitsInsightsPage" style="display:none;">
+      <div class="history-section-label-row">
+        <div class="history-section-label" id="splitsInsightsLabel">Split groups</div>
+        <button class="toolbar-btn" id="splitsInsightsBackBtn" style="display:none;">← All splits</button>
+      </div>
+      <div class="history-list" id="splitsInsightsList"></div>
+    </div>
   </div>
 
   <div id="historyPage" style="display:none;">
     <div class="history-summary" id="historySummary"></div>
     <div class="history-section-label-row">
       <div class="history-section-label">Recent activity</div>
-      <button class="toolbar-btn" id="viewSplitsBtnHistory">🔗 Splits</button>
     </div>
     <div class="history-list" id="historyList"><div class="empty">Loading…</div></div>
   </div>
@@ -702,27 +721,12 @@
   <div id="reviewPage" style="display:none;">
     <div class="history-section-label-row">
       <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
-      <button class="toolbar-btn" id="viewSplitsBtnReview">🔗 Splits</button>
     </div>
     <div class="history-list" id="reviewList"></div>
     <div class="history-section-label" id="awaitingSyncSectionLabel">Awaiting bank sync</div>
     <div class="list" id="awaitingSyncList"></div>
     <div class="history-section-label" id="unsureSectionLabel">Needs category</div>
     <div class="list" id="unsureList"></div>
-  </div>
-</div>
-
-<!-- Splits sheet — reachable from Main/History/Review via the 🔗 Splits
-     buttons, and from tapping any remark that links transactions together.
-     Shows either every split group, or (when opened from a specific
-     transaction's remark) just that one group's detail. -->
-<div class="sheet-backdrop" id="splitsBackdrop">
-  <div class="sheet">
-    <div class="sheet-inner">
-      <span class="close-x" id="splitsClose">✕</span>
-      <h2 id="splitsSectionLabel">Split groups</h2>
-      <div class="history-list" id="splitsList"></div>
-    </div>
   </div>
 </div>
 
@@ -1445,7 +1449,10 @@ function switchInsightsSub(sub) {
   document.querySelectorAll('.insights-subtab').forEach(el => el.classList.toggle('active', el.dataset.sub === sub));
   document.getElementById('calendarPage').style.display = sub === 'calendar' ? '' : 'none';
   document.getElementById('trendsPage').style.display = sub === 'charts' ? '' : 'none';
-  if (sub === 'calendar') renderCalendar(); else renderTrends();
+  document.getElementById('splitsInsightsPage').style.display = sub === 'splits' ? '' : 'none';
+  if (sub === 'calendar') renderCalendar();
+  else if (sub === 'charts') renderTrends();
+  else if (sub === 'splits') renderSplitsInsights(splitsFilterRemark);
 }
 document.querySelectorAll('.insights-subtab').forEach(el => {
   el.onclick = () => switchInsightsSub(el.dataset.sub);
@@ -2179,6 +2186,7 @@ function renderReviewList() {
     attachExtraTagAmountHandlers();
     attachRemarkHandlers();
     attachLinkHandlers();
+    attachFlagHandlers();
   }
 
   const unsureLabel = document.getElementById('unsureSectionLabel');
@@ -2198,6 +2206,7 @@ function renderReviewList() {
     attachExtraTagAmountHandlers();
     attachRemarkHandlers();
     attachLinkHandlers();
+    attachFlagHandlers();
     attachReviewRememberHandlers();
     attachReviewConfirmHandlers();
     attachReviewConfirmCatHandlers();
@@ -3127,6 +3136,7 @@ function render() {
     attachExtraTagAmountHandlers();
     attachRemarkHandlers();
     attachLinkHandlers();
+    attachFlagHandlers();
     attachAlsoTaggedHandlers();
     return;
   }
@@ -3198,6 +3208,7 @@ function render() {
   attachExtraTagAmountHandlers();
   attachRemarkHandlers();
   attachLinkHandlers();
+  attachFlagHandlers();
   attachAlsoTaggedHandlers();
 }
 
@@ -3585,6 +3596,25 @@ function renderTxnRow(t, opts) {
   const reloadFlagHtml = reloadLabel
     ? `<span class="tbc-flag" title="Internal · ${escapeHtml(reloadLabel)}">${escapeHtml(reloadLabel)}</span>`
     : '';
+  // Internal transfers (TNG<->TNG Card reload legs, and HL Bank/PBank
+  // Internal legs) are matched fully automatically — see
+  // pendingReloadSyncTxns() and confirmTbcIfMatches_() (Code.gs). There's no
+  // manual "confirm" step for these, by design (the account-to-account
+  // chain — PBank -> HL Bank -> TNG -> TNG Card — is deterministic enough
+  // not to need one). This flag button is just an escape hatch: if an
+  // auto-match ever looks wrong, tap it to mark the row so it's easy to
+  // spot and bring up directly instead of it silently sitting there wrong.
+  // Only offered once a row is actually in its "resolved" state (not a TBC
+  // placeholder or still-pending-sync row — those aren't matched yet, so
+  // there's nothing to dispute).
+  const isInternalRow = t.category === 'Transfer' && (RELOAD_SUBTAGS.includes(t.subTag) || t.subTag === 'Internal');
+  const isFlagged = !!(t.remark && t.remark.indexOf('*FLAGGED*') === 0);
+  const flaggedFlagHtml = isFlagged
+    ? `<span class="tbc-flag flagged-flag" title="${escapeHtml(t.remark)}">Flagged</span>`
+    : '';
+  const flagBtnHtml = (isInternalRow && !isTbc && !isPendingSync)
+    ? `<button class="flag-btn${isFlagged ? ' is-flagged' : ''}" data-row="${t.row}" title="${isFlagged ? 'Flagged as possibly wrong — tap to unflag' : 'Flag this auto-match as possibly wrong'}">🚩</button>`
+    : '';
   // The Review tab's "Confirm" button stamps a generic "Confirmed manually
   // on <date>" remark (see renderReviewList) purely as an internal marker —
   // it's not a real split/note, so isSplitLinkableRemark() filters it out
@@ -3635,13 +3665,13 @@ function renderTxnRow(t, opts) {
       </label>`
     : '';
   const reviewConfirmHtml = (opts.reviewMode && isToOthers)
-    ? `<div class="review-actions"><button class="review-btn confirm review-confirm-btn" data-row="${t.row}">Confirm transfer (add remark)</button></div>`
+    ? `<div class="review-actions"><button class="review-btn confirm review-confirm-btn" data-row="${t.row}">Who was this for?</button></div>`
     : '';
   return `
     <div class="txn" data-row="${t.row}">
       <div class="dot ${dotClass}"></div>
       <div class="info">
-        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}</div>
+        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${flaggedFlagHtml}${flagBtnHtml}</div>
         ${hintHtml}
         ${typeHintHtml}
         <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
@@ -3831,6 +3861,25 @@ function attachRemarkHandlers() {
   });
 }
 
+// Toggle the 🚩 flag on an Internal-transfer row (see flagBtnHtml in
+// renderTxnRow) — overwrites the remark field with a "*FLAGGED*" marker (or
+// clears it back to empty to unflag). These rows never carry a real remark
+// otherwise (no Splits/TBC use on Internal legs), so this doesn't collide
+// with anything.
+function attachFlagHandlers() {
+  document.querySelectorAll('.flag-btn').forEach(el => {
+    el.onclick = async () => {
+      const row = Number(el.dataset.row);
+      const t = allTxns.find(x => x.row === row);
+      const isFlagged = !!(t && t.remark && t.remark.indexOf('*FLAGGED*') === 0);
+      const newRemark = isFlagged ? '' : `*FLAGGED* possible wrong auto-match (${new Date().toISOString().slice(0, 10)})`;
+      el.disabled = true;
+      await callApi('updateRemark', { row, remark: newRemark });
+      await loadData();
+    };
+  });
+}
+
 // Manual "link" for grouping transactions that belong together even across
 // different accounts/categories — e.g. you pay a group lunch on TNG, then
 // each friend's reimbursement lands as a separate Transfer row, maybe in a
@@ -3853,7 +3902,7 @@ function groupByRemark(remark) {
 }
 function attachLinkHandlers() {
   document.querySelectorAll('.remark[data-remark]').forEach(el => {
-    el.onclick = () => openSplitsModal(el.dataset.remark);
+    el.onclick = () => openSplitsInsights(el.dataset.remark);
   });
 }
 
@@ -3873,6 +3922,7 @@ const CONFIRM_REMARK_RE = /^Confirmed .+ on \d{4}-\d{2}-\d{2}$/;
 function isSplitLinkableRemark(remark) {
   if (!remark) return false;
   if (remark.indexOf('*TBC') === 0) return false;
+  if (remark.indexOf('*FLAGGED*') === 0) return false;
   if (CONFIRM_REMARK_RE.test(remark)) return false;
   return true;
 }
@@ -3933,14 +3983,17 @@ function splitGroupCardHtml(g) {
     </div>`;
 }
 
-// Powers the Splits sheet, reachable from the 🔗 Splits buttons on
-// Main/History/Review (full browse, filterRemark omitted) and from tapping
-// any linked remark on a transaction row (filterRemark set — jumps
-// straight to that one group's detail instead of making you find it in a
-// list).
-function renderSplitsModal(filterRemark) {
-  const el = document.getElementById('splitsList');
-  const label = document.getElementById('splitsSectionLabel');
+// Powers the Splits sub-tab under Insights — every group permanently
+// browsable there (full browse, filterRemark null) instead of the old
+// popup. Tapping a shared note on any transaction row (see
+// attachLinkHandlers) still jumps straight to one group's detail via
+// openSplitsInsights(remark), same as the modal used to.
+let splitsFilterRemark = null;
+function renderSplitsInsights(filterRemark) {
+  const el = document.getElementById('splitsInsightsList');
+  const label = document.getElementById('splitsInsightsLabel');
+  const backBtn = document.getElementById('splitsInsightsBackBtn');
+  backBtn.style.display = filterRemark ? '' : 'none';
   const groups = filterRemark ? remarkGroups().filter(g => g.remark === filterRemark) : splitGroups();
   if (!groups.length) {
     label.textContent = filterRemark || 'Split groups';
@@ -3954,22 +4007,22 @@ function renderSplitsModal(filterRemark) {
   el.querySelectorAll('.split-group-viewlist').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
-      closeSplitsModal();
+      switchPage('main');
       groupByRemark(btn.dataset.remark);
     };
   });
 }
-function openSplitsModal(filterRemark) {
-  renderSplitsModal(filterRemark || null);
-  document.getElementById('splitsBackdrop').classList.add('open');
+// Jumps to the Insights > Splits sub-tab, filtered to one group's detail —
+// called when tapping a shared note on any transaction row.
+function openSplitsInsights(filterRemark) {
+  splitsFilterRemark = filterRemark || null;
+  switchPage('insights');
+  switchInsightsSub('splits');
 }
-function closeSplitsModal() {
-  document.getElementById('splitsBackdrop').classList.remove('open');
-}
-document.getElementById('splitsClose').onclick = closeSplitsModal;
-document.getElementById('viewSplitsBtnMain').onclick = () => openSplitsModal();
-document.getElementById('viewSplitsBtnHistory').onclick = () => openSplitsModal();
-document.getElementById('viewSplitsBtnReview').onclick = () => openSplitsModal();
+document.getElementById('splitsInsightsBackBtn').onclick = () => {
+  splitsFilterRemark = null;
+  renderSplitsInsights(null);
+};
 
 // Split/remark picker sheet — opened from the ✎ button on any transaction
 // row. Lists every existing split name (including ones used on just one
