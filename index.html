@@ -3326,6 +3326,20 @@ function titleCaseName(s) {
 // don't lose track of where the money actually went/came from. Returns null
 // while the row is still shown as Transfer (no hint needed) or if the
 // merchant text doesn't match a known transfer pattern.
+// Shows the raw statement Type (e.g. "Payment", "Transfer to Wallet",
+// "Reload") as a small line under the merchant name — only for Transfer/
+// Unsure rows, where the merchant text alone is often unhelpful (a generic
+// "Fund Transfer" or a reference code). Skipped if the type text is empty,
+// or is basically the same word as the merchant/subTag already shown (e.g.
+// no point printing "Reload" again under a row already labeled Internal).
+function txnTypeHint(t) {
+  if (t.category !== 'Transfer' && t.category !== 'Unsure') return null;
+  const type = String(t.type || t.notes || '').trim();
+  if (!type) return null;
+  const merchant = String(t.merchant || '').trim().toLowerCase();
+  if (type.toLowerCase() === merchant) return null;
+  return type;
+}
 function transferHint(t) {
   if (t.category === 'Transfer') return null;
   const m = (t.merchant || '').trim();
@@ -3583,6 +3597,8 @@ function renderTxnRow(t, opts) {
     : '';
   const hint = transferHint(t);
   const hintHtml = hint ? `<div class="transfer-hint">(${escapeHtml(hint)})</div>` : '';
+  const typeHint = txnTypeHint(t);
+  const typeHintHtml = typeHint ? `<div class="transfer-hint">${escapeHtml(typeHint)}</div>` : '';
   // Normalize the subTag passed to the "+ also under" options so a Card
   // Reload/TNG Card Top-up row doesn't offer "+ also under Internal" on
   // itself (it already IS Internal from the frontend's point of view).
@@ -3629,6 +3645,7 @@ function renderTxnRow(t, opts) {
       <div class="info">
         <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}</div>
         ${hintHtml}
+        ${typeHintHtml}
         <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
         ${remarkHtml}
         <div class="cat-select-row">
@@ -5335,7 +5352,17 @@ function importRowsMatch(a, b) {
   const sameAmount = Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
   if (!sameAccount || !sameDate || !sameAmount) return false;
   if (isReloadishImportRow(a) && isReloadishImportRow(b)) return true;
-  if (importRowContext(a) !== importRowContext(b)) return false;
+  const ctxA = importRowContext(a);
+  const ctxB = importRowContext(b);
+  // Two sources sometimes truncate the same merchant name differently (e.g.
+  // "the ice cream bar (sri" vs the full "the ice cream bar (sri hartamas)
+  // sdn bhd") — an exact-text match would miss this and let a real
+  // duplicate through. If one side's text is a prefix of the other's AND
+  // the raw statement Type also matches, treat it as the same merchant.
+  const isPrefixMatch = ctxA !== ctxB && ctxA.length > 3 && ctxB.length > 3 &&
+    (ctxA.startsWith(ctxB) || ctxB.startsWith(ctxA));
+  const sameType = String(a.type || '').trim().toLowerCase() === String(b.type || '').trim().toLowerCase() && String(a.type || '').trim() !== '';
+  if (ctxA !== ctxB && !(isPrefixMatch && sameType)) return false;
   // Only enforce an exact time match when BOTH sides actually have a time
   // recorded. The eWallet PDF only ever prints a real clock time in the
   // "PayDirect Payment" row type (tolls/parking) — for every other type
