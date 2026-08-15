@@ -357,7 +357,15 @@
   .dot.Income { background: var(--income); }
   .dot.Custom { background: var(--muted); }
   .txn .info { flex: 1; min-width: 0; }
-  .txn .merchant { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Badges (tbc-flag/reload/synced) used to live inside this same nowrap+
+     ellipsis div as the merchant name — on a long name, the line would
+     overflow and the browser's ellipsis truncation silently swallowed
+     whichever badges came after the cutoff (most often the green "Synced"
+     one, since it's added last). Now the name has its own truncating span
+     (.merchant-text) and the badges sit outside it in a wrapping flex row,
+     so a badge is never invisible just because the name next to it is long. */
+  .txn .merchant { font-size: 15px; font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; row-gap: 3px; }
+  .txn .merchant-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 40px; }
   .tbc-flag {
     display: inline-flex; align-items: center; justify-content: center;
     padding: 1px 6px; border-radius: 8px; background: #ffd60a;
@@ -3846,7 +3854,7 @@ function renderTxnRow(t, opts) {
     <div class="txn" data-row="${t.row}">
       <div class="dot ${dotClass}"></div>
       <div class="info">
-        <div class="merchant">${txnTitle(t)}${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${syncedFlagHtml}</div>
+        <div class="merchant"><span class="merchant-text">${txnTitle(t)}</span>${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${syncedFlagHtml}</div>
         ${hintHtml}
         ${typeHintHtml}
         <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
