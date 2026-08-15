@@ -2161,10 +2161,12 @@ function renderReviewList() {
     return false;
   }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
-  // Live-computed, not stored — see pendingReloadSyncTxns()/
+  // Live-computed, not stored — see internalSyncGaps()/
   // refreshPendingReloadSync() (called from renderApp() before this runs).
+  // Each entry is { row, txn, awaiting } — awaiting is which account's
+  // matching leg hasn't shown up yet (see internalSyncGaps()).
   const awaitingSync = pendingReloadSyncCache.slice()
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    .sort((a, b) => (a.txn.date || '').localeCompare(b.txn.date || ''));
 
   const badge = document.getElementById('reviewTabBadge');
   const badgeCount = unconfirmed.length + unsure.length + awaitingSync.length;
@@ -2180,7 +2182,7 @@ function renderReviewList() {
     awaitingSyncEl.innerHTML = '<div class="empty">Nothing waiting on a bank statement right now.</div>';
   } else {
     awaitingSyncLabel.textContent = `Awaiting bank sync (${awaitingSync.length})`;
-    awaitingSyncEl.innerHTML = awaitingSync.map(renderTxnRow).join('');
+    awaitingSyncEl.innerHTML = awaitingSync.map(x => renderTxnRow(x.txn)).join('');
     attachCatSelectHandlers();
     attachExtraTagHandlers();
     attachExtraTagAmountHandlers();
@@ -3460,7 +3462,10 @@ function normalizedSubTag(category, subTag) {
 // manual "confirm one, then sweep the rest" process) — purely a live,
 // recomputed view, so it can never get stuck out of sync with reality.
 const RELOAD_SYNC_GRACE_DAYS = 2;
-const RELOAD_SYNC_MATCH_WINDOW_DAYS = 3; // HL Bank debit may post up to this many days after the TNG-side reload
+// Symmetric — an August audit found real cases where the HL Bank debit
+// posts BEFORE the TNG-side wallet reload shows up (not just after), so a
+// one-sided "bank can lag by up to N days" window missed genuine matches.
+const RELOAD_SYNC_MATCH_WINDOW_DAYS = 5;
 const RELOAD_SYNC_EXPIRE_DAYS = 14;
 // Both arguments must be plain "yyyy-mm-dd" date-only strings (like t.date
 // already is) — mixing a date-only string with a full Date object here
@@ -3469,53 +3474,122 @@ const RELOAD_SYNC_EXPIRE_DAYS = 14;
 function daysBetween_(dateA, dateB) {
   return Math.round((new Date(dateB) - new Date(dateA)) / 86400000);
 }
-function pendingReloadSyncTxns() {
+function amountEq_(a, b) {
+  return Math.abs(Number(a || 0) - Number(b || 0)) < 0.01;
+}
+// Pairs two lists by amount, preferring the CLOSEST date match across the
+// whole list rather than the first-found one. A naive "walk list A in date
+// order, claim the first candidate in list B" approach is order-dependent —
+// an earlier-dated row can steal a same-amount match that actually belongs
+// to a later-dated row, leaving the later one falsely flagged as a gap even
+// though a good match exists elsewhere in the list. Building every valid
+// (amount-matching, within-window) pair up front and assigning closest-
+// distance-first avoids that: verified against the real dataset during the
+// 2026-08 audit, this resolved several false "orphan" rows the naive
+// version produced purely from processing order.
+function closestPairMatch_(listA, listB, maxDays) {
+  const pairs = [];
+  listA.forEach(a => listB.forEach(b => {
+    if (!amountEq_(a.amount, b.amount)) return;
+    const dist = Math.abs(daysBetween_(a.date, b.date));
+    if (dist > maxDays) return;
+    pairs.push({ a, b, dist });
+  }));
+  pairs.sort((p, q) => p.dist - q.dist);
+  const usedA = new Set(), usedB = new Set();
+  pairs.forEach(p => {
+    if (usedA.has(p.a.row) || usedB.has(p.b.row)) return;
+    usedA.add(p.a.row);
+    usedB.add(p.b.row);
+  });
+  return { usedA, usedB };
+}
+// Finds every Internal-transfer leg — on EITHER side — that's missing its
+// counterpart on the neighboring account, across the two hops that matter:
+// PBank <-> HL Bank, and HL Bank <-> TNG (eWallet). TNG <-> TNG Card is
+// checked too but only as a same-day pre-filter (see cardLegs below) — it
+// was already fully reliable on its own, so it isn't re-audited from both
+// sides here.
+//
+// This replaced an older one-directional version that only ever asked "does
+// this TNG row have a bank match?" — a 2026-08 audit found 17 older TNG
+// reload rows were tagged subTag "Internal" instead of "Card Reload" (a
+// leftover from before the two were split) and were silently excluded from
+// the TNG-side pool entirely, and that HL Bank/PBank rows with no TNG/HL
+// Bank counterpart were never checked at all, in either direction. Fixed by
+// (a) including both subtags in the TNG-side pool, and (b) walking each
+// chain from both ends so an orphan on ANY side gets caught, not just a
+// TNG-side one.
+//
+// Returns [{ row, txn, awaiting }] — awaiting is the account name that
+// still needs to show a matching leg for this row to be considered synced.
+function internalSyncGaps() {
   const today = new Date().toISOString().slice(0, 10);
-  const candidates = allTxns
-    .filter(t => t.account === 'TNG' && t.category === 'Transfer' && t.subTag === 'Card Reload')
-    .sort((a, b) => (a.date || '').localeCompare(b.date || '')); // earliest reload gets first claim on a bank leg
-  if (!candidates.length) return [];
-  // A "Card Reload" row that already has a matching TNG Card-account leg
-  // (same amount, same day — e.g. the OTA-reload records pulled from a TNG
-  // Card PDF/CSV/screenshot import) is a wallet-to-physical-card transfer,
-  // not a bank-funded eWallet top-up. No bank money moves in a wallet-to-
-  // card transfer, so it will NEVER show up as an HL Bank debit — checking
-  // it against HL Bank at all was a false alarm (see the "Touch 'n Go Sdn
-  // Bhd - EV2 OTA" investigation). Match against the TNG Card side FIRST,
-  // before even looking at HL Bank or the age window below, so these never
-  // get flagged regardless of how old they are.
+  const gaps = [];
+
+  // ---- TNG <-> TNG Card (same-day pre-filter only; unaffected by the fix
+  // above, kept exactly as it worked before) ----
+  const tngRows = allTxns
+    .filter(t => t.account === 'TNG' && t.category === 'Transfer' && (t.subTag === 'Card Reload' || t.subTag === 'Internal'))
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const cardLegs = allTxns.filter(t => t.account === 'TNG Card' && RELOAD_SUBTAGS.includes(t.subTag));
   const usedCardRows = new Set();
-  const bankLegs = allTxns.filter(t =>
-    t.account === 'HL Bank' && t.subTag === 'Internal' && /To TNG/i.test(t.merchant || ''));
-  const usedBankRows = new Set();
-  const pending = [];
-  candidates.forEach(t => {
-    const cardMatch = cardLegs.find(c => {
-      if (usedCardRows.has(c.row)) return false;
-      if (Math.abs(Number(c.amount || 0) - Number(t.amount || 0)) >= 0.01) return false;
-      return c.date === t.date;
-    });
-    if (cardMatch) { usedCardRows.add(cardMatch.row); return; }
+  const tngMatchedToCard = new Set();
+  tngRows.forEach(t => {
+    const m = cardLegs.find(c => !usedCardRows.has(c.row) && amountEq_(c.amount, t.amount) && c.date === t.date);
+    if (m) { usedCardRows.add(m.row); tngMatchedToCard.add(t.row); }
+  });
+
+  // ---- HL Bank "To TNG (Wallet Reload)" <-> remaining TNG rows ----
+  const hlToTng = allTxns
+    .filter(t => t.account === 'HL Bank' && t.category === 'Transfer' && t.subTag === 'Internal' && /to tng/i.test(t.merchant || ''));
+  const tngRemaining = tngRows.filter(t => !tngMatchedToCard.has(t.row));
+  const m1 = closestPairMatch_(tngRemaining, hlToTng, RELOAD_SYNC_MATCH_WINDOW_DAYS);
+  tngRemaining.forEach(t => {
+    if (m1.usedA.has(t.row)) return;
+    const ageDays = daysBetween_(t.date, today);
+    // Too fresh: the bank debit probably hasn't posted yet, don't flag yet.
+    // Too old (past expiry): by elimination this is almost certainly a
+    // physical Card top-up whose bank leg will never show up — same
+    // reasoning the original TNG-Card-first check above already covers for
+    // same-day matches; this catches the slower ones too.
+    if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
+    gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank' });
+  });
+  hlToTng.forEach(b => {
+    if (m1.usedB.has(b.row)) return;
+    const ageDays = daysBetween_(b.date, today);
+    if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
+    gaps.push({ row: b.row, txn: b, awaiting: 'TNG' });
+  });
+
+  // ---- PBank <-> HL Bank ----
+  const pbankRows = allTxns
+    .filter(t => t.account === 'PBank' && t.category === 'Transfer' && t.subTag === 'Internal');
+  const hlPbankSide = allTxns
+    .filter(t => t.account === 'HL Bank' && t.category === 'Transfer' && t.subTag === 'Internal' && /pbank/i.test(t.merchant || ''));
+  const m2 = closestPairMatch_(pbankRows, hlPbankSide, RELOAD_SYNC_MATCH_WINDOW_DAYS);
+  pbankRows.forEach(t => {
+    if (m2.usedA.has(t.row)) return;
     const ageDays = daysBetween_(t.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
-    const match = bankLegs.find(b => {
-      if (usedBankRows.has(b.row)) return false;
-      if (Math.abs(Number(b.amount || 0) - Number(t.amount || 0)) >= 0.01) return false;
-      const diff = daysBetween_(t.date, b.date);
-      return diff >= -1 && diff <= RELOAD_SYNC_MATCH_WINDOW_DAYS;
-    });
-    if (match) { usedBankRows.add(match.row); return; }
-    pending.push(t);
+    gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank' });
   });
-  return pending;
+  hlPbankSide.forEach(b => {
+    if (m2.usedB.has(b.row)) return;
+    const ageDays = daysBetween_(b.date, today);
+    if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
+    gaps.push({ row: b.row, txn: b, awaiting: 'PBank' });
+  });
+
+  return gaps;
 }
 // Recomputed once per data load/refresh (see renderApp()) rather than
 // inside renderTxnRow() itself, since it scans the whole dataset — doing
 // that per-row during a render would be wasteful for a list of any size.
 let pendingReloadSyncCache = [];
 function refreshPendingReloadSync() {
-  pendingReloadSyncCache = pendingReloadSyncTxns();
+  pendingReloadSyncCache = internalSyncGaps();
 }
 
 // Which two accounts a Transfer row moves money between, e.g. "HL Bank" or
@@ -3580,13 +3654,16 @@ function renderTxnRow(t, opts) {
   const tbcFlagHtml = isTbc
     ? `<span class="tbc-flag" title="${escapeHtml(t.remark)}">${escapeHtml(tbcPairLabel(t))}</span>`
     : '';
-  // A "Card Reload" row still waiting on a matching HL Bank debit (see
-  // pendingReloadSyncTxns()) gets its own badge instead of the plain
-  // reload-direction one below — more useful at a glance than "TNG > Card"
-  // for a row that might not even BE a Card top-up yet.
-  const isPendingSync = pendingReloadSyncCache.some(x => x.row === t.row);
-  const pendingSyncFlagHtml = isPendingSync
-    ? `<span class="tbc-flag" title="No matching HL Bank debit found yet — this usually posts within a few days; re-import a newer HL Bank statement once it does.">Awaiting HL Bank</span>`
+  // An Internal-transfer leg still waiting on its counterpart on the
+  // neighboring account (see internalSyncGaps()) gets its own badge instead
+  // of the plain reload-direction one below — more useful at a glance than
+  // e.g. "TNG > Card" for a row that might not even BE matched yet. Covers
+  // PBank<->HL Bank and HL Bank<->TNG now, not just the TNG-side check this
+  // used to be limited to.
+  const pendingSyncEntry = pendingReloadSyncCache.find(x => x.row === t.row);
+  const isPendingSync = !!pendingSyncEntry;
+  const pendingSyncFlagHtml = pendingSyncEntry
+    ? `<span class="tbc-flag" title="No matching ${escapeHtml(pendingSyncEntry.awaiting)} record found yet — this usually posts within a few days; re-import a newer ${escapeHtml(pendingSyncEntry.awaiting)} statement once it does.">Awaiting ${escapeHtml(pendingSyncEntry.awaiting)}</span>`
     : '';
   // Reload rows that AREN'T a TBC placeholder or awaiting-sync still get the
   // small yellow account-pair badge (see reloadPairLabel) so folding them
@@ -3598,7 +3675,7 @@ function renderTxnRow(t, opts) {
     : '';
   // Internal transfers (TNG<->TNG Card reload legs, and HL Bank/PBank
   // Internal legs) are matched fully automatically — see
-  // pendingReloadSyncTxns() and confirmTbcIfMatches_() (Code.gs). There's no
+  // internalSyncGaps() and confirmTbcIfMatches_() (Code.gs). There's no
   // manual "confirm" step for these, by design (the account-to-account
   // chain — PBank -> HL Bank -> TNG -> TNG Card — is deterministic enough
   // not to need one). This flag button is just an escape hatch: if an
@@ -5431,12 +5508,39 @@ function importRowContext(r) {
 function isReloadishImportRow(r) {
   return r.type === 'Reload' || (r.category === 'Transfer' && RELOAD_SUBTAGS.includes(r.subTag));
 }
+// TNG's own statement never prints a recipient's name for a P2P transfer
+// made to someone's own QR code — it only ever shows the generic
+// merchant/notes text "Fund Transfer" for Type "Transfer to Wallet" (or
+// "Receive from Wallet" incoming). If you separately caught the same
+// transaction via a screenshot (which DOES show the real name), a later
+// PDF import of the same statement period re-adds it under this generic
+// name — merchant text never matches ("Fund Transfer" vs a real name), so
+// the normal context check below always let it back in as a fresh "new"
+// row instead of catching it as a duplicate. See the 2026-08-02 RM100
+// KHONG PIAU SOON / "Fund Transfer" duplicate (recurred twice).
+function isGenericTransferImportRow(r) {
+  return /^(Transfer to Wallet|Receive from Wallet)$/i.test(String(r.type || '').trim()) &&
+    /^fund transfer$/i.test(String(r.merchant || r.notes || '').trim());
+}
 function importRowsMatch(a, b) {
   const sameAccount = (a.account || 'TNG') === (b.account || 'TNG');
   const sameDate = a.date === b.date;
   const sameAmount = Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
   if (!sameAccount || !sameDate || !sameAmount) return false;
   if (isReloadishImportRow(a) && isReloadishImportRow(b)) return true;
+  // A generic "Fund Transfer" leg matches ANY existing Transfer-category row
+  // with the same account+date+amount+Type — even one that's since been
+  // given a real name (via screenshot) or recategorized — since the
+  // statement can never supply more identifying info than this for this
+  // transaction type. Doesn't touch tolls/parking (different category and
+  // Type entirely) or any other merchant-named row, so legitimate same-
+  // amount-same-day repeats elsewhere (e.g. multiple real tolls) are
+  // unaffected.
+  if ((isGenericTransferImportRow(a) || isGenericTransferImportRow(b)) &&
+      a.category === 'Transfer' && b.category === 'Transfer' &&
+      String(a.type || '').trim().toLowerCase() === String(b.type || '').trim().toLowerCase()) {
+    return true;
+  }
   const ctxA = importRowContext(a);
   const ctxB = importRowContext(b);
   // Two sources sometimes truncate the same merchant name differently (e.g.
