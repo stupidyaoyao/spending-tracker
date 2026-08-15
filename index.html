@@ -3772,11 +3772,15 @@ function renderTxnRow(t, opts) {
   const pendingSyncFlagHtml = pendingSyncEntry
     ? `<span class="tbc-flag" title="No matching ${escapeHtml(pendingSyncEntry.awaiting)} record found yet — this usually posts within a few days; re-import a newer ${escapeHtml(pendingSyncEntry.awaiting)} statement once it does.">Awaiting ${escapeHtml(pendingSyncEntry.awaiting)}</span>`
     : '';
-  // Reload rows that AREN'T a TBC placeholder or awaiting-sync still get the
-  // small yellow account-pair badge (see reloadPairLabel) so folding them
-  // into Internal doesn't lose the at-a-glance top-up direction the old
-  // yellow dot gave.
-  const reloadLabel = (!isTbc && !isPendingSync && isReloadRow) ? reloadPairLabel(t) : null;
+  // Every resolved Internal-transfer row — not just the TNG<->TNG Card
+  // physical reload legs — gets the small yellow account-pair badge (see
+  // reloadPairLabel/accountPairOther_, which already handled PBank/HL
+  // Bank/TNG's Internal subTag branches, just wasn't reached from here
+  // before). Previously this badge was scoped to isReloadRow only, so
+  // PBank<->HL Bank rows only ever showed the green Synced badge with
+  // nothing indicating direction/pair at a glance the way reload rows did.
+  const isInternalRow = t.category === 'Transfer' && (RELOAD_SUBTAGS.includes(t.subTag) || t.subTag === 'Internal');
+  const reloadLabel = (!isTbc && !isPendingSync && isInternalRow) ? reloadPairLabel(t) : null;
   const reloadFlagHtml = reloadLabel
     ? `<span class="tbc-flag" title="Internal · ${escapeHtml(reloadLabel)}">${escapeHtml(reloadLabel)}</span>`
     : '';
@@ -3792,8 +3796,9 @@ function renderTxnRow(t, opts) {
   // records are actually linked. This replaced an earlier manual 🚩
   // "flag as wrong" escape hatch — with the badge now pointing straight at
   // the counterpart record, spotting/checking a bad match no longer needs a
-  // separate flagging step.
-  const isInternalRow = t.category === 'Transfer' && (RELOAD_SUBTAGS.includes(t.subTag) || t.subTag === 'Internal');
+  // separate flagging step. (isInternalRow itself is declared above, next to
+  // reloadLabel, since both badges now share the same "is this an Internal
+  // transfer row" gate.)
   const syncMatch = isInternalRow ? internalSyncMatchCache[t.row] : null;
   const syncedFlagHtml = (syncMatch && !isTbc && !isPendingSync)
     ? `<span class="tbc-flag synced-flag" data-row="${syncMatch.counterpartRow}" title="Matched with ${escapeHtml(syncMatch.counterpartAccount)} — tap to view that record">✓ Synced with ${escapeHtml(syncMatch.counterpartAccount)}</span>`
