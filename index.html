@@ -960,10 +960,9 @@ const CATEGORY_RULES = [
   { category: 'Housing', subTag: 'Water & Electric', keywords: ['TNB', 'SYABAS', 'AIR SELANGOR', 'INDAH WATER'] },
   { category: 'Housing', subTag: 'WiFi', keywords: ['UNIFI', 'TIME FIBRE', 'MAXIS FIBRE'] },
   { category: 'Housing', subTag: 'Carpark Rent', keywords: ['CARPARK RENT'] },
-  // "PMB..." reference codes are Public Bank Mutual (unit trust) transfers —
-  // money genuinely leaving to an external investment, not a tracked account
-  // and not everyday spending, so it gets its own subtag under Unsure.
-  { category: 'Unsure', subTag: 'Invest', keywords: ['PMB'] },
+  // "PMB..." reference codes are Public Bank Mutual (unit trust) payouts —
+  // matches the existing two live PMB rows, both filed as Income > Interest.
+  { category: 'Income', subTag: 'Interest', keywords: ['PMB'] },
 ];
 // No transaction types are excluded anymore — Reload / Receive from Wallet /
 // Cashback now import under "Transfer" (see categorize() below) instead of
@@ -1016,7 +1015,6 @@ const CATEGORY_OPTIONS = [
   // Unsure sits last in the dropdown too — it's the fallback "not categorized
   // yet" bucket, not something worth scanning past every time you pick a
   // real category.
-  { category: 'Unsure', subTag: 'Invest', label: 'Unsure · Invest' },
   { category: 'Unsure', subTag: '', label: 'Unsure' },
 ];
 function optionValue(o) { return o.category + '|' + o.subTag; }
@@ -2202,6 +2200,7 @@ function renderReviewList() {
     attachLinkHandlers();
     attachReviewRememberHandlers();
     attachReviewConfirmHandlers();
+    attachReviewConfirmCatHandlers();
   }
 
   el.style.display = '';
@@ -2462,7 +2461,6 @@ const SUBTAG_COLORS = {
   'Convenience Store': '#34c759', Hypermarket: '#30d158', Pharmacies: '#ff2d55', 'Personal Care': '#ff9500',
   Subscription: '#ff6482',
   Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
-  Invest: '#ff453a',
   // Yellow (matches .dot.Reload) — any movement of money between your OWN
   // accounts, called out distinctly from To Others/From Others (money
   // actually going to/from someone else) below. "Internal" used to be its
@@ -3649,9 +3647,10 @@ function renderTxnRow(t, opts) {
         <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
         ${remarkHtml}
         <div class="cat-select-row">
-          <select class="txn-cat-select" data-row="${t.row}">${categoryOptionsHtml(t.category, t.subTag, t.account)}</select>
+          <select class="txn-cat-select${opts.reviewMode ? ' review-cat-select' : ''}" data-row="${t.row}" data-committed="${t.category}|${t.subTag || ''}">${categoryOptionsHtml(t.category, t.subTag, t.account)}</select>
           ${extraSelectHtml}
           ${extraAmountHtml}
+          ${opts.reviewMode ? `<button class="review-btn confirm review-confirm-cat-btn" data-row="${t.row}">Confirm</button>` : ''}
         </div>
         ${reviewRememberHtml}
         ${reviewConfirmHtml}
@@ -3668,8 +3667,12 @@ function renderTxnRow(t, opts) {
 // Entertainment to Subscription) without re-adding it. Changing the primary
 // category/subtag also clears any "+ also under" tag (extraTag), since it
 // may no longer make sense against the new primary category.
+// Review-tab selects (.review-cat-select) are excluded here — they don't
+// auto-save on change, see attachReviewConfirmCatHandlers() below. Picking a
+// new value on a Review row is just staging a choice; nothing is written to
+// the sheet, and the row stays put, until "Confirm" is actually tapped.
 function attachCatSelectHandlers() {
-  document.querySelectorAll('.txn-cat-select').forEach(el => {
+  document.querySelectorAll('.txn-cat-select:not(.review-cat-select)').forEach(el => {
     el.onchange = async () => {
       const row = Number(el.dataset.row);
       const [category, subTag] = el.value.split('|');
@@ -3683,6 +3686,35 @@ function attachCatSelectHandlers() {
       // this same row, saving the new category here also saves it as a
       // merchant rule, so the next import of this merchant is guessed right
       // the first time instead of landing back in Unsure.
+      const rememberEl = document.querySelector(`.review-remember-check[data-row="${row}"]`);
+      if (rememberEl && rememberEl.checked && t && t.merchant) {
+        await callApi('saveMerchantRule', { rule: { merchant: t.merchant, category, subTag } });
+      }
+      renderApp();
+    };
+  });
+}
+
+// Review tab only — the dropdown just stages a pick (see attachCatSelect
+// Handlers' exclusion above); this is what actually saves it. Reads
+// whatever's currently selected at click time (not what it was when the row
+// was first rendered), applies the same "remember this merchant" save the
+// old auto-save path did, then re-renders — which is what makes the row
+// leave Review once its category is no longer Unsure/unconfirmed To Others.
+function attachReviewConfirmCatHandlers() {
+  document.querySelectorAll('.review-confirm-cat-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const row = Number(btn.dataset.row);
+      const select = document.querySelector(`.review-cat-select[data-row="${row}"]`);
+      if (!select) return;
+      const [category, subTag] = select.value.split('|');
+      const t = allTxns.find(x => x.row === row);
+      const hadExtraTag = t && t.extraTag;
+      if (t) { t.category = category; t.subTag = subTag; t.extraTag = ''; }
+      btn.disabled = true;
+      select.disabled = true;
+      await callApi('updateCategory', { row, category, subTag });
+      if (hadExtraTag) await callApi('updateExtraTag', { row, extraTag: '' });
       const rememberEl = document.querySelector(`.review-remember-check[data-row="${row}"]`);
       if (rememberEl && rememberEl.checked && t && t.merchant) {
         await callApi('saveMerchantRule', { rule: { merchant: t.merchant, category, subTag } });
