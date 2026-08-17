@@ -2358,10 +2358,22 @@ function resetMainFilters() {
 // entry (or anywhere else with a row number) — clears whatever filters
 // would otherwise hide it, scrolls it into view, and flashes it blue so
 // it's easy to spot.
-function jumpToRecord(row) {
+//
+// opts.filterCategory/filterSubTag (optional): instead of resetting to the
+// default "All" view, land already filtered to that category/subtag — used
+// by the green "Synced" badge (see attachFlagHandlers) so tapping it takes
+// you to the counterpart record within Transfer > Internal specifically
+// (the only place these rows live) rather than dumping you back into the
+// full unfiltered list every time.
+function jumpToRecord(row, opts) {
+  opts = opts || {};
   const t = allTxns.find(x => x.row === row);
   if (!t) return;
   resetMainFilters();
+  if (opts.filterCategory) {
+    activeFilter = opts.filterCategory;
+    activeSubFilter = opts.filterSubTag || 'All';
+  }
   // Month view never renders individual transaction rows (summary cards
   // only — see render()), so a jump target would have nowhere to land.
   // Drop to Day grouping so the target row actually exists to scroll to.
@@ -3730,14 +3742,25 @@ function tbcPairLabel(t) {
   const flow = txnFlow(t);
   return flow === 'in' ? `${otherShort} > ${mine} TBC` : `${mine} > ${otherShort} TBC`;
 }
-// Small yellow "which accounts" badge shown on every Card Reload/TNG Card
-// Top-up row (see renderTxnRow) — now that these no longer get their own
-// yellow dot (they render as plain grey Internal rows), this is what keeps
-// the top-up direction/amount visible at a glance instead of needing to open
-// the row. Same account-pair logic as tbcPairLabel(), just without the
-// "TBC" suffix since this isn't a placeholder waiting to be confirmed.
-function reloadPairLabel(t) {
-  const other = accountPairOther_(t);
+// Small yellow "which accounts" badge shown on every resolved Internal-
+// transfer row (see renderTxnRow) — this is what keeps the top-up/transfer
+// direction visible at a glance instead of needing to open the row. Same
+// account-pair logic as tbcPairLabel(), just without the "TBC" suffix since
+// this isn't a placeholder waiting to be confirmed.
+//
+// syncMatch (optional): the row's real matched counterpart, from
+// internalSyncMatchCache — same data the green "Synced" badge uses. When
+// present, this is preferred over accountPairOther_()'s static per-subTag
+// guess, since that guess is really just "which account does this subTag
+// USUALLY pair with" (e.g. every TNG Card-Reload row is assumed to pair
+// with TNG Card) rather than what this specific row actually matched to.
+// A 2026-08 report found this mismatch on real data: a TNG row funded by
+// HL Bank still showed the generic "CARD > TNG" guess instead of the true
+// "BANK > TNG" its own green badge already knew about. Falls back to the
+// static guess only when there's no real match yet (e.g. the instant a row
+// is imported, before the sync engine has run).
+function reloadPairLabel(t, syncMatch) {
+  const other = (syncMatch && syncMatch.counterpartAccount) || accountPairOther_(t);
   if (!other) return null;
   const mine = TBC_ACCOUNT_SHORT[t.account] || t.account;
   const otherShort = TBC_ACCOUNT_SHORT[other] || other;
@@ -3779,11 +3802,7 @@ function renderTxnRow(t, opts) {
   // before). Previously this badge was scoped to isReloadRow only, so
   // PBank<->HL Bank rows only ever showed the green Synced badge with
   // nothing indicating direction/pair at a glance the way reload rows did.
-  const isInternalRow = t.category === 'Transfer' && (RELOAD_SUBTAGS.includes(t.subTag) || t.subTag === 'Internal');
-  const reloadLabel = (!isTbc && !isPendingSync && isInternalRow) ? reloadPairLabel(t) : null;
-  const reloadFlagHtml = reloadLabel
-    ? `<span class="tbc-flag" title="Internal · ${escapeHtml(reloadLabel)}">${escapeHtml(reloadLabel)}</span>`
-    : '';
+  //
   // Internal transfers (TNG<->TNG Card reload legs, and HL Bank/PBank
   // Internal legs) are matched fully automatically — see
   // internalSyncGaps() and confirmTbcIfMatches_() (Code.gs). There's no
@@ -3796,10 +3815,17 @@ function renderTxnRow(t, opts) {
   // records are actually linked. This replaced an earlier manual 🚩
   // "flag as wrong" escape hatch — with the badge now pointing straight at
   // the counterpart record, spotting/checking a bad match no longer needs a
-  // separate flagging step. (isInternalRow itself is declared above, next to
-  // reloadLabel, since both badges now share the same "is this an Internal
-  // transfer row" gate.)
+  // separate flagging step.
+  //
+  // syncMatch is computed here (before reloadLabel) so reloadPairLabel can
+  // use the real matched counterpart instead of its static per-subTag guess
+  // — see the comment on reloadPairLabel for why that matters.
+  const isInternalRow = t.category === 'Transfer' && (RELOAD_SUBTAGS.includes(t.subTag) || t.subTag === 'Internal');
   const syncMatch = isInternalRow ? internalSyncMatchCache[t.row] : null;
+  const reloadLabel = (!isTbc && !isPendingSync && isInternalRow) ? reloadPairLabel(t, syncMatch) : null;
+  const reloadFlagHtml = reloadLabel
+    ? `<span class="tbc-flag" title="Internal · ${escapeHtml(reloadLabel)}">${escapeHtml(reloadLabel)}</span>`
+    : '';
   const syncedFlagHtml = (syncMatch && !isTbc && !isPendingSync)
     ? `<span class="tbc-flag synced-flag" data-row="${syncMatch.counterpartRow}" title="Matched with ${escapeHtml(syncMatch.counterpartAccount)} — tap to view that record">✓ Synced with ${escapeHtml(syncMatch.counterpartAccount)}</span>`
     : '';
@@ -4055,12 +4081,15 @@ function attachRemarkHandlers() {
 // are actually linked instead of just trusting a generic checkmark.
 // Replaced the old manual 🚩 "flag as wrong" button — pointing directly at
 // the counterpart record makes spotting a bad auto-match easier than a
-// flag ever did.
+// flag ever did. Lands filtered to Transfer > Internal (not the default
+// "All" view) since that's the only place these matched rows ever live —
+// dumping you into the full unfiltered list on every jump was more
+// scrolling than necessary.
 function attachFlagHandlers() {
   document.querySelectorAll('.synced-flag').forEach(el => {
     el.onclick = (e) => {
       e.stopPropagation();
-      jumpToRecord(Number(el.dataset.row));
+      jumpToRecord(Number(el.dataset.row), { filterCategory: 'Transfer', filterSubTag: 'Internal' });
     };
   });
 }
