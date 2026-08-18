@@ -3580,6 +3580,76 @@ function daysBetween_(dateA, dateB) {
 function amountEq_(a, b) {
   return Math.abs(Number(a || 0) - Number(b || 0)) < 0.01;
 }
+// Minimum-cost bipartite assignment (Hungarian algorithm / Kuhn-Munkres,
+// O(n^3)). cost[i][j] = cost of assigning left row i to right row j; use
+// SENTINEL for pairs that aren't valid candidates at all (wrong amount, too
+// far apart, etc). Handles rectangular inputs (left/right different sizes)
+// by padding to a square matrix internally.
+//
+// This exists because a plain greedy "assign the closest match first" pass
+// (see closestPairMatch_ below) is provably NOT globally optimal once three
+// or more same-amount rows are competing for overlapping windows: greedily
+// grabbing the single closest pair first can leave a WORSE total assignment
+// than holding off would have produced (verified during the 2026-08 TNG
+// audit — see the long comment on the TNG<->{Card,Bank} section of
+// internalSyncGaps() for the concrete real-world example this fixes).
+// Returns { assignment, totalCost } where assignment[i] is the right-side
+// index matched to left row i, or -1 if left row i couldn't be matched to
+// any real (non-SENTINEL) candidate.
+function hungarianMinCost_(cost, SENTINEL) {
+  const n = cost.length;
+  const m = n ? cost[0].length : 0;
+  const size = Math.max(n, m);
+  if (size === 0) return { assignment: [], totalCost: 0 };
+  const a = [];
+  for (let i = 0; i < size; i++) {
+    a.push(new Array(size).fill(SENTINEL));
+    if (i < n) { for (let j = 0; j < m; j++) a[i][j] = cost[i][j]; }
+  }
+  const INF = Infinity;
+  const u = new Array(size + 1).fill(0);
+  const v = new Array(size + 1).fill(0);
+  const p = new Array(size + 1).fill(0); // p[j] = 1-indexed left row matched to right col j
+  const way = new Array(size + 1).fill(0);
+  for (let i = 1; i <= size; i++) {
+    p[0] = i;
+    let j0 = 0;
+    const minv = new Array(size + 1).fill(INF);
+    const used = new Array(size + 1).fill(false);
+    do {
+      used[j0] = true;
+      const i0 = p[j0];
+      let delta = INF, j1 = -1;
+      for (let j = 1; j <= size; j++) {
+        if (!used[j]) {
+          const cur = a[i0 - 1][j - 1] - u[i0] - v[j];
+          if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+          if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+        }
+      }
+      for (let j = 0; j <= size; j++) {
+        if (used[j]) { u[p[j]] += delta; v[j] -= delta; }
+        else { minv[j] -= delta; }
+      }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do {
+      const j1 = way[j0];
+      p[j0] = p[j1];
+      j0 = j1;
+    } while (j0 !== 0);
+  }
+  const assignment = new Array(n).fill(-1);
+  for (let j = 1; j <= size; j++) {
+    if (p[j] !== 0 && p[j] - 1 < n && j - 1 < m) {
+      const i = p[j] - 1, jj = j - 1;
+      if (a[i][jj] < SENTINEL) assignment[i] = jj;
+    }
+  }
+  let totalCost = 0;
+  assignment.forEach((j, i) => { if (j >= 0) totalCost += cost[i][j]; });
+  return { assignment, totalCost };
+}
 // Pairs two lists by amount, preferring the CLOSEST date match across the
 // whole list rather than the first-found one. A naive "walk list A in date
 // order, claim the first candidate in list B" approach is order-dependent —
@@ -3659,27 +3729,79 @@ function internalSyncGaps() {
     return !!latest && daysBetween_(gapDate, latest) > RELOAD_SYNC_MATCH_WINDOW_DAYS;
   };
 
-  // ---- TNG <-> TNG Card (same-day pre-filter only; unaffected by the fix
-  // above, kept exactly as it worked before) ----
+  // ---- TNG <-> {TNG Card same-day, HL Bank "To TNG" within-window} ----
+  // These two hops used to run as two separate greedy passes: TNG<->Card
+  // (exact same-day, first-found-wins) ran FIRST and unconditionally locked
+  // in any same-day amount coincidence, then whatever TNG rows survived
+  // went into the HL Bank<->TNG closestPairMatch_() pass. That ordering had
+  // a real bug: if a bank-funded wallet reload happened to share the exact
+  // same date+amount as an unrelated same-day wallet->card top-up, the
+  // Card-hop would greedily consume the reload row before the Bank-hop
+  // ever got to consider it — forcing a DIFFERENT TNG reload (on some other
+  // date) to wrongly claim the orphaned bank charge via date-distance
+  // tiebreak, leaving the real bank charge permanently unmatched. Real
+  // case (2026-08 audit, confirmed against HL Bank's own records): a Jul 29
+  // RM200 bank-funded reload and a Jul 29 RM200 wallet->card top-up shared
+  // a date+amount coincidence; the Card-hop stole the reload row, so the
+  // app ended up pairing the wrong TNG row against the bank statement and
+  // an Aug 3 RM200 bank charge was left orphaned forever.
+  //
+  // Fixed by resolving both hops together instead of in a fixed order, using
+  // hungarianMinCost_() to find the assignment with the LOWEST POSSIBLE total
+  // date-distance across every TNG row and every Card/Bank candidate at once.
+  // A same-day Card coincidence no longer auto-wins just because it's
+  // checked first, or because it happens to be a locally "obvious" choice —
+  // a greedy nearest-first pass (what closestPairMatch_ below does, and what
+  // an earlier version of this fix also tried via a "least ambiguous first"
+  // heuristic) can still lock in a pairing that looks locally reasonable but
+  // is globally worse: verified against the real 2026-08 dataset, greedily
+  // taking the single closest match first ended up assigning an Aug 1 reload
+  // to a Jul 31 bank charge (1-day gap) purely because that gap was smaller
+  // than any other single pair, leaving a Jul 29 reload — which actually
+  // belonged to that Jul 31 charge — pushed onto an Aug 3 charge 5 days away,
+  // and in the worst case (with the old Card-first order) leaving the Aug 3
+  // charge unmatched entirely. Minimizing the TOTAL distance across all pairs
+  // at once (rather than each pair's own distance in isolation) avoids that:
+  // it correctly prefers two small gaps (2 + 2) over one tiny gap and one
+  // huge one (1 + 5), even though the tiny gap alone looks like the "best"
+  // individual match.
   const tngRows = allTxns
     .filter(t => t.account === 'TNG' && t.category === 'Transfer' && (t.subTag === 'Card Reload' || t.subTag === 'Internal'))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const cardLegs = allTxns.filter(t => t.account === 'TNG Card' && RELOAD_SUBTAGS.includes(t.subTag));
-  const usedCardRows = new Set();
-  const tngMatchedToCard = new Set();
-  tngRows.forEach(t => {
-    const m = cardLegs.find(c => !usedCardRows.has(c.row) && amountEq_(c.amount, t.amount) && c.date === t.date);
-    if (m) { usedCardRows.add(m.row); tngMatchedToCard.add(t.row); addMatch(t, m); }
-  });
-
-  // ---- HL Bank "To TNG (Wallet Reload)" <-> remaining TNG rows ----
   const hlToTng = allTxns
     .filter(t => t.account === 'HL Bank' && t.category === 'Transfer' && t.subTag === 'Internal' && /to tng/i.test(t.merchant || ''));
-  const tngRemaining = tngRows.filter(t => !tngMatchedToCard.has(t.row));
-  const m1 = closestPairMatch_(tngRemaining, hlToTng, RELOAD_SYNC_MATCH_WINDOW_DAYS);
-  m1.pairs.forEach(p => addMatch(p.a, p.b));
-  tngRemaining.forEach(t => {
-    if (m1.usedA.has(t.row)) return;
+
+  const tngOtherPool = [
+    ...cardLegs.map(c => ({ kind: 'card', row: c })),
+    ...hlToTng.map(b => ({ kind: 'bank', row: b })),
+  ];
+  const TNG_SYNC_SENTINEL = 1e6; // "not a valid candidate at all" — must dwarf any real distance
+  const tngCostMatrix = tngRows.map(t => tngOtherPool.map(r => {
+    if (r.kind === 'card') {
+      return (amountEq_(r.row.amount, t.amount) && r.row.date === t.date) ? 0 : TNG_SYNC_SENTINEL;
+    }
+    if (!amountEq_(r.row.amount, t.amount)) return TNG_SYNC_SENTINEL;
+    const dist = Math.abs(daysBetween_(t.date, r.row.date));
+    return dist <= RELOAD_SYNC_MATCH_WINDOW_DAYS ? dist : TNG_SYNC_SENTINEL;
+  }));
+  const tngHungarian = tngRows.length && tngOtherPool.length
+    ? hungarianMinCost_(tngCostMatrix, TNG_SYNC_SENTINEL)
+    : { assignment: [] };
+  const usedTngRows = new Set();
+  const usedCardRows = new Set();
+  const usedHlToTngRows = new Set();
+  tngHungarian.assignment.forEach((j, i) => {
+    if (j < 0 || tngCostMatrix[i][j] >= TNG_SYNC_SENTINEL) return;
+    const t = tngRows[i];
+    const r = tngOtherPool[j];
+    usedTngRows.add(t.row);
+    if (r.kind === 'card') usedCardRows.add(r.row.row); else usedHlToTngRows.add(r.row.row);
+    addMatch(t, r.row);
+  });
+
+  tngRows.forEach(t => {
+    if (usedTngRows.has(t.row)) return;
     const ageDays = daysBetween_(t.date, today);
     // Too fresh: the bank debit probably hasn't posted yet, don't flag yet.
     // Too old (past expiry): by elimination this is almost certainly a
@@ -3690,7 +3812,7 @@ function internalSyncGaps() {
     gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank', stale: isStale_(t.date, 'HL Bank') });
   });
   hlToTng.forEach(b => {
-    if (m1.usedB.has(b.row)) return;
+    if (usedHlToTngRows.has(b.row)) return;
     const ageDays = daysBetween_(b.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
     gaps.push({ row: b.row, txn: b, awaiting: 'TNG', stale: isStale_(b.date, 'TNG') });
