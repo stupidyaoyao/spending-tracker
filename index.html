@@ -373,6 +373,7 @@
     vertical-align: middle; flex-shrink: 0; cursor: default; white-space: nowrap;
   }
   .tbc-flag.synced-flag { background: #30d158; color: #08300f; cursor: pointer; }
+  .tbc-flag.stale-flag { background: #ff453a; color: #fff; }
   .txn .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .txn .amount { font-size: 15px; font-weight: 700; color: #ff453a; }
   .txn .amount.in { color: #30d158; }
@@ -817,7 +818,7 @@
           <option value="TNG Card">TNG Card (PDF or CSV)</option>
           <option value="TNG Card-Screenshot">TNG Card (Screenshot)</option>
           <option value="HL Bank">HL Bank (CSV)</option>
-          <option value="PBank">PBank (CSV)</option>
+          <option value="PBank">PBank (PDF or CSV)</option>
         </select>
       </div>
 
@@ -978,7 +979,11 @@ const CATEGORY_RULES = [
   { category: 'Housing', subTag: 'Carpark Rent', keywords: ['CARPARK RENT'] },
   // "PMB..." reference codes are Public Bank Mutual (unit trust) payouts —
   // matches the existing two live PMB rows, both filed as Income > Interest.
-  { category: 'Income', subTag: 'Interest', keywords: ['PMB'] },
+  // creditOnly: a PMB DIRECT DEBIT line (money leaving to BUY into the fund,
+  // e.g. "DR-ECP PMB129028768 PUBLIC MUTUAL BHD") is the opposite of a
+  // payout and must never land here — see the creditOnly check everywhere
+  // CATEGORY_RULES is consulted for a known-debit transaction.
+  { category: 'Income', subTag: 'Interest', keywords: ['PMB'], creditOnly: true },
 ];
 // No transaction types are excluded anymore — Reload / Receive from Wallet /
 // Cashback now import under "Transfer" (see categorize() below) instead of
@@ -3636,6 +3641,23 @@ function internalSyncGaps() {
     matches.push({ row: a.row, account: a.account, counterpartRow: b.row, counterpartAccount: b.account });
     matches.push({ row: b.row, account: b.account, counterpartRow: a.row, counterpartAccount: a.account });
   };
+  // Latest transaction date seen so far for each account — used as a
+  // stand-in for "how far does that account's most recently imported
+  // statement reach". If a gap's date is well behind that account's latest
+  // date, the statement covering that period was already imported and
+  // still doesn't contain a match, which is a stronger signal than "give it
+  // a few more days" — see the `stale` flag added to each gap below.
+  const latestDateByAccount = {};
+  allTxns.forEach(t => {
+    if (!t.date) return;
+    if (!latestDateByAccount[t.account] || t.date > latestDateByAccount[t.account]) {
+      latestDateByAccount[t.account] = t.date;
+    }
+  });
+  const isStale_ = (gapDate, awaitingAccount) => {
+    const latest = latestDateByAccount[awaitingAccount];
+    return !!latest && daysBetween_(gapDate, latest) > RELOAD_SYNC_MATCH_WINDOW_DAYS;
+  };
 
   // ---- TNG <-> TNG Card (same-day pre-filter only; unaffected by the fix
   // above, kept exactly as it worked before) ----
@@ -3665,13 +3687,13 @@ function internalSyncGaps() {
     // reasoning the original TNG-Card-first check above already covers for
     // same-day matches; this catches the slower ones too.
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
-    gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank' });
+    gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank', stale: isStale_(t.date, 'HL Bank') });
   });
   hlToTng.forEach(b => {
     if (m1.usedB.has(b.row)) return;
     const ageDays = daysBetween_(b.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
-    gaps.push({ row: b.row, txn: b, awaiting: 'TNG' });
+    gaps.push({ row: b.row, txn: b, awaiting: 'TNG', stale: isStale_(b.date, 'TNG') });
   });
 
   // ---- PBank <-> HL Bank ----
@@ -3685,13 +3707,13 @@ function internalSyncGaps() {
     if (m2.usedA.has(t.row)) return;
     const ageDays = daysBetween_(t.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
-    gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank' });
+    gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank', stale: isStale_(t.date, 'HL Bank') });
   });
   hlPbankSide.forEach(b => {
     if (m2.usedB.has(b.row)) return;
     const ageDays = daysBetween_(b.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
-    gaps.push({ row: b.row, txn: b, awaiting: 'PBank' });
+    gaps.push({ row: b.row, txn: b, awaiting: 'PBank', stale: isStale_(b.date, 'PBank') });
   });
 
   return { gaps, matches };
@@ -3792,8 +3814,16 @@ function renderTxnRow(t, opts) {
   // used to be limited to.
   const pendingSyncEntry = pendingReloadSyncCache.find(x => x.row === t.row);
   const isPendingSync = !!pendingSyncEntry;
+  // A gap flagged `stale` means the awaiting account's own data already
+  // extends well past this row's date — i.e. a newer statement for that
+  // account HAS already been imported, and it still doesn't contain a
+  // matching record. That's a stronger, more actionable signal than the
+  // generic "give it a few more days" message (see isStale_ in
+  // internalSyncGaps): it's worth a real look rather than just waiting.
   const pendingSyncFlagHtml = pendingSyncEntry
-    ? `<span class="tbc-flag" title="No matching ${escapeHtml(pendingSyncEntry.awaiting)} record found yet — this usually posts within a few days; re-import a newer ${escapeHtml(pendingSyncEntry.awaiting)} statement once it does.">Awaiting ${escapeHtml(pendingSyncEntry.awaiting)}</span>`
+    ? (pendingSyncEntry.stale
+      ? `<span class="tbc-flag stale-flag" title="A newer ${escapeHtml(pendingSyncEntry.awaiting)} statement has already been imported and still has no matching record for this — it likely won't sync on its own. Worth checking directly.">⚠️ Not updated after ${escapeHtml(pendingSyncEntry.awaiting)} import</span>`
+      : `<span class="tbc-flag" title="No matching ${escapeHtml(pendingSyncEntry.awaiting)} record found yet — this usually posts within a few days; re-import a newer ${escapeHtml(pendingSyncEntry.awaiting)} statement once it does.">Awaiting ${escapeHtml(pendingSyncEntry.awaiting)}</span>`)
     : '';
   // Every resolved Internal-transfer row — not just the TNG<->TNG Card
   // physical reload legs — gets the small yellow account-pair badge (see
@@ -4587,6 +4617,11 @@ function categorizeBankA(typeCode, detailCols) {
     const merchantName = col0.replace(/^VISA\d+\s*/, '').replace(/^\d[\dX]{9,}\s*/i, '').split(/\s{2,}/)[0].trim();
     const col0Upper = col0.toUpperCase();
     for (const rule of CATEGORY_RULES) {
+      // This branch only ever sees known DEBITS (card purchases) — a
+      // creditOnly rule (e.g. PMB, meant for a Public Mutual payout) must
+      // never apply here even if its keyword happens to appear in the
+      // merchant text, since that would mean money leaving, not a payout.
+      if (rule.creditOnly) continue;
       for (const kw of rule.keywords) {
         if (col0Upper.includes(kw)) {
           return { category: rule.category, subTag: rule.subTag || '', merchant: merchantName || col0 };
@@ -4595,6 +4630,10 @@ function categorizeBankA(typeCode, detailCols) {
     }
     return { category: 'Unsure', subTag: '', merchant: merchantName || col0 };
   }
+  // Direct-debit collections (e.g. "DR-ECP PMB129028768 PUBLIC MUTUAL BHD" —
+  // buying into a unit trust fund) always land in plain Unsure rather than
+  // matching any CATEGORY_RULES keyword, so a fund-purchase debit is never
+  // confused with the unrelated PMB Income>Interest payout rule.
   return { category: 'Unsure', subTag: '', merchant: col0 || t };
 }
 
@@ -4626,6 +4665,257 @@ async function parseBankACsvFile(file) {
       // out — so the real direction is known outright here rather than
       // guessed from category/subtag.
       flow: credit ? 'in' : 'out'
+    });
+  });
+  return rows;
+}
+
+// ---- PBank PDF parsing ----
+// Unlike TNG's exported PDF (which is rotated, needing the column-bucket
+// approach in PDF_COLUMNS/parsePdfPageItems), Public Bank's statement PDF is
+// a normal, unrotated page, so pdf.js's raw item.transform[4]/[5] are
+// directly x/y — no axis swap needed. Rather than hardcode fixed column
+// x-ranges for this new format, this instead reconstructs each visual line
+// of text (grouping items by matching y, sorting by x, and inserting
+// whitespace proportional to the x-gap between items) — the same general
+// technique the command-line `pdftotext -layout` tool uses. That produces
+// plain text lines that look just like a real exported statement, letting
+// the rest of this parser work against recognizable line patterns
+// (verified against a real statement) instead of pixel coordinates specific
+// to this one PDF.
+function reconstructPdfLines(items) {
+  const usable = items.filter(it => it.str && it.str.length && it.transform);
+  if (!usable.length) return [];
+  const withPos = usable.map(it => ({
+    x: it.transform[4], y: it.transform[5], str: it.str,
+    width: it.width || it.str.length * 4.5,
+  }));
+  // Top-to-bottom (y descending — PDF's origin is bottom-left, so a higher
+  // y is higher up the page), then left-to-right within a line.
+  withPos.sort((a, b) => b.y - a.y || a.x - b.x);
+  const Y_TOL = 2;
+  const lines = [];
+  let current = null;
+  withPos.forEach(it => {
+    if (current && Math.abs(it.y - current.y) <= Y_TOL) {
+      current.items.push(it);
+    } else {
+      current = { y: it.y, items: [it] };
+      lines.push(current);
+    }
+  });
+  return lines.map(line => {
+    line.items.sort((a, b) => a.x - b.x);
+    let out = '';
+    let prevEnd = null;
+    line.items.forEach(it => {
+      if (prevEnd !== null) {
+        const gap = it.x - prevEnd;
+        const charW = it.width / Math.max(it.str.length, 1) || 4.5;
+        const spaces = Math.max(1, Math.round(gap / charW));
+        out += ' '.repeat(Math.min(spaces, 40));
+      }
+      out += it.str;
+      prevEnd = it.x + it.width;
+    });
+    return out;
+  });
+}
+
+// Recognized transaction-type codes exactly as Public Bank prints them —
+// matched longest-first so e.g. "DUITNOW TRSF DR" is never mistakenly cut
+// short at a shorter accidental prefix. Deliberately the same literal
+// strings categorizeBankA() already knows how to handle (it was built
+// against the PBank CSV export, which uses this identical vocabulary), so a
+// PDF-derived row is categorized exactly the same way a CSV-derived one
+// would be — no separate rule set to keep in sync.
+const PBANK_KNOWN_TYPES = [
+  'TSFR FUND CR', 'DUITNOW TRSF DR', 'DUITNOW TRSF CR', 'DUITNOW QR DR', 'DUITNOW QR CR',
+  'PB DEBIT CARD DR', 'DR MYDEBIT', 'MYDEBIT PURCHASE', 'DEP-ECP', 'DR-ECP', 'SST DR', 'IBG DR', 'IBG CR',
+].sort((a, b) => b.length - a.length);
+
+// Turns the reconstructed text lines of a PBank statement into transaction
+// records. Public Bank's layout doesn't repeat the date for a second
+// same-day transaction (see the real statement — 05/08 has three separate
+// entries under one date), so a transaction boundary can't be found by date
+// alone: instead, a real transaction line is recognized by ending in TWO
+// decimal numbers (its own amount, then the running balance) — a
+// same-day repeat, a "Balance B/F" carry line, or a wrapped detail line all
+// have at most one trailing number (or none), so they're distinguished
+// automatically rather than needing their own special-cased regexes.
+// Direction (debit/credit) isn't in a separate column here the way the CSV
+// export has it — it's inferred from whether the running balance went up or
+// down since the previous transaction, seeded from the statement's opening
+// "Balance From Last Statement" line.
+function parsePBankStatementLines(lines) {
+  const BALANCE_SEED_RE = /balance/i;
+  const TRAILING_TWO_NUMS_RE = /^(.*?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
+  const TRAILING_ONE_NUM_RE = /^(.*?)\s+([\d,]+\.\d{2})\s*$/;
+  const DATE_RE = /^(\d{1,2})\/(\d{1,2})\s+(.*)$/;
+  // Page-repeating letterhead/header/footer boilerplate that every PBank
+  // statement PDF prints at the top and bottom of EVERY page. Since
+  // `current` is now kept open across a page break (see the comment below),
+  // this noise has to be recognized and skipped rather than swallowed into
+  // detailParts — otherwise it would land ahead of the real merchant detail
+  // line that follows it on the next page and corrupt the parsed merchant
+  // name. Mostly matched structurally (statement labels, disclaimer text,
+  // table column headers), plus a handful of literal lines from this
+  // account's own branch letterhead/address block and account-holder name
+  // (safe to hardcode — this app only ever imports this one PBank account).
+  const BOILERPLATE_RE = new RegExp([
+    'PENYATA AKAUN', 'STATEMENT OF ACCOUNT', 'Nombor Akaun', 'Jenis Akaun',
+    'Tarikh Penyata', 'Muka Surat', '^TARIKH\\s+URUS NIAGA', '^DATE\\s+TRANSACTION',
+    'Penyata ini dicetak', 'This is a computer generated statement',
+    'Dilindungi oleh PIDM', '^pendeposit\\.?$', 'Protected by PIDM',
+    'Baki Harian Dan Penutup', 'Terima Kasih Kerana', 'Daily And Closing Balances',
+    'Thank You For Banking', 'Anda boleh melihat', 'You may view Public Bank',
+    '^PERHATIAN', 'Dimaklumkan bahawa', 'sifar toleransi', 'sila layari',
+    'Please be informed that the Bank', 'tolerance approach', "visit the Bank's website",
+    'Closing Balance In This Statement',
+    // Letterhead/address block (this account's specific branch) + the
+    // bare account-holder-name header line repeated on pages 2/3 — anchored
+    // exactly so it doesn't accidentally swallow a real transaction line
+    // that merely mentions the same name (e.g. "DUITNOW TRSF DR ... NG JIA
+    // YAO" or the "FROM NG" detail line, both of which have extra text).
+    'ALOR SETAR BRANCH', 'JLN TELUK WANJAH', '^05200 ALOR SETAR$',
+    '^KEDAH DARUL AMAN$', '^TEL:', '^NG JIA YAO\\s*$', '^DESA SERAYA$',
+    '^05050 ALOR SETAR KEDAH$',
+  ].join('|'), 'i');
+
+  const txns = [];
+  let currentDate = null;
+  let prevBalance = null;
+  let current = null;
+
+  function finalize() {
+    if (current) txns.push(current);
+    current = null;
+  }
+
+  lines.forEach(rawLine => {
+    const line = rawLine.replace(/\s+$/, '');
+    if (!line.trim()) return;
+
+    let rest = line;
+    const dm = line.match(DATE_RE);
+    if (dm) {
+      currentDate = `${dm[1].padStart(2, '0')}/${dm[2].padStart(2, '0')}`;
+      rest = dm[3];
+    }
+    if (!rest.trim()) return;
+
+    const twoNums = rest.match(TRAILING_TWO_NUMS_RE);
+    if (twoNums) {
+      finalize();
+      const desc = twoNums[1].trim();
+      const amount = parseFloat(twoNums[2].replace(/,/g, ''));
+      const balance = parseFloat(twoNums[3].replace(/,/g, ''));
+      let typeCode = desc;
+      let restOfDesc = '';
+      for (const kt of PBANK_KNOWN_TYPES) {
+        if (desc.toUpperCase().startsWith(kt)) {
+          typeCode = kt;
+          restOfDesc = desc.slice(kt.length).trim();
+          break;
+        }
+      }
+      const flow = prevBalance === null ? null : (balance >= prevBalance ? 'in' : 'out');
+      prevBalance = balance;
+      if (flow && amount > 0) {
+        current = { date: currentDate, typeCode, restOfDesc, detailParts: [], amount, flow };
+      }
+      return;
+    }
+
+    const oneNum = rest.match(TRAILING_ONE_NUM_RE);
+    if (oneNum && BALANCE_SEED_RE.test(oneNum[1])) {
+      // "Balance From Last Statement" / "Balance B/F" / "Balance C/F" /
+      // "Closing Balance..." — not a transaction, just re-seeds the running
+      // balance so the next real transaction's direction can be computed.
+      // Deliberately does NOT finalize() the in-progress transaction here:
+      // a real PBank statement can print a "Balance C/F" at the bottom of
+      // one page and then continue that SAME transaction's merchant/detail
+      // lines at the top of the next page, right after "Balance B/F" (seen
+      // in a real statement — the 18/07 RM18.30 card charge's VISA/merchant
+      // lines land on page 2 while the amount+balance line itself printed
+      // on page 1). Finalizing here would orphan those detail lines onto no
+      // transaction at all. `current` instead stays open until the next
+      // real two-number transaction line replaces it (or end of input).
+      prevBalance = parseFloat(oneNum[2].replace(/,/g, ''));
+      return;
+    }
+
+    // Skip repeating page letterhead/header/footer noise (see BOILERPLATE_RE
+    // above) rather than attaching it as a detail line — it would otherwise
+    // land ahead of the real merchant text that follows on the next page.
+    if (BOILERPLATE_RE.test(line)) return;
+
+    // Anything else is a wrapped continuation line (merchant/reference
+    // detail) belonging to whichever transaction is currently in progress.
+    if (current) current.detailParts.push(rest.trim());
+  });
+  finalize();
+  return txns;
+}
+
+async function parseBankAPdfFile(file) {
+  if (!window.pdfjsLib) throw new Error('PDF reader failed to load — check your connection and try again.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: buf });
+  loadingTask.onPassword = (callback, reason) => {
+    const msg = reason === 2 ? 'Incorrect password — try again:' : 'This PDF is password-protected. Enter the password:';
+    const pwd = window.prompt(msg);
+    callback(pwd || '');
+  };
+  const pdf = await loadingTask.promise;
+  let allLines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    allLines = allLines.concat(reconstructPdfLines(content.items));
+  }
+  // Public Bank prints day/month only per transaction row (no year) — the
+  // year has to come from the statement's own header instead, e.g.
+  // "Tarikh Penyata / Statement Date          12 Aug 2026". Falls back to
+  // the current year if that line isn't found for some reason, rather than
+  // hardcoding a specific year that would silently mis-date every row on
+  // next year's statement.
+  const MONTH_NUMS = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12' };
+  let statementYear = String(new Date().getFullYear());
+  for (const l of allLines) {
+    const ym = l.match(/(\d{1,2})\s+([A-Za-z]{3})\w*\s+(\d{4})/);
+    if (ym && MONTH_NUMS[ym[2].toLowerCase()]) { statementYear = ym[3]; break; }
+  }
+  const txns = parsePBankStatementLines(allLines);
+  if (!txns.length) {
+    const err = new Error(`Couldn't recognize any transactions in that PDF.\n\nFirst few reconstructed lines:\n${allLines.slice(0, 15).join('\n')}`);
+    err.diagnostic = true;
+    throw err;
+  }
+  const rows = [];
+  txns.forEach(t => {
+    // See the comment on detailCols[0] below: restOfDesc (any text on the
+    // SAME line as the type+amount, e.g. "478628 NG JIA YAO" on a DUITNOW
+    // TRSF DR line) only gets prepended as its own column when non-empty —
+    // for a PB DEBIT CARD DR row restOfDesc is always empty, so col0 stays
+    // the VISA merchant line categorizeBankA's card-purchase branch expects
+    // at that exact position; only rows that actually have trailing text on
+    // the transaction line itself (transfers, mainly) get it shifted in.
+    const detailCols = t.restOfDesc ? [t.restOfDesc, ...t.detailParts] : t.detailParts;
+    const guess = categorizeBankA(t.typeCode, detailCols);
+    const dm = t.date.match(/^(\d{2})\/(\d{2})$/);
+    // Statement rows are printed newest-first-per-page in this export but
+    // can straddle a New Year in principle; a Dec/Jan boundary edge case
+    // isn't handled here — same simplifying assumption the rest of this
+    // app already makes throughout (single-year datasets).
+    const date = dm ? `${statementYear}-${dm[2]}-${dm[1]}` : t.date;
+    rows.push({
+      date, time: '', amount: t.amount,
+      category: guess.category, subTag: guess.subTag,
+      merchant: guess.merchant, source: 'PBank PDF Import', notes: t.typeCode, type: t.typeCode,
+      account: 'PBank',
+      flow: t.flow,
     });
   });
   return rows;
@@ -5910,7 +6200,7 @@ importSubmitBtn.onclick = async () => {
     showImportLoading('Reading file…');
     try {
       if (importAccount === 'PBank') {
-        rows = await parseBankACsvFile(file);
+        rows = file.name.toLowerCase().endsWith('.pdf') ? await parseBankAPdfFile(file) : await parseBankACsvFile(file);
       } else if (importAccount === 'HL Bank') {
         rows = await parseBankBCsvFile(file);
       } else if (importAccount === 'TNG Card') {
@@ -5921,6 +6211,12 @@ importSubmitBtn.onclick = async () => {
         rows = await parseCsvFile(file);
       }
     } catch (err) {
+      // File read/parse genuinely failed (corrupt PDF, wrong file type,
+      // password entry cancelled, unrecognized statement layout, etc.) —
+      // pop up a blocking alert() so this can't be missed/scrolled past,
+      // in addition to the inline status text with the fuller detail.
+      const shortMsg = (err && err.message ? err.message : String(err)).split('\n')[0];
+      window.alert(`Couldn't read that file.\n\n${shortMsg}\n\nSee the notice below the upload button for more detail.`);
       if (err && err.diagnostic) {
         importStatusEl.className = 'status-msg debug';
         importStatusEl.textContent = err.message;
