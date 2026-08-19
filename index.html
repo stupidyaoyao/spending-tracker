@@ -3790,9 +3790,34 @@ function internalSyncGaps() {
   // ties toward matching the older candidate first — clearing the
   // longest-outstanding gap is the more useful default than an arbitrary one.
   const TNG_SYNC_AGE_EPS = 0.001;
+  // A same-day Card top-up match used to always cost 0 — cheaper than ANY
+  // bank-delay match, even a 1-day one — so the Hungarian assignment would
+  // always grab a same-day Card coincidence for a TNG row before ever
+  // considering whether that row actually belongs to a real bank charge a
+  // few days later. That's exactly how the original TNG<->Card<->Bank bug
+  // happened, and it resurfaced here in a subtler form: verified live
+  // against the real dataset (2026-08 audit) that a Jul 29 TNG reload
+  // already CONFIRMED (via the user's own HL Bank chat transcript) to match
+  // a Jul 31 bank charge was instead being grabbed by an unrelated same-day
+  // Card top-up, because 0 beats any real distance. That one wrong pick
+  // then cascaded, orphaning a genuine, separate bank charge (Aug 7) two
+  // hops downstream.
+  //
+  // Real bank posting delay for these reload rows is consistently 1-5 days
+  // (see RELOAD_SYNC_MATCH_WINDOW_DAYS) and is NEVER same-day — a same-day
+  // bank post basically doesn't happen. So a same-day Card match isn't
+  // actually "closer" than a same-day bank charge would be; it's simply the
+  // only kind of match that CAN be same-day. Pricing it above the entire
+  // bank window (rather than at 0) means: any legitimate in-window bank
+  // pairing is preferred first, and the Card match is only used as a
+  // fallback for whichever TNG row is left over once every real bank
+  // pairing within the window has already been made — which is exactly the
+  // scenario a genuine wallet-funds-card top-up (no separate bank charge to
+  // compete with) falls into anyway.
+  const TNG_SYNC_CARD_COST = RELOAD_SYNC_MATCH_WINDOW_DAYS + 1;
   const tngCostMatrix = tngRows.map(t => tngOtherPool.map(r => {
     if (r.kind === 'card') {
-      return (amountEq_(r.row.amount, t.amount) && r.row.date === t.date) ? 0 : TNG_SYNC_SENTINEL;
+      return (amountEq_(r.row.amount, t.amount) && r.row.date === t.date) ? TNG_SYNC_CARD_COST : TNG_SYNC_SENTINEL;
     }
     if (!amountEq_(r.row.amount, t.amount)) return TNG_SYNC_SENTINEL;
     const dist = Math.abs(daysBetween_(t.date, r.row.date));
