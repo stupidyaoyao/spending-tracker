@@ -4700,6 +4700,27 @@ function stripTrailingRef(name) {
   return (name || '').replace(/\d+$/, '').trim();
 }
 
+// DUITNOW QR DR/CR rows (both CSV and PDF sources) carry the counterparty
+// name in one of several detail columns, alongside pure reference-number
+// fragments and "QR REF NO:" boilerplate. The CSV layout usually puts the
+// name straight in column 0, but the PDF parser's reconstructed "restOfDesc"
+// column is sometimes just a bare digit string (a ref-number fragment split
+// onto its own line in the PDF), which used to get treated as column 0 and
+// left the real name — sitting one column over — unused entirely, producing
+// an empty "To Others ()" merchant. This picks the first column that looks
+// like an actual name instead of blindly trusting column 0.
+function pbankQrNameCol_(detailCols) {
+  for (const c of (detailCols || [])) {
+    const s = (c || '').trim();
+    if (!s) continue;
+    if (/^QR REF NO/i.test(s)) continue;
+    if (/^DUITQR/i.test(s)) continue;
+    if (/^\d+(\s+QR\d+)?$/i.test(s)) continue;
+    return s;
+  }
+  return (detailCols && detailCols[0]) || '';
+}
+
 // Bank A (Statement.csv): a Public Bank-style savings account export. It has
 // a metadata header block (account number, balance, etc.), then a loosely
 // comma-separated table — Date, Ref No, Description code, Debit, Credit,
@@ -4746,8 +4767,14 @@ function categorizeBankA(typeCode, detailCols) {
     return { category: 'Transfer', subTag: 'To Others', merchant: `To Others (${name})` };
   }
   if (t === 'DUITNOW QR DR') {
-    const name = stripTrailingRef(col0.split(/\s{2,}/)[0] || col0);
+    const nameCol = pbankQrNameCol_(detailCols);
+    const name = stripTrailingRef(nameCol.split(/\s{2,}/)[0] || nameCol);
     return { category: 'Transfer', subTag: 'To Others', merchant: `To Others (${name})` };
+  }
+  if (t === 'DUITNOW QR CR') {
+    const nameCol = pbankQrNameCol_(detailCols);
+    const payer = stripTrailingRef(nameCol.split(/\s{2,}/)[0] || nameCol);
+    return { category: 'Income', subTag: 'Other', merchant: `Bank Credit${payer ? ' (' + payer + ')' : ''}` };
   }
   if (t === 'PB DEBIT CARD DR' || t === 'DR MYDEBIT') {
     const merchantName = col0.replace(/^VISA\d+\s*/, '').replace(/^\d[\dX]{9,}\s*/i, '').split(/\s{2,}/)[0].trim();
