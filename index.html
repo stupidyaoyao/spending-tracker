@@ -3777,13 +3777,27 @@ function internalSyncGaps() {
     ...hlToTng.map(b => ({ kind: 'bank', row: b })),
   ];
   const TNG_SYNC_SENTINEL = 1e6; // "not a valid candidate at all" — must dwarf any real distance
+  // Minimizing total distance alone can still leave a genuine tie: two
+  // candidate charges the same number of days from a TNG row (e.g. one 2
+  // days earlier, one 2 days later) are mathematically indistinguishable by
+  // distance, so the Hungarian assignment could arbitrarily leave either one
+  // unmatched — verified live against the real dataset (2026-08 audit): an
+  // Aug 3 charge and an Aug 7 charge both sat exactly 2 days from the same
+  // TNG reload, and pure distance-minimization happened to orphan the OLDER
+  // (Aug 3) one instead of the newer one. A tiny epsilon nudge (far smaller
+  // than the smallest real distance difference, so it only ever breaks exact
+  // ties and never overrides a genuine closer/farther match) biases those
+  // ties toward matching the older candidate first — clearing the
+  // longest-outstanding gap is the more useful default than an arbitrary one.
+  const TNG_SYNC_AGE_EPS = 0.001;
   const tngCostMatrix = tngRows.map(t => tngOtherPool.map(r => {
     if (r.kind === 'card') {
       return (amountEq_(r.row.amount, t.amount) && r.row.date === t.date) ? 0 : TNG_SYNC_SENTINEL;
     }
     if (!amountEq_(r.row.amount, t.amount)) return TNG_SYNC_SENTINEL;
     const dist = Math.abs(daysBetween_(t.date, r.row.date));
-    return dist <= RELOAD_SYNC_MATCH_WINDOW_DAYS ? dist : TNG_SYNC_SENTINEL;
+    if (dist > RELOAD_SYNC_MATCH_WINDOW_DAYS) return TNG_SYNC_SENTINEL;
+    return dist - TNG_SYNC_AGE_EPS * daysBetween_(r.row.date, today);
   }));
   const tngHungarian = tngRows.length && tngOtherPool.length
     ? hungarianMinCost_(tngCostMatrix, TNG_SYNC_SENTINEL)
