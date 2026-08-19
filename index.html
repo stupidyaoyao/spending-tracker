@@ -6141,6 +6141,21 @@ function importRowsMatch(a, b) {
   const sameAmount = Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
   if (!sameAccount || !sameDate || !sameAmount) return false;
   if (isReloadishImportRow(a) && isReloadishImportRow(b)) return true;
+  // PBank's raw statement "Type" code (DUITNOW QR DR, DEP-ECP, etc.) is the
+  // same underlying value regardless of which pipeline parsed the row —
+  // CSV and PDF imports of the SAME statement period pull the payer/payee
+  // name from different columns and can produce different merchant text for
+  // the identical transaction (see the 2026-08 PBank PDF re-import: Salary/
+  // QR-credit/QR-debit rows re-added as "new" purely because the PDF parser
+  // extracted a fuller or differently-formatted name than the CSV did).
+  // account+date+amount+Type is proof enough for these — Type alone is
+  // already a stronger signal than the reload-only rule above requires.
+  if (a.type && b.type &&
+      String(a.type).trim().toUpperCase() === String(b.type).trim().toUpperCase() &&
+      typeof PBANK_KNOWN_TYPES !== 'undefined' &&
+      PBANK_KNOWN_TYPES.includes(String(a.type).trim().toUpperCase())) {
+    return true;
+  }
   // A generic "Fund Transfer" leg matches ANY existing Transfer-category row
   // with the same account+date+amount+Type — even one that's since been
   // given a real name (via screenshot) or recategorized — since the
