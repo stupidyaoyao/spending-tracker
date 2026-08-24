@@ -3247,12 +3247,47 @@ function render() {
   }
 
   const groups = {};
-  const order = [];
+  let order = [];
   sorted.forEach(t => {
     const key = groupKeyFor(t);
     if (!groups[key]) { groups[key] = []; order.push(key); }
     groups[key].push(t);
   });
+
+  // Each group's real header total (same calc the render loop below uses) —
+  // computed once up front so it can drive both the amount-sort ordering
+  // and the zero-total filter just below, instead of each doing its own
+  // pass over the same rows.
+  const groupTotals = {};
+  order.forEach(key => {
+    const groupSpendTxns = activeFilter === 'All'
+      ? groups[key].filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
+      : groups[key];
+    groupTotals[key] = groupSpendTxns.reduce((s, t) => s + expenseTotalAmount(t), 0);
+  });
+
+  // "Sort: Amount high/low" used to only sort the flat list of individual
+  // transactions BEFORE grouping, then just took whichever group a
+  // transaction happened to land in first as that group's position — so a
+  // category's spot on screen reflected its single largest transaction, not
+  // its actual total (e.g. a category built from several mid-size charges
+  // could out-total another category with one big charge, yet still show up
+  // lower on screen). Re-sorting the GROUPS themselves by their own total
+  // fixes that — the flat per-row order inside each group still comes from
+  // the date/amount sort above, only the group ORDER changes here.
+  if (sortMode === 'amount_desc') {
+    order = order.slice().sort((a, b) => groupTotals[b] - groupTotals[a]);
+  } else if (sortMode === 'amount_asc') {
+    order = order.slice().sort((a, b) => groupTotals[a] - groupTotals[b]);
+  }
+
+  // A group whose header total nets to exactly RM0.00 — either because it's
+  // a Transfer/Income category deliberately excluded from spend totals (see
+  // groupSpendTxns above) or because its own in/out amounts genuinely
+  // cancel out — has nothing useful to show at a glance in a totals-focused
+  // list like this one. Drop it instead of leaving a "RM0.00" header
+  // sitting in the middle of an otherwise real ranking.
+  order = order.filter(key => Math.abs(groupTotals[key]) >= 0.005);
 
   // Every grouped mode (Day/Category/Merchant) is collapsible — tap a
   // header to reveal that group's rows, same behavior regardless of what
@@ -3281,10 +3316,7 @@ function render() {
     // same day" that didn't actually agree. Selecting a specific category
     // (including Transfer itself) still shows that category's own real
     // total, unaffected by this.
-    const groupSpendTxns = activeFilter === 'All'
-      ? groups[key].filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
-      : groups[key];
-    const groupTotal = groupSpendTxns.reduce((s, t) => s + expenseTotalAmount(t), 0);
+    const groupTotal = groupTotals[key];
     const expanded = !isCollapsible || expandedGroups.has(key);
     const headerClass = isCollapsible ? ' collapsible' + (expanded ? '' : ' collapsed') : '';
     html += `<div class="day-group">
@@ -5557,6 +5589,40 @@ async function extractCardPdfRecords(file) {
   return records;
 }
 
+// Each statement's PDF says what it is, right in its own header text — no
+// need to guess from the "Import from" dropdown alone. A user can easily
+// pick the wrong option (e.g. "TNG eWallet" when the file is actually the
+// TNG Card statement — happened 2026-08-24, uploaded a Card statement under
+// "TNG", which silently ran the eWallet's row-parsing logic against a
+// completely different table shape and produced a confusing raw-text dump
+// instead of a clear "wrong statement type" message). Checking the file's
+// own header first lets the import flow catch that mismatch immediately,
+// before wasting a full parse attempt with the wrong parser.
+const PDF_KIND_MARKERS = [
+  { kind: 'TNG', label: 'TNG eWallet', re: /TNG WALLET TRANSACTION HISTORY/i },
+  { kind: 'TNG Card', label: 'TNG Card', re: /Customer Transactions Statement/i },
+  { kind: 'PBank', label: 'PBank', re: /(STATEMENT OF ACCOUNT|PENYATA AKAUN|PIDM)/i },
+];
+async function detectPdfStatementKind_(file) {
+  if (!window.pdfjsLib) return null;
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const page = await pdf.getPage(1);
+    const content = await page.getTextContent();
+    const text = content.items.map(it => it.str || '').join(' ');
+    for (const m of PDF_KIND_MARKERS) {
+      if (m.re.test(text)) return m;
+    }
+  } catch (e) {
+    // Best-effort only — a password-protected file, a load hiccup, or an
+    // unrecognized layout should never itself block the real import attempt
+    // below; just skip the mismatch check in that case.
+  }
+  return null;
+}
+
 async function parseCardPdfFile(file) {
   const records = await extractCardPdfRecords(file);
   if (!records.length) {
@@ -6402,6 +6468,17 @@ importSubmitBtn.onclick = async () => {
     importStatusEl.textContent = 'Reading file…';
     showImportLoading('Reading file…');
     try {
+      // Catch a wrong "Import from" pick before wasting a full parse attempt
+      // on it — see detectPdfStatementKind_ above for the real-world case
+      // this covers.
+      if (file.name.toLowerCase().endsWith('.pdf') && ['TNG', 'TNG Card', 'PBank'].includes(importAccount)) {
+        const detected = await detectPdfStatementKind_(file);
+        if (detected && detected.kind !== importAccount) {
+          const expectedLabel = importAccount === 'TNG' ? 'TNG eWallet' : importAccount;
+          const err = new Error(`This looks like a ${detected.label} statement, not ${expectedLabel}. Switch "Import from" to ${detected.label} and try again.`);
+          throw err;
+        }
+      }
       if (importAccount === 'PBank') {
         rows = file.name.toLowerCase().endsWith('.pdf') ? await parseBankAPdfFile(file) : await parseBankACsvFile(file);
       } else if (importAccount === 'HL Bank') {
