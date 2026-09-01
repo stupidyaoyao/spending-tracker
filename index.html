@@ -4887,6 +4887,13 @@ async function parseBankACsvFile(file) {
       flow: credit ? 'in' : 'out'
     });
   });
+  // The CSV's own metadata block has a "To Date: ,DD-MM-YYYY" line right at
+  // the top (see the header rows this loop otherwise skips via DATE_RE not
+  // matching) — the statement's own declared end date, same idea as the PDF
+  // parser's "Tarikh Penyata" line above.
+  const toDateMatch = text.match(/To Date:\s*,\s*(\d{2})-(\d{2})-(\d{4})/);
+  const csvStatementEnd = toDateMatch ? `${toDateMatch[3]}-${toDateMatch[2]}-${toDateMatch[1]}` : null;
+  rows.__staleNote = staleImportNote_('PBank', csvStatementEnd, rows);
   return rows;
 }
 
@@ -5103,9 +5110,14 @@ async function parseBankAPdfFile(file) {
   // next year's statement.
   const MONTH_NUMS = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12' };
   let statementYear = String(new Date().getFullYear());
+  let statementDate = null;
   for (const l of allLines) {
     const ym = l.match(/(\d{1,2})\s+([A-Za-z]{3})\w*\s+(\d{4})/);
-    if (ym && MONTH_NUMS[ym[2].toLowerCase()]) { statementYear = ym[3]; break; }
+    if (ym && MONTH_NUMS[ym[2].toLowerCase()]) {
+      statementYear = ym[3];
+      statementDate = parseNamedDate_(ym[1], ym[2], ym[3]);
+      break;
+    }
   }
   const txns = parsePBankStatementLines(allLines);
   if (!txns.length) {
@@ -5138,6 +5150,7 @@ async function parseBankAPdfFile(file) {
       flow: t.flow,
     });
   });
+  rows.__staleNote = staleImportNote_('PBank', statementDate, rows);
   return rows;
 }
 
@@ -5432,6 +5445,7 @@ async function extractPdfRecords(file) {
   let records = [];
   let rawDump = null;
   let allSkipped = [];
+  let statementEnd = null;
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
@@ -5441,6 +5455,7 @@ async function extractPdfRecords(file) {
         const y = Math.round(it.transform[5] * 10) / 10;
         return `${i}: x=${x} y=${y} "${it.str}"`;
       }).join('\n');
+      statementEnd = parseTransactionPeriodEnd_(content.items.map(it => it.str || '').join(' '));
     }
     const pageRecords = parsePdfPageItems(content.items);
     allSkipped = allSkipped.concat(pageRecords.__skipped || []);
@@ -5448,6 +5463,7 @@ async function extractPdfRecords(file) {
   }
   records.__rawDump = rawDump;
   records.__skipped = allSkipped;
+  records.__statementEnd = statementEnd;
   return records;
 }
 
@@ -5485,6 +5501,7 @@ async function parsePdfFile(file) {
   const STATEMENT_JUNK_RE = /total|balance\s*b\/f|opening balance|closing balance|statement period/i;
   rows.__possibleMissed = (records.__skipped || [])
     .filter(s => RM_AMOUNT_RE.test(s.rawLine) && !STATEMENT_JUNK_RE.test(s.rawLine));
+  rows.__staleNote = staleImportNote_('TNG eWallet', records.__statementEnd, rows);
   return rows;
 }
 
@@ -5580,12 +5597,15 @@ async function extractCardPdfRecords(file) {
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   let records = [];
   let sawOnline = false;
+  let statementEnd = null;
   for (let p = 1; p <= pdf.numPages && !sawOnline; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
+    if (p === 1) statementEnd = parseTransactionPeriodEnd_(content.items.map(it => it.str || '').join(' '));
     if (content.items.some(it => it.str && it.str.indexOf('Online Card Transactions') !== -1)) sawOnline = true;
     records = records.concat(parseCardPdfPageItems(content.items));
   }
+  records.__statementEnd = statementEnd;
   return records;
 }
 
@@ -5623,6 +5643,46 @@ async function detectPdfStatementKind_(file) {
   return null;
 }
 
+// Shared "this statement might still be catching up" detector. Every
+// statement claims to cover through some end date (its own "Transaction
+// Period" or "Statement Date" line) — but the actual latest transaction
+// found INSIDE it can be several days older, purely from normal bank/card
+// posting delay (a reload or parking charge taking a few days to post is
+// routine, not a bug). Surfacing that gap explicitly means you don't have
+// to come ask "did I miss anything?" every time — the app tells you
+// up front whether a statement looks current or still behind.
+const MONTH_NAME_MAP_ = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12' };
+function parseNamedDate_(day, monthName, year) {
+  const mm = MONTH_NAME_MAP_[(monthName || '').slice(0,3).toLowerCase()];
+  if (!mm) return null;
+  return `${year}-${mm}-${String(day).padStart(2,'0')}`;
+}
+// Pulls the END date out of a "D Month YYYY - D Month YYYY" date range
+// (TNG eWallet + TNG Card PDFs both print this as their "Transaction
+// Period" value). Deliberately NOT anchored to the "Transaction Period"
+// label itself — pdf.js's item order groups this statement's header
+// labels together and their colon-prefixed values together as two
+// separate runs (e.g. "...Transaction Period Card Type... : 01 August
+// 2026 - 24 August 2026 : Generic..."), so the label and its value never
+// actually sit next to each other in the extracted text. A date-range
+// shape like this is unique enough among the header fields (the other
+// date field, Generated Date & Time, is a single timestamp with no dash)
+// that matching it directly is more reliable than trying to pair it back
+// up with its label.
+function parseTransactionPeriodEnd_(text) {
+  const m = (text || '').match(/\d{1,2}\s+([A-Za-z]+)\s+(\d{4})\s*-\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+  if (!m) return null;
+  return parseNamedDate_(m[3], m[4], m[5]);
+}
+function staleImportNote_(label, statementEndDate, rows) {
+  if (!statementEndDate || !rows || !rows.length) return '';
+  const latest = rows.map(r => r.date).filter(Boolean).sort().pop();
+  if (!latest) return '';
+  const gapDays = daysBetween_(latest, statementEndDate);
+  if (gapDays < 3) return '';
+  return `ℹ️ This ${label} statement covers through ${statementEndDate}, but the latest transaction found inside is from ${latest} (${gapDays} day${gapDays === 1 ? '' : 's'} earlier) — this is usually just normal posting delay. If you used it more recently, try re-uploading in a few days.`;
+}
+
 async function parseCardPdfFile(file) {
   const records = await extractCardPdfRecords(file);
   if (!records.length) {
@@ -5654,6 +5714,7 @@ async function parseCardPdfFile(file) {
     }
     // Unrecognized sector — skip rather than guess.
   });
+  rows.__staleNote = staleImportNote_('TNG Card', records.__statementEnd, rows);
   return rows;
 }
 
@@ -6520,7 +6581,8 @@ importSubmitBtn.onclick = async () => {
     const missedNote = (rows.__possibleMissed && rows.__possibleMissed.length)
       ? `⚠️ ${rows.__possibleMissed.length} line(s) in the PDF looked like they might be transactions but weren't recognized — check these manually: ${rows.__possibleMissed.map(m => `[${m.date}] ${m.rawLine}`).join(' | ')}`
       : '';
-    showImportPreview(rows, missedNote);
+    const combinedNote = [rows.__staleNote, missedNote].filter(Boolean).join(' ');
+    showImportPreview(rows, combinedNote);
     return;
   }
 
