@@ -2755,7 +2755,12 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
             : { display: false },
           tooltip: {
             callbacks: {
-              label: (c) => (c.label ? c.label + ': ' : '') + formatSignedRM(Number(c.parsed))
+              // Income mode's totals[] entries are flat-positive (spendAmount()
+              // never negates Income), so formatSignedRM's spend-positive
+              // convention would render them with a wrong "-RM" sign — flip
+              // just for this view. Every other pie (Overall/By type/By shop)
+              // keeps summing real spend, so its sign is already correct.
+              label: (c) => (c.label ? c.label + ': ' : '') + formatSignedRM(opts.incomeMode ? -Number(c.parsed) : Number(c.parsed))
             }
           }
         }
@@ -3486,6 +3491,12 @@ function spendAmount(t) {
 // not an expense figure, so Card Reload/TNG Card Top-up still show their
 // real amounts there.
 function expenseTotalAmount(t) {
+  // Income is always inbound money — spendAmount() leaves it flat-positive
+  // (see NON_SPEND_CATEGORIES branch there), which then displays with a
+  // "-RM" minus sign via formatSignedRM()'s spend-positive convention. Flip
+  // the sign here specifically for Income so day/period totals correctly
+  // show "+RM" for genuine incoming money instead.
+  if (t.category === 'Income') return -Number(t.amount || 0);
   if (t.category === 'Transfer' && normalizedSubTag(t.category, t.subTag) === 'Internal') return 0;
   return spendAmount(t);
 }
@@ -6414,7 +6425,15 @@ function renderImportPreview() {
 // before — they're still shown in the preview (in their own read-only
 // section) with a "Keep anyway" option, instead of silently vanishing.
 function importRowContext(r) {
-  return String(r.merchant || r.notes || '').trim().toLowerCase();
+  // Strip ALL internal whitespace, not just collapse it — two import passes
+  // of the same real-world transaction sometimes differ only by spacing
+  // ("ANTHROPIC*CLAUDE SUB" vs "ANTHROPIC* CLAUDE SUB", "Shopee MYMarketplace"
+  // vs "Shopee MY Marketplace"), which an exact/collapsed-whitespace compare
+  // still treats as different merchants, letting a genuine re-import back in
+  // as a fresh "new" row (see the 2026-09 Claude-subscription/Shopee
+  // duplicate investigation). Removing all whitespace makes both sides
+  // normalize identically regardless of spacing.
+  return String(r.merchant || r.notes || '').trim().toLowerCase().replace(/\s+/g, '');
 }
 // Reload/top-up rows are the one case where two DIFFERENT import pipelines
 // legitimately describe the exact same real-world event with different
