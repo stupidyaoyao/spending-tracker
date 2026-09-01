@@ -209,9 +209,22 @@
      unlike the earlier cramped 4th-card version, there's room here to show
      both numbers clearly instead of one muted and one bold. */
   .totals-all { margin: 0 0 14px; }
-  .total-card-all { background: var(--card); border-radius: 14px; padding: 14px 16px; cursor: pointer; border: 1px solid transparent; }
+  .total-card-all { background: var(--card); border-radius: 14px; padding: 14px 16px; border: 1px solid transparent; }
   .total-card-all.active { border-color: var(--accent); background: #241c0f; }
-  .total-card-all .label { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .total-card-all .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  /* Single period-total card (replaces the old fixed Last week/This month/
+     All time 3-card row) — label is the period name (e.g. "Last month"),
+     value is that period's net spend, sub is the actual date range so it's
+     never ambiguous which days it covers. */
+  .total-card-all .value { font-size: 24px; font-weight: 700; white-space: nowrap; }
+  .total-card-all .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  /* The period dropdown itself, sitting just above the total card —
+     styled like the existing toolbar selects (Group by/Sort by) so it
+     doesn't look like a separate, unrelated control. */
+  .period-select {
+    width: 100%; background: var(--card); color: var(--text); border: 1px solid transparent;
+    border-radius: 14px; padding: 10px 12px; font-size: 14px; font-weight: 600;
+  }
   .total-all-row { display: flex; justify-content: space-around; align-items: center; }
   .total-all-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .total-all-label { font-size: 11px; color: var(--muted); }
@@ -579,6 +592,22 @@
     <div class="totals-all" id="totalsAll"></div>
     <div class="totals" id="totals"></div>
 
+    <div class="trend-range-row" id="mainRangeRow">
+      <button class="range-date-btn" id="mainFromBtn" data-target="from"></button>
+      <span>to</span>
+      <button class="range-date-btn" id="mainToBtn" data-target="to"></button>
+      <button class="toolbar-btn" id="mainRangeClearBtn">Clear</button>
+    </div>
+    <div class="mini-cal-popup" id="mainMiniCalPopup">
+      <div class="mini-cal-head">
+        <button class="cal-nav-btn" id="mainMiniCalPrev">&lsaquo;</button>
+        <span id="mainMiniCalLabel"></span>
+        <button class="cal-nav-btn" id="mainMiniCalNext">&rsaquo;</button>
+      </div>
+      <div class="mini-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+      <div class="mini-cal-grid" id="mainMiniCalGrid"></div>
+    </div>
+
     <div class="chart-card">
       <div class="chart-head">
         <span id="chartTitle">Overall</span>
@@ -627,23 +656,6 @@
         <option value="amount_desc">Sort: Amount high-low</option>
         <option value="amount_asc">Sort: Amount low-high</option>
       </select>
-      <button class="toolbar-btn" id="mainDateBtn">Date range</button>
-    </div>
-
-    <div class="trend-range-row" id="mainRangeRow">
-      <button class="range-date-btn" id="mainFromBtn" data-target="from"></button>
-      <span>to</span>
-      <button class="range-date-btn" id="mainToBtn" data-target="to"></button>
-      <button class="toolbar-btn" id="mainRangeClearBtn">Clear</button>
-    </div>
-    <div class="mini-cal-popup" id="mainMiniCalPopup">
-      <div class="mini-cal-head">
-        <button class="cal-nav-btn" id="mainMiniCalPrev">&lsaquo;</button>
-        <span id="mainMiniCalLabel"></span>
-        <button class="cal-nav-btn" id="mainMiniCalNext">&rsaquo;</button>
-      </div>
-      <div class="mini-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
-      <div class="mini-cal-grid" id="mainMiniCalGrid"></div>
     </div>
 
     <div class="toolbar-secondary" id="toolbarSecondary" style="display:none;">
@@ -2073,9 +2085,11 @@ document.getElementById('miniCalPrev').onclick = () => { miniCalMonth.setMonth(m
 document.getElementById('miniCalNext').onclick = () => { miniCalMonth.setMonth(miniCalMonth.getMonth() + 1); renderMiniCal(); };
 
 // Same tap-a-day mini calendar pattern as Trends' Custom range, but for the
-// Main page's own "Date range" button beside Group by/Sort by — an
-// independent from/to filter over the transaction list (see the filter in
-// render()). null/null means no range set, i.e. show everything.
+// The from/to mini-calendar row shown when the period dropdown (see
+// selectMainPeriod()/renderTotals() above) is set to "Custom range…" — the
+// dropdown itself now shows the selected period name, so this row only
+// needs to manage its own from/to buttons and visibility, not a separate
+// "Date range" button anymore.
 let mainRangeFrom = null;
 let mainRangeTo = null;
 let mainRangeRowOpen = false;
@@ -2083,10 +2097,6 @@ let mainMiniCalTarget = null; // 'from' | 'to' | null (closed)
 let mainMiniCalMonth = new Date();
 
 function renderMainRangeButtons() {
-  const hasRange = mainRangeFrom && mainRangeTo;
-  const btn = document.getElementById('mainDateBtn');
-  btn.textContent = hasRange ? formatRangeBtnLabel(mainRangeFrom) + ' - ' + formatRangeBtnLabel(mainRangeTo) : 'Date range';
-  btn.classList.toggle('active', hasRange);
   document.getElementById('mainRangeRow').classList.toggle('show', mainRangeRowOpen);
   const todayStr = new Date().toISOString().slice(0, 10);
   document.getElementById('mainFromBtn').textContent = formatRangeBtnLabel(mainRangeFrom || todayStr);
@@ -2142,15 +2152,15 @@ function renderMainMiniCal() {
     };
   });
 }
-document.getElementById('mainDateBtn').onclick = () => {
-  mainRangeRowOpen = !mainRangeRowOpen;
-  if (!mainRangeRowOpen) closeMainMiniCal();
-  renderMainRangeButtons();
-};
 document.getElementById('mainRangeClearBtn').onclick = () => {
   mainRangeFrom = null;
   mainRangeTo = null;
   mainRangeRowOpen = false;
+  // Clearing a custom range with nothing else selected would otherwise
+  // leave the period dropdown stuck on "Custom range…" showing "Pick a
+  // date range below" — fall back to "All time" instead, same as if
+  // Custom had never been picked in the first place.
+  mainPeriod = 'all';
   closeMainMiniCal();
   renderMainRangeButtons();
   render();
@@ -2340,13 +2350,13 @@ function renderHistory() {
   });
 }
 
-// Clears every Main-page filter (account/category/subtag/search/custom date
-// range) back to its default "show everything" state, without touching page
-// navigation or the time-scope (Today/Week/Month/All time) pie toggle —
-// those are handled separately by whoever calls this. Used by the
-// bottom-left reset button, the "All time" stat card (see renderTotals()),
-// and jumpToRecord() below (which needs a clean slate before it can
-// guarantee the target row is actually visible).
+// Clears every Main-page filter (account/category/subtag/search/period)
+// back to its default "show everything" state, without touching page
+// navigation. Used by the bottom-left reset button and jumpToRecord()
+// below. Now also resets mainPeriod to 'all' — since the period filter
+// scopes the transaction list too (not just the pies, see
+// computeMainPeriodRange()), a jump-to-record target from outside the
+// current period would otherwise still be invisible after a "reset".
 function resetMainFilters() {
   activeAccountFilter = 'All';
   activeFilter = 'All';
@@ -2356,6 +2366,8 @@ function resetMainFilters() {
   if (searchBox) searchBox.value = '';
   mainRangeFrom = null;
   mainRangeTo = null;
+  mainRangeRowOpen = false;
+  mainPeriod = 'all';
   if (typeof renderMainRangeButtons === 'function') renderMainRangeButtons();
 }
 
@@ -2420,24 +2432,54 @@ function startOfLastWeek(d) {
   return r;
 }
 
-// Which time window the pies (big + mini) are scoped to — null means all
-// time (no scoping). Set by tapping one of the Last week/This month/All
-// time cards below; tapping the already-active one clears it back to null
-// (all time, same effect as the "All time" card).
-let activeTimeFilter = 'month'; // null | 'week' | 'month' | 'all' — defaults
-// to "This month" on load (most people want "how am I doing this month" at
-// a glance), rather than the whole history. Tap Last week/All time to
-// switch, tap whichever card is active to go back to unscoped (all time).
+// Single period selector that scopes BOTH the pies (big + mini) AND the
+// transaction list/totals below — replaces two previously-independent
+// controls (the Last week/This month/All time pie-only toggle, and the
+// separate "Date range" button that only touched the list). Having two
+// disconnected date scopes meant the pie and the list could show numbers
+// from two entirely different windows at once with no visual indication
+// why (e.g. pie = all-time Car spend, list = zero rows in a custom range
+// that just didn't happen to contain any) — this unifies them so picking
+// a period always means the same thing everywhere on the page.
+// 'today' | 'week' (this week) | 'lastWeek' | 'month' (this month) |
+// 'lastMonth' | 'all' | 'custom' (uses mainRangeFrom/mainRangeTo below).
+// Defaults to "Last month" — a fresh calendar month (like right after it
+// flips over) would otherwise show RM0 under "This month" with no easy way
+// to see what was actually spent last month without digging through every
+// category one at a time.
+let mainPeriod = 'lastMonth';
+
+// Returns [fromDateStr, toDateStr] (inclusive, "YYYY-MM-DD") for the
+// currently selected mainPeriod, or [null, null] for "no scoping" (all
+// time, or "custom" before any dates have been picked yet). The one place
+// that turns mainPeriod into actual dates — isInTimeFilter (pies) and
+// render()'s list/totals filter (see below) both call this so they can
+// never drift apart the way the old two-filter setup could.
+function computeMainPeriodRange() {
+  const now = new Date();
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayStr = fmt(now);
+  if (mainPeriod === 'today') return [todayStr, todayStr];
+  if (mainPeriod === 'week') return [fmt(startOfWeek(now)), todayStr];
+  if (mainPeriod === 'lastWeek') {
+    const s = startOfLastWeek(now);
+    const e = new Date(s); e.setDate(e.getDate() + 6);
+    return [fmt(s), fmt(e)];
+  }
+  if (mainPeriod === 'month') return [fmt(new Date(now.getFullYear(), now.getMonth(), 1)), todayStr];
+  if (mainPeriod === 'lastMonth') {
+    const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const e = new Date(now.getFullYear(), now.getMonth(), 0); // day 0 of this month = last day of previous month
+    return [fmt(s), fmt(e)];
+  }
+  if (mainPeriod === 'custom') return [mainRangeFrom, mainRangeTo];
+  return [null, null]; // 'all'
+}
 
 function isInTimeFilter(t) {
-  if (!activeTimeFilter) return true;
-  const now = new Date();
-  const d = new Date(t.date);
-  // 'week' now means the calendar week *before* the current one ("Last
-  // week"), not the still-in-progress current week.
-  if (activeTimeFilter === 'week') return d >= startOfLastWeek(now) && d < startOfWeek(now);
-  if (activeTimeFilter === 'month') return d >= new Date(now.getFullYear(), now.getMonth(), 1);
-  return true;
+  const [from, to] = computeMainPeriodRange();
+  if (!from || !to) return true;
+  return t.date >= from && t.date <= to;
 }
 
 // "Updated 30 Jul, 14:47" — the date+time of the most recent transaction in
@@ -2457,51 +2499,69 @@ function lastUpdatedLabel(base) {
     ', ' + latest.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+const MAIN_PERIOD_LABELS = {
+  today: 'Today', week: 'This week', lastWeek: 'Last week',
+  month: 'This month', lastMonth: 'Last month', all: 'All time', custom: 'Custom range',
+};
+
+// Changes mainPeriod and re-renders — the one place that does both, so
+// every trigger (the dropdown below, and anywhere else that might want to
+// change the period later) stays in sync the same way. Picking "custom"
+// opens the from/to mini-calendar row instead of computing a range right
+// away, since there's nothing to compute until dates are actually picked.
+function selectMainPeriod(period) {
+  mainPeriod = period;
+  if (period === 'custom') {
+    mainRangeRowOpen = true;
+  } else {
+    mainRangeRowOpen = false;
+    closeMainMiniCal();
+  }
+  renderMainRangeButtons();
+  render();
+}
+
 function renderTotals(txns, incomeTxns) {
-  const now = new Date();
-  const lastWeekStart = startOfLastWeek(now);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  // txns arrives already scoped to mainPeriod (see the date-range filter in
+  // render()) as well as account/category/subtag/search — so the total
+  // here is simply everything currently in `txns`, no separate per-period
+  // math needed the way the old fixed Last-week/This-month/All-time cards
+  // required.
+  const total = txns.reduce((s, t) => s + expenseTotalAmount(t), 0);
+  const [from, to] = computeMainPeriodRange();
+  const fmtShort = (dateStr) => new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  let rangeLabel;
+  if (mainPeriod === 'all') rangeLabel = 'All time';
+  else if (from && to) rangeLabel = from === to ? fmtShort(from) : `${fmtShort(from)} - ${fmtShort(to)}`;
+  else rangeLabel = 'Pick a date range below';
 
-  const sum = (filterFn) => txns.filter(filterFn).reduce((s, t) => s + expenseTotalAmount(t), 0);
-
-  const lastWeekEnd = new Date(lastWeekStart); lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
-  const week = sum(t => { const d = new Date(t.date); return d >= lastWeekStart && d <= lastWeekEnd; });
-  const month = sum(t => new Date(t.date) >= monthStart);
-  const allTime = sum(() => true);
-
-  const fmtShort = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const weekRangeLabel = `${fmtShort(lastWeekStart)} - ${fmtShort(lastWeekEnd)}`;
-
-  const cardActive = (scope) => activeTimeFilter === scope ? ' active' : '';
-  // Three equal-size cards in one row: Last week, This month, All time.
-  // "All time" used to get its own larger standalone rectangle with a
-  // separate Expense/Income split — it's now just a third quick-pick here,
-  // matching the compact single-net-value style of the other two (its
-  // Income figure is still visible the normal way: via the Overall
-  // Expense/Income stat row above once "All time" is the active scope).
-  document.getElementById('totals').innerHTML = `
-    <div class="total-card${cardActive('week')}" data-scope="week"><div class="label">Last week</div><div class="value">${formatSignedRM(week)}</div><div class="sub">${weekRangeLabel}</div></div>
-    <div class="total-card${cardActive('month')}" data-scope="month"><div class="label">This month</div><div class="value">${formatSignedRM(month)}</div></div>
-    <div class="total-card${cardActive('all')}" data-scope="all"><div class="label">All time</div><div class="value">${formatSignedRM(allTime)}</div></div>
+  // Single dropdown replaces the old fixed Last week/This month/All time
+  // cards — it's the one control for the period, and (unlike before) it
+  // scopes the pies AND the transaction list/totals together, see
+  // computeMainPeriodRange()/isInTimeFilter() above and the list filter in
+  // render().
+  document.getElementById('totalsAll').innerHTML = `
+    <select id="periodSelect" class="period-select">
+      <option value="today">Today</option>
+      <option value="week">This week</option>
+      <option value="lastWeek">Last week</option>
+      <option value="month">This month</option>
+      <option value="lastMonth">Last month</option>
+      <option value="all">All time</option>
+      <option value="custom">Custom range…</option>
+    </select>
   `;
-  document.getElementById('totalsAll').innerHTML = '';
-  // Tapping a card scopes the pies (big + mini, see renderCharts()) to that
-  // period; tapping the same card again clears back to all-time. This is
-  // purely a pie-scoping control — the totals cards themselves always show
-  // their own fixed period regardless, and the transaction list below isn't
-  // affected. "All time" specifically ALSO resets every Main filter
-  // (account/category/subtag/search/date range) back to default every time
-  // it's tapped — same as the bottom-left reset button (see
-  // resetMainFilters()) — since "all time" is naturally read as "show me
-  // literally everything" rather than just a pie-scope toggle.
-  document.querySelectorAll('#totals .total-card').forEach(el => {
-    el.onclick = () => {
-      const scope = el.dataset.scope;
-      activeTimeFilter = activeTimeFilter === scope ? null : scope;
-      if (scope === 'all') resetMainFilters();
-      render();
-    };
-  });
+  const periodSelect = document.getElementById('periodSelect');
+  periodSelect.value = mainPeriod;
+  periodSelect.onchange = () => selectMainPeriod(periodSelect.value);
+
+  document.getElementById('totals').innerHTML = `
+    <div class="total-card-all">
+      <div class="label">${escapeHtml(MAIN_PERIOD_LABELS[mainPeriod] || '')}</div>
+      <div class="value">${formatSignedRM(total)}</div>
+      <div class="sub">${escapeHtml(rangeLabel)}</div>
+    </div>
+  `;
 }
 
 // Semantic palette: categories that are always spending get warm red/orange
@@ -2711,8 +2771,10 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
 // one selected account (bigger) when you've drilled into a specific account
 // — i.e. picking an account "zooms" the mini row down to that account
 // instead of touching the combined pie above it. Both the big pie and the
-// minis are further scoped by activeTimeFilter (Today/This week/This
-// month/all-time) via chartTxnsFor()/statsFor().
+// minis are further scoped by the mainPeriod dropdown (Today/This week/
+// Last week/This month/Last month/All time/Custom) via
+// chartTxnsFor()/statsFor() — the same period the transaction list/totals
+// below use, see computeMainPeriodRange().
 function renderCharts() {
   const modeToggleEl = document.getElementById('chartModeToggle');
   // Guests in view-only mode never get an Expense/Income switch on the
@@ -2798,7 +2860,7 @@ function renderCharts() {
     });
     // On the "All categories" view, the mini pie's head number is that
     // account/group's Income-Expense net flow for whichever period is
-    // selected (Today/This week/This month/all-time via activeTimeFilter) —
+    // selected (via the mainPeriod dropdown, see computeMainPeriodRange) —
     // "how much did I use or earn" for that window. The account's REAL
     // current balance is a separate, always-current figure shown below the
     // pie instead (see trueEl below) so the two don't get conflated. When a
@@ -3144,12 +3206,14 @@ function render() {
   // (and the totals below, same as the category filters do) to whatever
   // matches, e.g. "grab" or "lunch with ali".
   filtered = searchFilter(filtered);
-  // Independent custom date-range filter (the "Date range" button beside
-  // Group by/Sort by) — narrows the list + Totals cards the same way search
-  // does. Deliberately separate from the Today/This week/This month scoping
-  // above (activeTimeFilter), which only drives the Overall/mini pies.
-  if (mainRangeFrom && mainRangeTo) {
-    filtered = filtered.filter(t => t.date >= mainRangeFrom && t.date <= mainRangeTo);
+  // The period dropdown above the pie (see computeMainPeriodRange()) — the
+  // SAME range used by isInTimeFilter() for the pies, so the list/totals
+  // and the pie always agree on what window they're both showing, instead
+  // of the two being able to silently drift apart the way the old separate
+  // "Date range" button + Last week/Month/All time pie toggle could.
+  const [mainPeriodFrom, mainPeriodTo] = computeMainPeriodRange();
+  if (mainPeriodFrom && mainPeriodTo) {
+    filtered = filtered.filter(t => t.date >= mainPeriodFrom && t.date <= mainPeriodTo);
   }
   // On the "All" view, keep Transfer out of the totals cards so wallet
   // top-ups/sends/receipts don't inflate spend numbers. Selecting the
@@ -4334,7 +4398,7 @@ function groupByRemark(remark) {
   activeAccountFilter = 'All';
   activeFilter = 'All';
   activeSubFilter = 'All';
-  activeTimeFilter = null;
+  mainPeriod = 'all';
   render();
 }
 function attachLinkHandlers() {
@@ -4959,6 +5023,7 @@ function reconstructPdfLines(items) {
 const PBANK_KNOWN_TYPES = [
   'TSFR FUND CR', 'DUITNOW TRSF DR', 'DUITNOW TRSF CR', 'DUITNOW QR DR', 'DUITNOW QR CR',
   'PB DEBIT CARD DR', 'DR MYDEBIT', 'MYDEBIT PURCHASE', 'DEP-ECP', 'DR-ECP', 'SST DR', 'IBG DR', 'IBG CR',
+  'ATM WDL',
 ].sort((a, b) => b.length - a.length);
 
 // Turns the reconstructed text lines of a PBank statement into transaction
@@ -4976,9 +5041,26 @@ const PBANK_KNOWN_TYPES = [
 // "Balance From Last Statement" line.
 function parsePBankStatementLines(lines) {
   const BALANCE_SEED_RE = /balance/i;
-  const TRAILING_TWO_NUMS_RE = /^(.*?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
+  // The leading gap is \s* (zero-or-more), not \s+ — a Print Preview
+  // boundary line can be JUST "amount   balance" with no description text
+  // of its own (its description arrived as a separate pre-detail line
+  // instead, see pendingBlock below); DATE_RE's own \s+ already consumes
+  // every space between the date and here, so there's no leftover leading
+  // space for an empty group1 to sit in front of. Requiring \s+ made such
+  // a line fall through this check entirely (only 2 number-tokens exist,
+  // not 3), silently miss the transaction boundary, and get swallowed as
+  // more pre-detail text instead.
+  const TRAILING_TWO_NUMS_RE = /^(.*?)\s*([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
   const TRAILING_ONE_NUM_RE = /^(.*?)\s+([\d,]+\.\d{2})\s*$/;
-  const DATE_RE = /^(\d{1,2})\/(\d{1,2})\s+(.*)$/;
+  // Two real PBank PDF shapes print the date differently: the official
+  // downloadable statement uses day/month only, no year, slash-separated
+  // ("12/07") — the year comes from the statement header instead (see
+  // parseBankAPdfFile). The online-banking "Print Preview" export prints a
+  // full day-month-year, dash-separated ("01-08-2026") — the 4th capture
+  // group here is only present for that second shape, and is used below to
+  // build a complete date immediately instead of a bare "DD/MM" that needs
+  // the statement-year fallback.
+  const DATE_RE = /^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{4}))?\s+(.*)$/;
   // Page-repeating letterhead/header/footer boilerplate that every PBank
   // statement PDF prints at the top and bottom of EVERY page. Since
   // `current` is now kept open across a page break (see the comment below),
@@ -5007,12 +5089,31 @@ function parsePBankStatementLines(lines) {
     'ALOR SETAR BRANCH', 'JLN TELUK WANJAH', '^05200 ALOR SETAR$',
     '^KEDAH DARUL AMAN$', '^TEL:', '^NG JIA YAO\\s*$', '^DESA SERAYA$',
     '^05050 ALOR SETAR KEDAH$',
+    // Header/footer boilerplate specific to the online-banking "Print
+    // Preview" export shape (see the DATE_RE comment above) — this export
+    // has its own account-summary header and browser-print footer instead
+    // of the official statement's PENYATA AKAUN letterhead.
+    'PrintPreview', 'Savings / Current Account Transaction History',
+    'Account No\\.', 'Account Name', 'Account Type', 'Search Mode', 'Page Number',
+    '^Transaction\\s+Debit\\s+Credit$', '^Transaction Description\\s+Balance$',
+    '^Date\\s+Amount\\s+Amount', 'PUBLIC BANK BERHAD', 'PUBLIC ISLAMIC BANK',
+    '^Note$', 'This is a computer generated receipt', '^about:blank',
   ].join('|'), 'i');
 
   const txns = [];
   let currentDate = null;
   let prevBalance = null;
   let current = null;
+  // Holds description line(s) that arrive BEFORE their transaction's own
+  // date+amount line — only happens in the Print Preview export shape,
+  // where a card/QR transaction's type+merchant line sometimes prints
+  // above the date/amount/balance line rather than sharing it (the
+  // official statement always keeps them on the same line). Recognized by
+  // starting with a known PBANK_KNOWN_TYPES prefix, so a genuine
+  // continuation/reference line (which never starts with one) can't be
+  // mistaken for the start of a new transaction and misfiled onto the
+  // wrong one.
+  let pendingBlock = [];
 
   function finalize() {
     if (current) txns.push(current);
@@ -5026,15 +5127,30 @@ function parsePBankStatementLines(lines) {
     let rest = line;
     const dm = line.match(DATE_RE);
     if (dm) {
-      currentDate = `${dm[1].padStart(2, '0')}/${dm[2].padStart(2, '0')}`;
-      rest = dm[3];
+      // dm[3] (the year) is only present in the Print Preview export's
+      // dash-separated date — build a complete date right away for that
+      // shape; the official statement's bare "DD/MM" still needs the
+      // statement-year fallback applied later in parseBankAPdfFile.
+      currentDate = dm[3]
+        ? `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}`
+        : `${dm[1].padStart(2, '0')}/${dm[2].padStart(2, '0')}`;
+      rest = dm[4];
     }
     if (!rest.trim()) return;
 
     const twoNums = rest.match(TRAILING_TWO_NUMS_RE);
     if (twoNums) {
       finalize();
-      const desc = twoNums[1].trim();
+      let desc = twoNums[1].trim();
+      if (pendingBlock.length) {
+        // A pre-detail block (see pendingBlock above) collected ahead of
+        // this boundary line belongs to THIS transaction — fold it into
+        // the description before extracting the type code below, exactly
+        // as if it had been printed inline like the official statement
+        // does.
+        desc = (pendingBlock.join(' ') + (desc ? ' ' + desc : '')).trim();
+        pendingBlock = [];
+      }
       const amount = parseFloat(twoNums[2].replace(/,/g, ''));
       const balance = parseFloat(twoNums[3].replace(/,/g, ''));
       let typeCode = desc;
@@ -5077,9 +5193,22 @@ function parsePBankStatementLines(lines) {
     // land ahead of the real merchant text that follows on the next page.
     if (BOILERPLATE_RE.test(line)) return;
 
-    // Anything else is a wrapped continuation line (merchant/reference
-    // detail) belonging to whichever transaction is currently in progress.
-    if (current) current.detailParts.push(rest.trim());
+    // Anything else is either: a wrapped continuation line (merchant/
+    // reference detail) belonging to whichever transaction is currently in
+    // progress — the official statement's only shape — or, in the Print
+    // Preview export, the START of a pre-detail block for the NEXT
+    // transaction (see pendingBlock above), recognized by starting with a
+    // known type prefix. Once a pre-detail block has started, any further
+    // non-boundary line keeps extending it rather than falling back to
+    // `current`, in case a Print Preview description ever wraps onto more
+    // than one line before its date+amount line arrives.
+    const trimmed = rest.trim();
+    const startsNewPreDetail = PBANK_KNOWN_TYPES.some(kt => trimmed.toUpperCase().startsWith(kt));
+    if (startsNewPreDetail || pendingBlock.length) {
+      pendingBlock.push(trimmed);
+    } else if (current) {
+      current.detailParts.push(trimmed);
+    }
   });
   finalize();
   return txns;
@@ -5119,6 +5248,17 @@ async function parseBankAPdfFile(file) {
       break;
     }
   }
+  // The online-banking "Print Preview" export (see the DATE_RE comment in
+  // parsePBankStatementLines) has no named-month header line at all — its
+  // own "Closing Balance" line already carries the full dash-separated
+  // date though ("29-08-2026 Closing Balance ..."), so that's used as the
+  // statement end date instead, purely for the stale-import note below.
+  if (!statementDate) {
+    for (const l of allLines) {
+      const cb = l.match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+Closing Balance/i);
+      if (cb) { statementDate = `${cb[3]}-${cb[2].padStart(2,'0')}-${cb[1].padStart(2,'0')}`; break; }
+    }
+  }
   const txns = parsePBankStatementLines(allLines);
   if (!txns.length) {
     const err = new Error(`Couldn't recognize any transactions in that PDF.\n\nFirst few reconstructed lines:\n${allLines.slice(0, 15).join('\n')}`);
@@ -5136,7 +5276,15 @@ async function parseBankAPdfFile(file) {
     // the transaction line itself (transfers, mainly) get it shifted in.
     const detailCols = t.restOfDesc ? [t.restOfDesc, ...t.detailParts] : t.detailParts;
     const guess = categorizeBankA(t.typeCode, detailCols);
-    const dm = t.date.match(/^(\d{2})\/(\d{2})$/);
+    // t.date is either a bare "DD/MM" (official statement — needs the
+    // statement-year fallback below) or already a complete "YYYY-MM-DD"
+    // (Print Preview export, which prints its own year) — or, in principle,
+    // still null if a transaction line was somehow encountered before any
+    // date line at all. Guarded explicitly so a genuinely unparseable row
+    // gets skipped with its date left null (surfaces as a visibly wrong/
+    // missing date to go check manually) instead of crashing the whole
+    // import with a TypeError partway through the batch.
+    const dm = t.date ? t.date.match(/^(\d{2})\/(\d{2})$/) : null;
     // Statement rows are printed newest-first-per-page in this export but
     // can straddle a New Year in principle; a Dec/Jan boundary edge case
     // isn't handled here — same simplifying assumption the rest of this
@@ -5621,7 +5769,12 @@ async function extractCardPdfRecords(file) {
 const PDF_KIND_MARKERS = [
   { kind: 'TNG', label: 'TNG eWallet', re: /TNG WALLET TRANSACTION HISTORY/i },
   { kind: 'TNG Card', label: 'TNG Card', re: /Customer Transactions Statement/i },
-  { kind: 'PBank', label: 'PBank', re: /(STATEMENT OF ACCOUNT|PENYATA AKAUN|PIDM)/i },
+  // PBank has two real-world export shapes: the official downloadable
+  // statement (STATEMENT OF ACCOUNT / PENYATA AKAUN / PIDM disclaimer) and
+  // the online-banking "Print Preview" screen saved as a PDF (its own
+  // "Savings / Current Account Transaction History" / "Search Mode" header
+  // instead) — both need to be recognized as PBank here.
+  { kind: 'PBank', label: 'PBank', re: /(STATEMENT OF ACCOUNT|PENYATA AKAUN|PIDM|Current Account Transaction History|Search Mode\s*:)/i },
 ];
 async function detectPdfStatementKind_(file) {
   if (!window.pdfjsLib) return null;
