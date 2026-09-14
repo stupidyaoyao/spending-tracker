@@ -796,7 +796,8 @@
           <label>Account</label>
           <select id="fAccount">
             <option value="TNG">TNG</option>
-            <option value="HL Bank">HL Bank</option>
+            <option value="HL Bank 1">HL Bank 1</option>
+            <option value="HL Bank 2">HL Bank 2</option>
             <option value="PBank">PBank</option>
             <option value="Cash">Cash</option>
           </select>
@@ -829,7 +830,8 @@
           <option value="TNG-Screenshot">TNG eWallet (Screenshot)</option>
           <option value="TNG Card">TNG Card (PDF or CSV)</option>
           <option value="TNG Card-Screenshot">TNG Card (Screenshot)</option>
-          <option value="HL Bank">HL Bank (CSV)</option>
+          <option value="HL Bank 1">HL Bank 1 (CSV)</option>
+          <option value="HL Bank 2">HL Bank 2 (CSV)</option>
           <option value="PBank">PBank (PDF or CSV)</option>
         </select>
       </div>
@@ -1042,6 +1044,12 @@ const CATEGORY_OPTIONS = [
   // is filed under this single subtag. The Merchant text still says which
   // specific leg it was (e.g. "To Bank B"); see txnTitle()/transferHint().
   { category: 'Transfer', subTag: 'Internal', label: 'Transfer · Internal' },
+  // Manual-only bucket for cash you pulled out (ATM withdrawal etc.) — no
+  // auto-categorization rule ever assigns this; the user marks it by hand
+  // during Review when they decide a withdrawal is genuinely "to cash"
+  // rather than something else. See categorize()/CATEGORY_RULES: neither
+  // touches this subtag.
+  { category: 'Transfer', subTag: 'To Cash', label: 'Transfer · To Cash' },
   { category: 'Income', subTag: 'Salary', label: 'Income · Salary' },
   { category: 'Income', subTag: 'Interest', label: 'Income · Interest' },
   { category: 'Income', subTag: 'Other', label: 'Income · Other' },
@@ -1122,7 +1130,7 @@ function trueBalanceFor(account) {
 // Expense/Income above it, this number doesn't change when you tap
 // Today/This week/This month.
 function currentBalanceTotal() {
-  return ['TNG', 'HL Bank', 'PBank', 'TNG Card'].reduce((s, a) => {
+  return ['TNG', 'HL Bank 1', 'HL Bank 2', 'PBank', 'TNG Card'].reduce((s, a) => {
     const b = trueBalanceFor(a);
     return s + (b === null ? 0 : b);
   }, 0);
@@ -1176,7 +1184,20 @@ function categorize(description, type) {
 }
 
 let allTxns = [];
-const ACCOUNTS = ['TNG', 'HL Bank', 'PBank', 'Cash'];
+// HL Bank split into two real accounts (2026-09): "HL Bank 1" is the old
+// physical account (all pre-split rows renamed to this via Code.gs's
+// splitHLBankAccount()), "HL Bank 2" is the newly opened one. Kept as two
+// permanently separate accounts here — same as TNG/PBank never merge — so
+// HL Bank 1's history stays intact; if/when HL Bank 1 physically closes, a
+// future one-time migration (mirroring splitHLBankAccount) can rename all
+// "HL Bank 1" rows to "HL Bank 2" to fold the history together, same
+// pattern as the original renameBankAccounts() migration.
+const ACCOUNTS = ['TNG', 'HL Bank 1', 'HL Bank 2', 'PBank', 'Cash'];
+// Any transaction whose account is one of the two physical HL Bank
+// accounts — used wherever old code only ever knew about a single "HL
+// Bank" (reconciliation matching, sync-gap detection) since a transfer to
+// "the bank" could now be either one.
+function isHLBank(account) { return account === 'HL Bank 1' || account === 'HL Bank 2'; }
 // Cash is manually-tracked (no CSV/PDF import) and gets a filter chip like
 // any other account, but is deliberately left out of the default "All"
 // mini-pie grid so it doesn't clutter the main view — its own pie only
@@ -1189,7 +1210,7 @@ const ACCOUNTS = ['TNG', 'HL Bank', 'PBank', 'Cash'];
 // chip individually still zooms into just that one, unmerged).
 const MINI_PIE_GROUPS = [
   { label: 'TNG', accounts: ['TNG'] },
-  { label: 'Banks', accounts: ['HL Bank', 'PBank'] }
+  { label: 'Banks', accounts: ['HL Bank 1', 'HL Bank 2', 'PBank'] }
 ];
 let activeAccountFilter = 'All';
 let activeFilter = 'All';
@@ -2600,7 +2621,7 @@ const SUBTAG_COLORS = {
   // really the exact same "moved money between my own accounts" concept,
   // just now confirmed. All three share this yellow instead.
   'Card Reload': '#ffcc00', 'TNG Card Top-up': '#ffcc00', 'Internal': '#ffcc00',
-  'To Others': '#8e8e93', 'From Others': '#636366',
+  'To Others': '#8e8e93', 'From Others': '#636366', 'To Cash': '#a2845e',
   Salary: '#30d158', Interest: '#64d2ff', Other: '#bf5af2', Others: '#8e8e93'
 };
 function colorForSub(key) { return SUBTAG_COLORS[key] || '#8e8e93'; }
@@ -2993,7 +3014,7 @@ function renderStatBreakdown(base) {
   if (stat === 'balance') {
     // Real running balance per account, not Income-Expense — same source
     // as currentBalanceTotal() above.
-    rows = ['TNG', 'HL Bank', 'PBank', 'TNG Card']
+    rows = ['TNG', 'HL Bank 1', 'HL Bank 2', 'PBank', 'TNG Card']
       .map(a => ({ account: a, value: trueBalanceFor(a) }))
       .filter(r => r.value !== null);
     note = '<div class="stat-breakdown-note">Cash not included — no starting balance set for it yet</div>';
@@ -3831,6 +3852,12 @@ function internalSyncGaps() {
       latestDateByAccount[t.account] = t.date;
     }
   });
+  // The gaps below still label the awaiting side generically as "HL Bank"
+  // (a gap could be waiting on either physical HL Bank account) — give that
+  // generic label a combined "latest date" too, so isStale_ below keeps
+  // working now that real rows are tagged "HL Bank 1"/"HL Bank 2" instead.
+  latestDateByAccount['HL Bank'] = [latestDateByAccount['HL Bank 1'], latestDateByAccount['HL Bank 2']]
+    .filter(Boolean).sort().pop();
   const isStale_ = (gapDate, awaitingAccount) => {
     const latest = latestDateByAccount[awaitingAccount];
     return !!latest && daysBetween_(gapDate, latest) > RELOAD_SYNC_MATCH_WINDOW_DAYS;
@@ -3877,7 +3904,7 @@ function internalSyncGaps() {
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const cardLegs = allTxns.filter(t => t.account === 'TNG Card' && RELOAD_SUBTAGS.includes(t.subTag));
   const hlToTng = allTxns
-    .filter(t => t.account === 'HL Bank' && t.category === 'Transfer' && t.subTag === 'Internal' && /to tng/i.test(t.merchant || ''));
+    .filter(t => isHLBank(t.account) && t.category === 'Transfer' && t.subTag === 'Internal' && /to tng/i.test(t.merchant || ''));
 
   const tngOtherPool = [
     ...cardLegs.map(c => ({ kind: 'card', row: c })),
@@ -3958,6 +3985,7 @@ function internalSyncGaps() {
     gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank', stale: isStale_(t.date, 'HL Bank') });
   });
   hlToTng.forEach(b => {
+
     if (usedHlToTngRows.has(b.row)) return;
     const ageDays = daysBetween_(b.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
@@ -3968,7 +3996,7 @@ function internalSyncGaps() {
   const pbankRows = allTxns
     .filter(t => t.account === 'PBank' && t.category === 'Transfer' && t.subTag === 'Internal');
   const hlPbankSide = allTxns
-    .filter(t => t.account === 'HL Bank' && t.category === 'Transfer' && t.subTag === 'Internal' && /pbank/i.test(t.merchant || ''));
+    .filter(t => isHLBank(t.account) && t.category === 'Transfer' && t.subTag === 'Internal' && /pbank/i.test(t.merchant || ''));
   const m2 = closestPairMatch_(pbankRows, hlPbankSide, RELOAD_SYNC_MATCH_WINDOW_DAYS);
   m2.pairs.forEach(p => addMatch(p.a, p.b));
   pbankRows.forEach(t => {
@@ -4010,7 +4038,7 @@ function refreshPendingReloadSync() {
 // known shape.
 function accountPairOther_(t) {
   if (t.subTag === 'Internal' && t.account === 'TNG') return 'HL Bank';
-  if (t.subTag === 'Internal' && t.account === 'HL Bank') return /From PBank/i.test(t.merchant || '') ? 'PBank' : 'TNG';
+  if (t.subTag === 'Internal' && isHLBank(t.account)) return /From PBank/i.test(t.merchant || '') ? 'PBank' : 'TNG';
   if (t.subTag === 'Internal' && t.account === 'PBank') return 'HL Bank';
   if (RELOAD_SUBTAGS.includes(t.subTag) && t.account === 'TNG') return 'TNG Card';
   if (RELOAD_SUBTAGS.includes(t.subTag) && t.account === 'TNG Card') return 'TNG';
@@ -4021,7 +4049,7 @@ function accountPairOther_(t) {
 // reload, or the physical TNG Card being topped up? Renamed so the two are
 // never confused: the linked bank account is always "BANK", the physical
 // TNG Card is always "CARD".
-const TBC_ACCOUNT_SHORT = { 'TNG': 'TNG', 'HL Bank': 'BANK', 'PBank': 'P', 'TNG Card': 'CARD' };
+const TBC_ACCOUNT_SHORT = { 'TNG': 'TNG', 'HL Bank': 'BANK', 'HL Bank 1': 'BANK1', 'HL Bank 2': 'BANK2', 'PBank': 'P', 'TNG Card': 'CARD' };
 // Falls back to plain "TBC" if accountPairOther_ doesn't recognize the shape
 // (e.g. an old/manually-added TBC row).
 function tbcPairLabel(t) {
@@ -5366,7 +5394,7 @@ function categorizeBankB(desc, reference) {
   return { category: 'Unsure', subTag: '', merchant: ref || desc };
 }
 
-function parseBankBCsvFile(file) {
+function parseBankBCsvFile(file, accountLabel) {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
@@ -5388,8 +5416,8 @@ function parseBankBCsvFile(file) {
           rows.push({
             date, time: '', amount,
             category: guess.category, subTag: guess.subTag,
-            merchant: guess.merchant, source: 'HL Bank CSV Import', notes: desc, type: desc,
-            account: 'HL Bank',
+            merchant: guess.merchant, source: accountLabel + ' CSV Import', notes: desc, type: desc,
+            account: accountLabel,
             // Same reasoning as PBank — the Deposit/Withdrawal column the
             // amount actually came from tells you the real direction
             // outright, no need to guess from category/subtag.
@@ -6714,8 +6742,8 @@ importSubmitBtn.onclick = async () => {
       }
       if (importAccount === 'PBank') {
         rows = file.name.toLowerCase().endsWith('.pdf') ? await parseBankAPdfFile(file) : await parseBankACsvFile(file);
-      } else if (importAccount === 'HL Bank') {
-        rows = await parseBankBCsvFile(file);
+      } else if (importAccount === 'HL Bank 1' || importAccount === 'HL Bank 2') {
+        rows = await parseBankBCsvFile(file, importAccount);
       } else if (importAccount === 'TNG Card') {
         rows = file.name.toLowerCase().endsWith('.pdf') ? await parseCardPdfFile(file) : await parseCardCsvFile(file);
       } else if (file.name.toLowerCase().endsWith('.pdf')) {
