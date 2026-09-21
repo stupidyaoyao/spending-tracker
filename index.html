@@ -944,7 +944,11 @@ const CATEGORY_RULES = [
     'AMPANG', 'SUNWAY'
   ] },
   { category: 'Car', subTag: 'Parking', keywords: ['PARKING', 'CARPARK', 'CAR PARK'] },
-  { category: 'Car', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP'] },
+  // 'PSS' = Petronas Smart/Service Station — the merchant code banks print
+  // for Petronas station card terminals (e.g. "PSS-PUCHONG JAYA MY"),
+  // distinct from the "PETRONAS" text that only shows up in some statement
+  // formats.
+  { category: 'Car', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP', 'PSS-'] },
   { category: 'Car', subTag: 'Service', keywords: ['WORKSHOP', 'BENGKEL', 'TAYAR', 'SERVICE CENTRE', 'AUTO CARE', 'CAR WASH', 'CARWASH'] },
   { category: 'Car', subTag: 'Ride', keywords: ['GRAB', 'MYCAR', 'INDRIVE'] },
   // Council/traffic compounds (e.g. MBSJ RM80) — most local-council payments
@@ -3899,16 +3903,44 @@ function internalSyncGaps() {
   // it correctly prefers two small gaps (2 + 2) over one tiny gap and one
   // huge one (1 + 5), even though the tiny gap alone looks like the "best"
   // individual match.
+  // 2026-09 fix: this used to additionally require the HL Bank side's
+  // merchant text to literally contain "to tng" (and, in the PBank block
+  // below, "pbank") before a row even counted as a candidate. That worked
+  // fine for rows auto-tagged fresh on import (categorizeBankB writes that
+  // exact text when it recognizes the account holder's own name), but broke
+  // permanently for any row that started out Unsure (generic bank text like
+  // "TNG-EWALLET ECOM 2-EC" or a raw payer name like "NG JIA YAO") and got
+  // manually recategorized to Transfer/Internal later — the category
+  // changes but the merchant text never gets rewritten, so it can never
+  // pass the text check and sits "awaiting" forever no matter how many
+  // times it's confirmed. Real cases: a Sep 5 TNG reload whose Sep 7 HL
+  // Bank 1 charge said "TNG-EWALLET ECOM 2-EC", and a PBank->HL Bank 2
+  // transfer whose HL side said "NG JIA YAO". Fixed by dropping the
+  // merchant-text gate entirely and matching purely on account pair + date
+  // + amount, same technique the TNG<->Card leg below already used safely.
   const tngRows = allTxns
     .filter(t => t.account === 'TNG' && t.category === 'Transfer' && (t.subTag === 'Card Reload' || t.subTag === 'Internal'))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const pbankRows = allTxns
+    .filter(t => t.account === 'PBank' && t.category === 'Transfer' && t.subTag === 'Internal')
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const cardLegs = allTxns.filter(t => t.account === 'TNG Card' && RELOAD_SUBTAGS.includes(t.subTag));
-  const hlToTng = allTxns
-    .filter(t => isHLBank(t.account) && t.category === 'Transfer' && t.subTag === 'Internal' && /to tng/i.test(t.merchant || ''));
+  // Every HL Bank (1 or 2) Internal-tagged row is a candidate for EITHER the
+  // TNG side or the PBank side now — no merchant-text pre-sorting into two
+  // separate pools. The combined assignment below decides which one each
+  // row actually belongs to, purely from account+date+amount fit.
+  const hlInternalLegs = allTxns
+    .filter(t => isHLBank(t.account) && t.category === 'Transfer' && t.subTag === 'Internal');
 
+  // Left pool: every "my own money is moving" row on the TNG/PBank side.
+  // Right pool: every candidate counterpart leg (TNG Card top-ups, or any
+  // HL Bank Internal row). One Hungarian assignment across the whole thing
+  // at once — same reasoning as the original TNG<->Card<->Bank fix below:
+  // resolving every pairing together avoids a locally-cheap match stealing
+  // a row that globally belongs elsewhere.
   const tngOtherPool = [
     ...cardLegs.map(c => ({ kind: 'card', row: c })),
-    ...hlToTng.map(b => ({ kind: 'bank', row: b })),
+    ...hlInternalLegs.map(b => ({ kind: 'bank', row: b })),
   ];
   const TNG_SYNC_SENTINEL = 1e6; // "not a valid candidate at all" — must dwarf any real distance
   // Minimizing total distance alone can still leave a genuine tie: two
@@ -3949,8 +3981,19 @@ function internalSyncGaps() {
   // scenario a genuine wallet-funds-card top-up (no separate bank charge to
   // compete with) falls into anyway.
   const TNG_SYNC_CARD_COST = RELOAD_SYNC_MATCH_WINDOW_DAYS + 1;
-  const tngCostMatrix = tngRows.map(t => tngOtherPool.map(r => {
+  // Combined left pool: TNG reload/internal rows AND PBank internal rows,
+  // tagged with their own kind so the cost function below knows which
+  // right-side candidates are even legal for that row (PBank never pairs
+  // with a TNG Card leg — only TNG does).
+  const myMoneyRows = [
+    ...tngRows.map(t => ({ kind: 'tng', row: t })),
+    ...pbankRows.map(t => ({ kind: 'pbank', row: t })),
+  ];
+  const tngCostMatrix = myMoneyRows.map(({ kind, row: t }) => tngOtherPool.map(r => {
     if (r.kind === 'card') {
+      // PBank rows can never match a TNG Card leg — only a TNG-side reload
+      // can (Card top-ups are wallet->card, nothing to do with the bank).
+      if (kind !== 'tng') return TNG_SYNC_SENTINEL;
       return (amountEq_(r.row.amount, t.amount) && r.row.date === t.date) ? TNG_SYNC_CARD_COST : TNG_SYNC_SENTINEL;
     }
     if (!amountEq_(r.row.amount, t.amount)) return TNG_SYNC_SENTINEL;
@@ -3958,18 +4001,19 @@ function internalSyncGaps() {
     if (dist > RELOAD_SYNC_MATCH_WINDOW_DAYS) return TNG_SYNC_SENTINEL;
     return dist - TNG_SYNC_AGE_EPS * daysBetween_(r.row.date, today);
   }));
-  const tngHungarian = tngRows.length && tngOtherPool.length
+  const tngHungarian = myMoneyRows.length && tngOtherPool.length
     ? hungarianMinCost_(tngCostMatrix, TNG_SYNC_SENTINEL)
     : { assignment: [] };
   const usedTngRows = new Set();
+  const usedPbankRows = new Set();
   const usedCardRows = new Set();
-  const usedHlToTngRows = new Set();
+  const usedHlInternalRows = new Set();
   tngHungarian.assignment.forEach((j, i) => {
     if (j < 0 || tngCostMatrix[i][j] >= TNG_SYNC_SENTINEL) return;
-    const t = tngRows[i];
+    const { kind, row: t } = myMoneyRows[i];
     const r = tngOtherPool[j];
-    usedTngRows.add(t.row);
-    if (r.kind === 'card') usedCardRows.add(r.row.row); else usedHlToTngRows.add(r.row.row);
+    if (kind === 'tng') usedTngRows.add(t.row); else usedPbankRows.add(t.row);
+    if (r.kind === 'card') usedCardRows.add(r.row.row); else usedHlInternalRows.add(r.row.row);
     addMatch(t, r.row);
   });
 
@@ -3984,32 +4028,23 @@ function internalSyncGaps() {
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
     gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank', stale: isStale_(t.date, 'HL Bank') });
   });
-  hlToTng.forEach(b => {
-
-    if (usedHlToTngRows.has(b.row)) return;
-    const ageDays = daysBetween_(b.date, today);
-    if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
-    gaps.push({ row: b.row, txn: b, awaiting: 'TNG', stale: isStale_(b.date, 'TNG') });
-  });
-
-  // ---- PBank <-> HL Bank ----
-  const pbankRows = allTxns
-    .filter(t => t.account === 'PBank' && t.category === 'Transfer' && t.subTag === 'Internal');
-  const hlPbankSide = allTxns
-    .filter(t => isHLBank(t.account) && t.category === 'Transfer' && t.subTag === 'Internal' && /pbank/i.test(t.merchant || ''));
-  const m2 = closestPairMatch_(pbankRows, hlPbankSide, RELOAD_SYNC_MATCH_WINDOW_DAYS);
-  m2.pairs.forEach(p => addMatch(p.a, p.b));
   pbankRows.forEach(t => {
-    if (m2.usedA.has(t.row)) return;
+    if (usedPbankRows.has(t.row)) return;
     const ageDays = daysBetween_(t.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
     gaps.push({ row: t.row, txn: t, awaiting: 'HL Bank', stale: isStale_(t.date, 'HL Bank') });
   });
-  hlPbankSide.forEach(b => {
-    if (m2.usedB.has(b.row)) return;
+  hlInternalLegs.forEach(b => {
+    if (usedHlInternalRows.has(b.row)) return;
     const ageDays = daysBetween_(b.date, today);
     if (ageDays < RELOAD_SYNC_GRACE_DAYS || ageDays > RELOAD_SYNC_EXPIRE_DAYS) return;
-    gaps.push({ row: b.row, txn: b, awaiting: 'PBank', stale: isStale_(b.date, 'PBank') });
+    // Best-effort guess for which side this unmatched HL Bank leg is
+    // waiting on — purely a display label now, not a matching gate (the
+    // assignment above already tried both sides regardless of this text).
+    const awaiting = /pbank/i.test(b.merchant || '') ? 'PBank'
+      : /to tng/i.test(b.merchant || '') ? 'TNG'
+      : 'TNG or PBank';
+    gaps.push({ row: b.row, txn: b, awaiting, stale: isStale_(b.date, awaiting) });
   });
 
   return { gaps, matches };
