@@ -4784,6 +4784,13 @@ let pendingImportDuplicates = [];
 // excluded from Import); the count + "Keep anyway" escape hatch is enough
 // most of the time.
 let importDuplicatesCollapsed = true;
+// Rows dated before the target account's own starting-balance anchor (see
+// beforeAccountOpening_) — like pendingImportDuplicates, held out of
+// pendingImportRows but still shown, read-only, with a "Keep anyway" escape
+// hatch, since this is almost always a sign the wrong account was picked
+// rather than a real transaction that needs to be dropped outright.
+let pendingImportBeforeOpening = [];
+let importBeforeOpeningCollapsed = true;
 
 function resetImportSheet() {
   importStage = 'pick';
@@ -4793,6 +4800,8 @@ function resetImportSheet() {
   pendingImportReviewRows = [];
   pendingImportDuplicates = [];
   importDuplicatesCollapsed = true;
+  pendingImportBeforeOpening = [];
+  importBeforeOpeningCollapsed = true;
   importPickField.style.display = 'block';
   document.getElementById('importToolbar').style.display = 'none';
   importPreviewList.style.display = 'none';
@@ -6379,6 +6388,24 @@ function renderImportPreview() {
     </div>
   `;
 
+  const beforeOpeningRowHtml = (r, i) => {
+    const anchor = accountBalances.find(b => b.account === r.account);
+    const asOf = anchor ? anchor.asOfDate : '?';
+    return `
+    <div class="txn preview-row preview-row-dup">
+      <div class="preview-top">
+        <div class="dot ${ALL_CATEGORIES.includes(r.category) ? r.category : 'Custom'}"></div>
+        <div class="info">
+          <div class="merchant">${txnTitle(r)}</div>
+          <div class="meta">${r.date} · ${r.time || 'No time record'} · predates ${r.account}'s starting balance (${asOf})</div>
+        </div>
+        <div>RM${Number(r.amount).toFixed(2)}</div>
+        <span class="preview-keep" data-before-idx="${i}">Keep anyway</span>
+      </div>
+    </div>
+  `;
+  };
+
   const renderSectionBody = (items) => {
     const sorted = sortPreviewIndexed(items);
     if (importGroupMode === 'none') return sorted.map(rowHtml).join('');
@@ -6398,6 +6425,18 @@ function renderImportPreview() {
   };
 
   let html = '';
+
+  if (pendingImportBeforeOpening.length) {
+    const chevron = importBeforeOpeningCollapsed ? '▸' : '▾';
+    html += `
+      <div class="preview-group">
+        <div class="history-section-label preview-section-toggle" id="beforeOpeningSectionToggle">
+          <span class="preview-section-chevron">${chevron}</span> ✕ Before account's starting balance (${pendingImportBeforeOpening.length}) — not imported
+        </div>
+        ${importBeforeOpeningCollapsed ? '' : pendingImportBeforeOpening.map(beforeOpeningRowHtml).join('')}
+      </div>
+    `;
+  }
 
   if (pendingImportDuplicates.length) {
     const chevron = importDuplicatesCollapsed ? '▸' : '▾';
@@ -6428,6 +6467,14 @@ function renderImportPreview() {
   if (dupToggle) {
     dupToggle.onclick = () => {
       importDuplicatesCollapsed = !importDuplicatesCollapsed;
+      renderImportPreview();
+    };
+  }
+
+  const beforeOpeningToggle = document.getElementById('beforeOpeningSectionToggle');
+  if (beforeOpeningToggle) {
+    beforeOpeningToggle.onclick = () => {
+      importBeforeOpeningCollapsed = !importBeforeOpeningCollapsed;
       renderImportPreview();
     };
   }
@@ -6468,6 +6515,18 @@ function renderImportPreview() {
     el.onclick = () => {
       const idx = Number(el.dataset.dupIdx);
       const [row] = pendingImportDuplicates.splice(idx, 1);
+      pendingImportRows.push(row);
+      pendingImportSections.push('restored');
+      pendingImportReviewLabels.push(null);
+      pendingImportReviewRows.push(null);
+      renderImportPreview();
+      importSubmitBtn.textContent = `Import ${pendingImportRows.length} transactions`;
+    };
+  });
+  importPreviewList.querySelectorAll('[data-before-idx]').forEach(el => {
+    el.onclick = () => {
+      const idx = Number(el.dataset.beforeIdx);
+      const [row] = pendingImportBeforeOpening.splice(idx, 1);
       pendingImportRows.push(row);
       pendingImportSections.push('restored');
       pendingImportReviewLabels.push(null);
@@ -6521,6 +6580,24 @@ function isReloadishImportRow(r) {
 function isGenericTransferImportRow(r) {
   return /^(Transfer to Wallet|Receive from Wallet)$/i.test(String(r.type || '').trim()) &&
     /^fund transfer$/i.test(String(r.merchant || r.notes || '').trim());
+}
+// 2026-09: HL Bank 1 and HL Bank 2 are two real, separate accounts, but a
+// mis-click on the "Import from" dropdown can land a genuine HL Bank 1
+// statement row under HL Bank 2 (or vice versa) — the CSV format is
+// identical for both, so nothing else about the file stops this. That
+// mistake produced 4 real duplicate rows (2026-09-08 to 09-11) that sat
+// undetected for days because the normal importRowsMatch() above only ever
+// compares rows on the SAME account. Unlike that stricter check, this is
+// deliberately loose — account+date+amount only, no merchant/context/time
+// match required — because the whole point is catching the case where the
+// two sides describe the same real transaction differently (e.g. "NG JIA
+// YAO" on one side, "From PBank" on the other, for the exact same transfer
+// row imported under the wrong HL account).
+function isCrossHLDuplicate(a, b) {
+  if (!isHLBank(a.account) || !isHLBank(b.account)) return false;
+  if (a.account === b.account) return false; // same-account dupes already caught above
+  if (a.date !== b.date) return false;
+  return Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
 }
 function importRowsMatch(a, b) {
   const sameAccount = (a.account || 'TNG') === (b.account || 'TNG');
@@ -6601,7 +6678,21 @@ function findReviewMatch(r) {
 
 function accountDateKey(account, date) { return (account || 'TNG') + '|' + date; }
 
+// True if r is dated strictly before the account's opening balance anchor
+// (accountBalances' asOfDate). A row like this can't be placed correctly —
+// there's no starting balance to add it against — and in practice it has
+// only ever shown up when the wrong account was picked in the import
+// dropdown (e.g. a pre-Sep-7 HL Bank 1 statement row imported as "HL Bank
+// 2", whose anchor starts 2026-09-07 with a RM0 balance). Accounts with no
+// anchor at all (Cash, TNG e-wallet) are open-ended and never flagged.
+function beforeAccountOpening_(r) {
+  const anchor = accountBalances.find(b => b.account === r.account);
+  return !!(anchor && anchor.asOfDate && r.date < anchor.asOfDate);
+}
+
 // Splits freshly-parsed rows into the buckets the preview screen shows:
+// beforeOpening (dated before the account's own starting balance — almost
+// always the wrong account was picked, held back like a duplicate),
 // duplicate (exact match, held back from import), reviewSynced (matches a
 // pending review placeholder — importing it clears that placeholder rather
 // than adding a new row), newDate (first transaction ever seen for that
@@ -6612,11 +6703,18 @@ function accountDateKey(account, date) { return (account || 'TNG') + '|' + date;
 // one flipping to "old date".
 function classifyImportRows(rows) {
   const existingDateKeys = new Set(allTxns.map(t => accountDateKey(t.account, t.date)));
-  const duplicate = [], reviewSynced = [], reviewSyncedLabels = [], reviewSyncedMatches = [], newDate = [], oldDate = [];
+  const beforeOpening = [], duplicate = [], reviewSynced = [], reviewSyncedLabels = [], reviewSyncedMatches = [], newDate = [], oldDate = [];
   const keptSoFar = [];
   rows.forEach(r => {
-    const dupExisting = allTxns.some(t => importRowsMatch(t, r));
-    const dupInBatch = keptSoFar.some(k => importRowsMatch(k, r));
+    if (beforeAccountOpening_(r)) { beforeOpening.push(r); return; }
+    // HL Bank 1 and HL Bank 2 are two separate real accounts but share an
+    // identical CSV format, so a mis-picked "Import from" dropdown can land
+    // a genuine HL Bank 1 row under HL Bank 2 (or vice versa) with no other
+    // clue in the file itself. isCrossHLDuplicate() catches that case (same
+    // date+amount, opposite HL account) alongside the normal same-account
+    // importRowsMatch() check.
+    const dupExisting = allTxns.some(t => importRowsMatch(t, r) || isCrossHLDuplicate(t, r));
+    const dupInBatch = keptSoFar.some(k => importRowsMatch(k, r) || isCrossHLDuplicate(k, r));
     if (dupExisting || dupInBatch) { duplicate.push(r); return; }
     keptSoFar.push(r);
     const reviewMatch = findReviewMatch(r);
@@ -6629,11 +6727,12 @@ function classifyImportRows(rows) {
     if (existingDateKeys.has(accountDateKey(r.account, r.date))) oldDate.push(r);
     else newDate.push(r);
   });
-  return { duplicate, reviewSynced, reviewSyncedLabels, reviewSyncedMatches, newDate, oldDate };
+  return { beforeOpening, duplicate, reviewSynced, reviewSyncedLabels, reviewSyncedMatches, newDate, oldDate };
 }
 
 function showImportPreview(rows, extraNote) {
-  const { duplicate, reviewSynced, reviewSyncedLabels, reviewSyncedMatches, newDate, oldDate } = classifyImportRows(rows);
+  const { beforeOpening, duplicate, reviewSynced, reviewSyncedLabels, reviewSyncedMatches, newDate, oldDate } = classifyImportRows(rows);
+  pendingImportBeforeOpening = beforeOpening;
   pendingImportDuplicates = duplicate;
   pendingImportRows = [...reviewSynced, ...newDate, ...oldDate];
   pendingImportSections = [
@@ -6662,7 +6761,10 @@ function showImportPreview(rows, extraNote) {
   const dupNote = duplicate.length
     ? `${duplicate.length} likely duplicate${duplicate.length > 1 ? 's' : ''} already in your data (shown below, not imported unless you keep them). `
     : '';
-  const notes = [extraNote, dupNote].filter(Boolean).join(' ');
+  const beforeOpeningNote = beforeOpening.length
+    ? `${beforeOpening.length} transaction${beforeOpening.length > 1 ? 's' : ''} dated before ${beforeOpening[0].account}'s starting balance (shown below, not imported — check you picked the right account). `
+    : '';
+  const notes = [extraNote, dupNote, beforeOpeningNote].filter(Boolean).join(' ');
   importStatusEl.textContent = pendingImportRows.length
     ? `${notes}Review the ${pendingImportRows.length} transaction(s) below — fix the category if needed, tap ✕ to drop any that look wrong, then Import.`
     : `${notes}Nothing new to import — every transaction found was already in your data.`;
