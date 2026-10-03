@@ -412,6 +412,11 @@
     cursor: pointer; line-height: 1;
   }
   .remark-btn.has-remark { color: var(--accent); }
+  .txn-delete-btn {
+    background: none; border: none; color: var(--muted); font-size: 13px; padding: 2px 2px;
+    cursor: pointer; line-height: 1; opacity: 0.6;
+  }
+  .txn-delete-btn:hover { color: #ff453a; opacity: 1; }
   .link-btn {
     background: none; border: none; color: var(--muted); font-size: 15px; padding: 2px 2px;
     cursor: pointer; line-height: 1;
@@ -950,6 +955,10 @@ const CATEGORY_RULES = [
   // formats.
   { category: 'Car', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP', 'PSS-'] },
   { category: 'Car', subTag: 'Service', keywords: ['WORKSHOP', 'BENGKEL', 'TAYAR', 'SERVICE CENTRE', 'AUTO CARE', 'CAR WASH', 'CARWASH'] },
+  // Must come BEFORE the Ride rule below — "GRAB-FOOD" contains "GRAB" and
+  // would otherwise match the generic Ride keyword first and get filed as a
+  // car ride instead of a food order (see the 2026-10 PBank CSV import).
+  { category: 'Food', keywords: ['GRAB-FOOD', 'GRABFOOD', 'GRAB FOOD'] },
   { category: 'Car', subTag: 'Ride', keywords: ['GRAB', 'MYCAR', 'INDRIVE'] },
   // Council/traffic compounds (e.g. MBSJ RM80) — most local-council payments
   // that show up on a bank/e-wallet statement this way are parking or
@@ -2228,7 +2237,7 @@ function renderReviewList() {
   // there the row has been reviewed and doesn't need to keep nagging.
   const unsure = allTxns.filter(t => {
     if (t.category === 'Unsure') return true;
-    if (t.category === 'Transfer' && t.subTag === 'To Others') {
+    if (t.category === 'Transfer' && (t.subTag === 'To Others' || t.subTag === 'From Others')) {
       const hasRealRemark = !!t.remark && t.remark.indexOf('*TBC') !== 0;
       return !hasRealRemark;
     }
@@ -4234,14 +4243,20 @@ function renderTxnRow(t, opts) {
   // remark, so this button (or the existing ✎ split-link one) is what
   // actually clears it.
   const isToOthers = t.category === 'Transfer' && t.subTag === 'To Others';
+  const isFromOthers = t.category === 'Transfer' && t.subTag === 'From Others';
   const reviewRememberHtml = opts.reviewMode
     ? `<label class="preview-remember review-remember">
         <input type="checkbox" class="review-remember-check" data-row="${t.row}"> Always categorize "${escapeHtml(t.merchant || '')}" this way
       </label>`
     : '';
-  const reviewConfirmHtml = (opts.reviewMode && isToOthers)
-    ? `<div class="review-actions"><button class="review-btn confirm review-confirm-btn" data-row="${t.row}">Who was this for?</button></div>`
+  const reviewConfirmHtml = (opts.reviewMode && (isToOthers || isFromOthers))
+    ? `<div class="review-actions"><button class="review-btn confirm review-confirm-btn" data-row="${t.row}" data-direction="${isFromOthers ? 'in' : 'out'}">${isFromOthers ? 'Who sent you this?' : 'Who was this for?'}</button></div>`
     : '';
+  // Delete affordance for a normal (already-committed) row -- TBC
+  // placeholders already have their own Delete button in the "Needs
+  // review" unconfirmed section, so this is hidden there to avoid a
+  // confusing double control for the exact same row.
+  const deleteBtnHtml = isTbc ? '' : `<button class="txn-delete-btn" data-row="${t.row}" title="Delete this transaction">✕</button>`;
   return `
     <div class="txn" data-row="${t.row}">
       <div class="dot ${dotClass}"></div>
@@ -4263,6 +4278,7 @@ function renderTxnRow(t, opts) {
       <div class="txn-actions">
         <div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
         ${remarkBtnHtml}
+        ${deleteBtnHtml}
       </div>
     </div>`;
 }
@@ -4357,7 +4373,10 @@ function attachReviewConfirmHandlers() {
   document.querySelectorAll('.review-confirm-btn').forEach(btn => {
     btn.onclick = async () => {
       const row = Number(btn.dataset.row);
-      const remark = prompt('Who/what was this transfer for? (required to confirm)');
+      const isIncoming = btn.dataset.direction === 'in';
+      const remark = prompt(isIncoming
+        ? 'Who sent you this transfer? (required to confirm)'
+        : 'Who/what was this transfer for? (required to confirm)');
       if (remark === null) return;
       const trimmed = remark.trim();
       if (!trimmed) { alert('A remark is required to confirm this transfer.'); return; }
@@ -4433,6 +4452,30 @@ function attachExtraTagAmountHandlers() {
 function attachRemarkHandlers() {
   document.querySelectorAll('.remark-btn').forEach(el => {
     el.onclick = () => openSplitPicker(Number(el.dataset.row));
+  });
+  attachDeleteHandlers();
+}
+
+// General per-row delete -- separate from the Review tab's TBC-placeholder
+// Delete button (which only ever targets an unconfirmed "*TBC" row). This
+// one applies to any already-committed transaction, e.g. a duplicate
+// imported under the wrong account (see the 2026-09 HL Bank 1/2 mix-up:
+// row 517 and 3 others needed deleting, but no delete control existed for
+// a normal confirmed row at all until this was added). Requires a typed
+// confirm() with the transaction's own details shown, since this is
+// permanent and there's no undo.
+function attachDeleteHandlers() {
+  document.querySelectorAll('.txn-delete-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const row = Number(btn.dataset.row);
+      const t = allTxns.find(x => x.row === row);
+      const label = t ? `${txnTitle(t)} · ${t.date} · RM${Number(t.amount || 0).toFixed(2)} · ${t.account || ''}` : 'this transaction';
+      if (!confirm(`Delete ${label} permanently? This can't be undone.`)) return;
+      btn.disabled = true;
+      btn.textContent = '…';
+      await callApi('deleteTransaction', { row });
+      await loadData();
+    };
   });
 }
 
@@ -4784,11 +4827,6 @@ let pendingImportDuplicates = [];
 // excluded from Import); the count + "Keep anyway" escape hatch is enough
 // most of the time.
 let importDuplicatesCollapsed = true;
-// Rows dated before the target account's own starting-balance anchor (see
-// beforeAccountOpening_) — like pendingImportDuplicates, held out of
-// pendingImportRows but still shown, read-only, with a "Keep anyway" escape
-// hatch, since this is almost always a sign the wrong account was picked
-// rather than a real transaction that needs to be dropped outright.
 let pendingImportBeforeOpening = [];
 let importBeforeOpeningCollapsed = true;
 
@@ -5753,7 +5791,10 @@ const CARD_TRANSNO_MAXX = 45;
 const CARD_DATE_COL = [95, 148];   // "Exit Date & Time" column — this also
                                     // catches a Reload row's one-and-only
                                     // date, which prints into this same slot
-const CARD_TYPE_COL = [195, 236];  // "Tran Type" column (multi-line)
+const CARD_TYPE_COL = [195, 220];  // "Tran Type" column (multi-line) — its
+                                    // own content never goes past x≈208.4,
+                                    // so this stops short of CARD_LOCATION_COL
+                                    // below rather than sharing its boundary
 const CARD_AMOUNT_COL = [460, 528]; // Trans Amount + Card Balance zone —
                                      // occasionally merge into one text run
                                      // (seen on the Reload row), so both
@@ -5761,6 +5802,94 @@ const CARD_AMOUNT_COL = [460, 528]; // Trans Amount + Card Balance zone —
                                      // FIRST RM figure found is taken as the
                                      // Trans Amount
 const CARD_SECTOR_COL_MIN = 528;   // "Sector" column (PARKING / TOLL / RETAIL)
+// Parking rows print the real car park name in a column pair the rest of
+// this parser never reads — "Entry Location" (x~236-270, wrapped across up
+// to 3 lines, e.g. "SETAPAK" / "VILLAGE") and, narrower still, an "Entry
+// SP"/operator-company line directly beside it (x~270-312, e.g. "TC_TIMETEC
+// COMPUTING SDN BHD" for car parks that print one — most don't). The
+// "Exit Location" repeat further right (x~312+) is the same value again and
+// deliberately NOT read, since reading it too would double every name.
+// The left edge of the location column isn't perfectly consistent between
+// rows (one real row measured at x=235.58, another at x=241), so its start
+// is set well below both — CARD_TYPE_COL's own content never goes past
+// x≈208.4, leaving plenty of margin without risking a wrapped location word
+// landing in the wrong column (verified against every parking row in the
+// 2026-09 Statement-2acfa12e.pdf Card statement).
+const CARD_LOCATION_COL = [220, 270];
+const CARD_OPERATOR_COL = [270, 312];
+// The statement's own column headers ("Entry"/"Location"/"Entry Location"/
+// "Entry SP" etc, sometimes split across lines the same way a real wrapped
+// name is) bleed into the first data row on a page — same root cause as the
+// Sector-header bleed above. Filtered out by exact text rather than
+// position, since they land in the exact x-range real location text does.
+const CARD_LOCATION_HEADER_WORDS = new Set([
+  'Entry', 'Exit', 'Location', 'Entry Location', 'Exit Location', 'Entry SP', 'Exit SP'
+]);
+// A facility/zone code (e.g. "TCB36", "TC_B36", "M7A67") can fall inside the
+// location column's x-range on some rows — these always mix letters+digits
+// with no lowercase, unlike any real location word, so they're excluded by
+// shape rather than by a fixed list.
+function isCardFacilityCode_(s) {
+  return /^[A-Z0-9_]{2,10}$/.test(s) && /\d/.test(s);
+}
+// A facility code sometimes prints glued onto the SAME line as the last
+// fragment of the location name rather than on its own line (e.g.
+// "A TCA14" — the trailing "A" is actually the end of "DAMANSARA", wrapped
+// the same mid-word way as the BADMINTON case above). Strips a trailing
+// code-shaped token off such a line and keeps the real word fragment in
+// front of it; a line that's nothing BUT a facility code still gets
+// dropped entirely via isCardFacilityCode_ above.
+function stripTrailingFacilityCode_(s) {
+  // Minimum length 4 (not 2) so a short, legitimate location abbreviation
+  // like "T1" (Terminal 1, as in "KLIA T1") never gets mistaken for a code —
+  // every real facility code actually seen on this statement runs 5-6 chars
+  // (TCA14, TCB36, M7A67, TC_B36, TD_A01).
+  const m = s.match(/^(\S.*?)\s+([A-Z0-9_]{4,10})$/);
+  return (m && /\d/.test(m[2])) ? m[1] : s;
+}
+// Reassembles a wrapped location name from its line fragments (in top-to-
+// bottom reading order). Most line breaks are between whole words, so the
+// default is to join with a space — but this statement sometimes wraps
+// MID-WORD with no hyphen (e.g. "BADMINTO" / "N CENTRE" for "BADMINTON
+// CENTRE"), which a plain space-join would render as "BADMINTO N CENTRE".
+// Detected by: the next line starts with a single capital letter followed
+// immediately by another word, and the previous line doesn't already end on
+// a natural word boundary (a closing bracket) — in that specific shape, the
+// lone leading letter is glued on with no space and the rest keeps its
+// space, which correctly reconstructs both "BADMINTON CENTRE" and ordinary
+// multi-word names alike (verified against every parking row in the 2026-09
+// Statement-2acfa12e.pdf Card statement).
+function reconstructCardLocationLines_(lines) {
+  let out = '';
+  lines.forEach((line, i) => {
+    if (i === 0) { out = line; return; }
+    // A lone single letter is always a mid-word continuation (there's no
+    // real one-letter location word), so it glues on with no space at all —
+    // same wrap behavior as the two-letters-plus-word case just below it.
+    if (/^[A-Z]$/.test(line)) {
+      out = out + line;
+      return;
+    }
+    const m = line.match(/^([A-Z])\s+(.*)$/);
+    if (m && out.length && !/\s/.test(out.slice(-1)) && !out.endsWith(')')) {
+      out = out + m[1] + ' ' + m[2];
+    } else {
+      out = out + ' ' + line;
+    }
+  });
+  return out.replace(/\s+/g, ' ').trim();
+}
+function extractCardParkingNames_(rowItems) {
+  const keep = it => !isCardFacilityCode_(it.str) && !CARD_LOCATION_HEADER_WORDS.has(it.str);
+  const locLines = rowItems.filter(it => it.x >= CARD_LOCATION_COL[0] && it.x < CARD_LOCATION_COL[1] && keep(it))
+    .sort((a, b) => b.y - a.y).map(it => stripTrailingFacilityCode_(it.str));
+  const opLines = rowItems.filter(it => it.x >= CARD_OPERATOR_COL[0] && it.x < CARD_OPERATOR_COL[1] && keep(it))
+    .sort((a, b) => b.y - a.y).map(it => stripTrailingFacilityCode_(it.str));
+  return {
+    location: reconstructCardLocationLines_(locLines),
+    operator: reconstructCardLocationLines_(opLines)
+  };
+}
 
 // Parses one pdf.js page's text items into Offline-section Card records.
 // Stops at the first "Online Card Transactions" marker, if present on this
@@ -5815,8 +5944,9 @@ function parseCardPdfPageItems(items) {
     const date = `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}`;
     const amount = parseFloat(amtMatches[0]);
     const isReload = /Reload/i.test(typeStr);
+    const { location, operator } = sector === 'PARKING' ? extractCardParkingNames_(rowItems) : { location: '', operator: '' };
 
-    records.push({ date, time: normalizeTime(timeStr), amount, sector, isReload, typeStr });
+    records.push({ date, time: normalizeTime(timeStr), amount, sector, isReload, typeStr, location, operator });
   }
   return records;
 }
@@ -5940,10 +6070,19 @@ async function parseCardPdfFile(file) {
       return;
     }
     if (r.sector === 'PARKING') {
+      // Use the real car park name when it was actually extracted (see
+      // extractCardParkingNames_ above) — falls back to the old generic
+      // label on the rare row where the column layout didn't yield anything
+      // usable, so this never produces an empty/garbled merchant. The
+      // operator company name, when a car park prints one (e.g. "TC_TIMETEC
+      // COMPUTING SDN BHD"), goes in notes as a secondary reference rather
+      // than being merged into the merchant name itself.
+      const merchant = r.location || 'TNG Card Parking';
+      const notes = r.operator ? `${r.typeStr} · ${r.operator}` : r.typeStr;
       rows.push({
         date: r.date, time: r.time || '', amount: r.amount,
         category: 'Car', subTag: 'Parking',
-        merchant: 'TNG Card Parking', source: 'TNG Card PDF Import', notes: r.typeStr, type: 'Parking',
+        merchant, source: 'TNG Card PDF Import', notes, type: 'Parking',
         account: 'TNG Card'
       });
       return;
@@ -6431,7 +6570,7 @@ function renderImportPreview() {
     html += `
       <div class="preview-group">
         <div class="history-section-label preview-section-toggle" id="beforeOpeningSectionToggle">
-          <span class="preview-section-chevron">${chevron}</span> ✕ Before account's starting balance (${pendingImportBeforeOpening.length}) — not imported
+          <span class="preview-section-chevron">${chevron}</span> ✕ Before account's starting balance (${pendingImportBeforeOpening.length}) -- not imported
         </div>
         ${importBeforeOpeningCollapsed ? '' : pendingImportBeforeOpening.map(beforeOpeningRowHtml).join('')}
       </div>
@@ -6581,21 +6720,36 @@ function isGenericTransferImportRow(r) {
   return /^(Transfer to Wallet|Receive from Wallet)$/i.test(String(r.type || '').trim()) &&
     /^fund transfer$/i.test(String(r.merchant || r.notes || '').trim());
 }
+// The TNG Card statement (PDF or CSV) never prints WHICH car park a parking
+// charge was for — parseCardPdfFile/parseCardCsvFile always label these rows
+// with the generic merchant text "TNG Card Parking" (see those functions).
+// If the same real-world parking charge was already captured with a real
+// location name (e.g. via the eWallet import, which does get a location),
+// the generic text never matches that name and the row re-imports as a false
+// "new" transaction every time a Card statement is re-checked (see the
+// 2026-09 Statement-2acfa12e.pdf check: 5 rows re-offered as new that were
+// actually SETAPAK VILLAGE / W (SENTUL) BADMINTON CENTRE / AEON MALL METRO
+// PRIMA parking already on file). Since the Card statement can never supply
+// more identifying info than this for a parking row, account+date+amount
+// already matched above is enough to call it a duplicate once one side is
+// this generic label.
+function isGenericParkingImportRow(r) {
+  return r.category === 'Car' && r.subTag === 'Parking' &&
+    /^tng card parking$/i.test(String(r.merchant || '').trim());
+}
 // 2026-09: HL Bank 1 and HL Bank 2 are two real, separate accounts, but a
 // mis-click on the "Import from" dropdown can land a genuine HL Bank 1
-// statement row under HL Bank 2 (or vice versa) — the CSV format is
+// statement row under HL Bank 2 (or vice versa) -- the CSV format is
 // identical for both, so nothing else about the file stops this. That
 // mistake produced 4 real duplicate rows (2026-09-08 to 09-11) that sat
 // undetected for days because the normal importRowsMatch() above only ever
 // compares rows on the SAME account. Unlike that stricter check, this is
-// deliberately loose — account+date+amount only, no merchant/context/time
-// match required — because the whole point is catching the case where the
-// two sides describe the same real transaction differently (e.g. "NG JIA
-// YAO" on one side, "From PBank" on the other, for the exact same transfer
-// row imported under the wrong HL account).
+// deliberately loose -- account+date+amount only, no merchant/context/time
+// match required -- because the whole point is catching the case where the
+// two sides describe the same real transaction differently.
 function isCrossHLDuplicate(a, b) {
   if (!isHLBank(a.account) || !isHLBank(b.account)) return false;
-  if (a.account === b.account) return false; // same-account dupes already caught above
+  if (a.account === b.account) return false;
   if (a.date !== b.date) return false;
   return Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
 }
@@ -6631,6 +6785,11 @@ function importRowsMatch(a, b) {
   if ((isGenericTransferImportRow(a) || isGenericTransferImportRow(b)) &&
       a.category === 'Transfer' && b.category === 'Transfer' &&
       String(a.type || '').trim().toLowerCase() === String(b.type || '').trim().toLowerCase()) {
+    return true;
+  }
+  if ((isGenericParkingImportRow(a) || isGenericParkingImportRow(b)) &&
+      a.category === 'Car' && b.category === 'Car' &&
+      a.subTag === 'Parking' && b.subTag === 'Parking') {
     return true;
   }
   const ctxA = importRowContext(a);
@@ -6678,41 +6837,17 @@ function findReviewMatch(r) {
 
 function accountDateKey(account, date) { return (account || 'TNG') + '|' + date; }
 
-// True if r is dated strictly before the account's opening balance anchor
-// (accountBalances' asOfDate). A row like this can't be placed correctly —
-// there's no starting balance to add it against — and in practice it has
-// only ever shown up when the wrong account was picked in the import
-// dropdown (e.g. a pre-Sep-7 HL Bank 1 statement row imported as "HL Bank
-// 2", whose anchor starts 2026-09-07 with a RM0 balance). Accounts with no
-// anchor at all (Cash, TNG e-wallet) are open-ended and never flagged.
 function beforeAccountOpening_(r) {
   const anchor = accountBalances.find(b => b.account === r.account);
   return !!(anchor && anchor.asOfDate && r.date < anchor.asOfDate);
 }
 
-// Splits freshly-parsed rows into the buckets the preview screen shows:
-// beforeOpening (dated before the account's own starting balance — almost
-// always the wrong account was picked, held back like a duplicate),
-// duplicate (exact match, held back from import), reviewSynced (matches a
-// pending review placeholder — importing it clears that placeholder rather
-// than adding a new row), newDate (first transaction ever seen for that
-// account+date) and oldDate (adds to a date that already has other
-// transactions). The new/old-date split is based on a snapshot of allTxns
-// taken before this batch, so two rows landing on the same brand-new date
-// within the same batch both count as "new date" rather than the second
-// one flipping to "old date".
 function classifyImportRows(rows) {
   const existingDateKeys = new Set(allTxns.map(t => accountDateKey(t.account, t.date)));
   const beforeOpening = [], duplicate = [], reviewSynced = [], reviewSyncedLabels = [], reviewSyncedMatches = [], newDate = [], oldDate = [];
   const keptSoFar = [];
   rows.forEach(r => {
     if (beforeAccountOpening_(r)) { beforeOpening.push(r); return; }
-    // HL Bank 1 and HL Bank 2 are two separate real accounts but share an
-    // identical CSV format, so a mis-picked "Import from" dropdown can land
-    // a genuine HL Bank 1 row under HL Bank 2 (or vice versa) with no other
-    // clue in the file itself. isCrossHLDuplicate() catches that case (same
-    // date+amount, opposite HL account) alongside the normal same-account
-    // importRowsMatch() check.
     const dupExisting = allTxns.some(t => importRowsMatch(t, r) || isCrossHLDuplicate(t, r));
     const dupInBatch = keptSoFar.some(k => importRowsMatch(k, r) || isCrossHLDuplicate(k, r));
     if (dupExisting || dupInBatch) { duplicate.push(r); return; }
@@ -6762,7 +6897,7 @@ function showImportPreview(rows, extraNote) {
     ? `${duplicate.length} likely duplicate${duplicate.length > 1 ? 's' : ''} already in your data (shown below, not imported unless you keep them). `
     : '';
   const beforeOpeningNote = beforeOpening.length
-    ? `${beforeOpening.length} transaction${beforeOpening.length > 1 ? 's' : ''} dated before ${beforeOpening[0].account}'s starting balance (shown below, not imported — check you picked the right account). `
+    ? `${beforeOpening.length} transaction${beforeOpening.length > 1 ? 's' : ''} dated before ${beforeOpening[0].account}'s starting balance (shown below, not imported -- check you picked the right account). `
     : '';
   const notes = [extraNote, dupNote, beforeOpeningNote].filter(Boolean).join(' ');
   importStatusEl.textContent = pendingImportRows.length
