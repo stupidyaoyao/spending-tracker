@@ -966,7 +966,7 @@ const CATEGORY_RULES = [
     'SPE', 'KESAS', 'LDP', 'MEX', 'BESRAYA', 'SUKE', 'SMART',
     'PLAZA LOKE YEW', 'AWAN BESAR', 'PUCHONG SELATAN', 'SG RAMAL',
     'SALAK SELATAN', 'PETALING JAYA', 'ALAM DAMAI', 'BUKIT TERATAI',
-    'AMPANG', 'SUNWAY'
+    'AMPANG', 'SUNWAY', 'DAMANSARA', 'PANTAI DALAM', 'PUCHONG BARAT'
   ] },
   { category: 'Car', subTag: 'Parking', keywords: ['PARKING', 'CARPARK', 'CAR PARK'] },
   // 'PSS' = Petronas Smart/Service Station — the merchant code banks print
@@ -1204,6 +1204,31 @@ function categorize(description, type) {
       return { category: r.category, subTag: r.subTag || '' };
     }
   }
+
+  // "PayDirect Payment" on the TNG eWallet statement is ONLY ever a highway
+  // toll or a car park fee — never Food/Sports/Shopping/etc — but the
+  // merchant text it prints is just a bare plaza or car park name with no
+  // other signal to go on (e.g. "LDP - PETALING JAYA" for a toll, "222
+  // Sports Centre PJ" or "UpTown 1, 2, 5, 7, Starling, Imazium" for parking).
+  // Running that through the FULL generic keyword list below is how "222
+  // Sports Centre PJ" (a parking fee) was getting miscategorized as Sports
+  // (gym/fitness) purely because "SPORTS CENTRE" is a Sports keyword —
+  // checking only the Toll list here, with Parking as the default for
+  // everything else, keeps every PayDirect Payment row inside Car where it
+  // actually belongs (confirmed against the 2026-09/10 TNG eWallet
+  // statement, which has real examples of both).
+  if (type === 'PayDirect Payment') {
+    const tollRule = CATEGORY_RULES.find(r => r.category === 'Car' && r.subTag === 'Toll');
+    // The literal word "TOLL" (e.g. "BATU TOLL PLAZA", "SEGAMBUT TOLL
+    // PLAZA") is checked on its own, separately from the specific plaza-name
+    // keyword list below — those two don't contain any of SPE/KESAS/LDP/etc,
+    // so without this they'd wrongly default to Parking despite saying
+    // "TOLL" right in the name (caught by testing every PayDirect Payment
+    // merchant in the real 2026-09/10 statement before shipping this).
+    const isToll = text.includes('TOLL') || (tollRule && tollRule.keywords.some(kw => text.includes(kw)));
+    return { category: 'Car', subTag: isToll ? 'Toll' : 'Parking' };
+  }
+
   for (const rule of CATEGORY_RULES) {
     for (const kw of rule.keywords) {
       if (text.includes(kw)) return { category: rule.category, subTag: rule.subTag || '' };
@@ -5978,6 +6003,23 @@ function reconstructCardLocationLines_(lines) {
   });
   return out.replace(/\s+/g, ' ').trim();
 }
+// A handful of multi-line names have their very last line sit just below
+// the row-boundary cutoff used to group text into rows (the line sits
+// closer to the NEXT physical row's anchor than this row's own date/amount
+// lines, purely due to this statement's uneven row heights) — the trailing
+// fragment gets dropped rather than risk re-including the next row's own
+// text by loosening that boundary for everyone. Patched by exact known
+// result rather than a general rule, since each case so far is a specific,
+// recurring car park name, not a pattern safe to guess at generally.
+const CARD_LOCATION_KNOWN_FIXES_ = { 'KOTA DAMANSAR': 'KOTA DAMANSARA' };
+function applyCardLocationKnownFixes_(location) {
+  for (const truncated in CARD_LOCATION_KNOWN_FIXES_) {
+    if (location.endsWith(truncated)) {
+      return location.slice(0, location.length - truncated.length) + CARD_LOCATION_KNOWN_FIXES_[truncated];
+    }
+  }
+  return location;
+}
 function extractCardParkingNames_(rowItems) {
   const keep = it => !isCardFacilityCode_(it.str) && !CARD_LOCATION_HEADER_WORDS.has(it.str);
   const locLines = rowItems.filter(it => it.x >= CARD_LOCATION_COL[0] && it.x < CARD_LOCATION_COL[1] && keep(it))
@@ -5985,7 +6027,7 @@ function extractCardParkingNames_(rowItems) {
   const opLines = rowItems.filter(it => it.x >= CARD_OPERATOR_COL[0] && it.x < CARD_OPERATOR_COL[1] && keep(it))
     .sort((a, b) => b.y - a.y).map(it => stripTrailingFacilityCode_(it.str));
   return {
-    location: reconstructCardLocationLines_(locLines),
+    location: applyCardLocationKnownFixes_(reconstructCardLocationLines_(locLines)),
     operator: reconstructCardLocationLines_(opLines)
   };
 }
