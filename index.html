@@ -162,6 +162,14 @@
   .review-btn.confirm { background: #1f3d2b; color: #30d158; }
   .review-btn.delete { background: #3d1f22; color: #ff453a; }
 
+  .just-imported-card { border-color: #1f3d2b; }
+  .just-imported-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; border-top: 1px solid rgba(255,255,255,0.06); }
+  .just-imported-row:first-of-type { border-top: 1px solid rgba(255,255,255,0.06); margin-top: 8px; }
+  .just-imported-label { flex: 1; }
+  .just-imported-count { color: var(--muted); font-size: 12px; }
+  .just-imported-amount { font-weight: 700; min-width: 72px; text-align: right; }
+  .just-imported-total { border-top: 1px solid rgba(255,255,255,0.15); margin-top: 4px; padding-top: 8px; font-weight: 700; }
+
   .split-group { background: var(--card); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
   .split-group-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .month-header { cursor: default; }
@@ -749,6 +757,17 @@
   </div>
 
   <div id="reviewPage" style="display:none;">
+    <!-- Summary of the batch you just imported — everything here already
+         auto-categorized fine (Food/Toll/Parking/etc) and needs no action,
+         this is just a quick "does this look right?" glance, separate from
+         the sections below which DO need something from you. Disappears
+         once dismissed or after your next import. -->
+    <div id="justImportedSection" style="display:none;">
+      <div class="history-section-label-row">
+        <div class="history-section-label" id="justImportedSectionLabel">Just imported</div>
+      </div>
+      <div class="list" id="justImportedList"></div>
+    </div>
     <div class="history-section-label-row">
       <div class="history-section-label" id="reviewSectionLabel">Needs review</div>
     </div>
@@ -891,6 +910,7 @@
 </div>
 
 <script>
+
 // ==========================================================================
 // This is a STANDALONE static page — it is NOT served by Apps Script.
 // Host it anywhere (Netlify, GitHub Pages, Firebase Hosting, etc). All
@@ -1249,6 +1269,20 @@ let miniChartsExpanded = false;
 // else without revealing how much money you actually have. Persisted so it
 // stays off/on across visits rather than resetting every reload.
 let balanceHidden = VIEW_ONLY ? true : localStorage.getItem('balanceHidden') === '1';
+
+// "Just imported" review summary — a quick post-import sanity check, not a
+// to-do list. Captures the rows from the single most recent Import click
+// (category/subTag/amount only, not full transaction objects) so a "Just
+// imported" section can show counts+totals by category without you having
+// to open every row. Persisted so it survives a page reload (you might
+// import, close the tab, and check back later) but is fully replaced by the
+// next import or cleared by the dismiss button — it's never a growing log.
+let recentlyImportedBatch = null;
+try { recentlyImportedBatch = JSON.parse(localStorage.getItem('recentlyImportedBatch') || 'null'); } catch (e) { recentlyImportedBatch = null; }
+function clearRecentlyImportedBatch() {
+  recentlyImportedBatch = null;
+  localStorage.removeItem('recentlyImportedBatch');
+}
 if (VIEW_ONLY) document.body.classList.add('view-only');
 function applyBalanceHidden() {
   document.body.classList.toggle('hide-balance', balanceHidden);
@@ -2217,7 +2251,72 @@ document.getElementById('mainMiniCalNext').onclick = () => { mainMiniCalMonth.se
 // you know it actually happened as guessed, or Delete if it turns out
 // wrong (e.g. you didn't actually reload that day) — either way the yellow
 // "!" on the Main page disappears once it's off this list.
+// Renders the "Just imported" summary from the captured batch, grouped by
+// category (+subTag) with count and total amount — same style distinction
+// as everywhere else: Transfer rows show "in"/"out" by their own sign, not
+// forced negative. Rows that actually need review (Unsure, To/From Others)
+// are excluded here since they already get their own dedicated section
+// below — this summary is only for the stuff that auto-confirmed cleanly.
+function renderJustImportedSummary() {
+  const section = document.getElementById('justImportedSection');
+  const label = document.getElementById('justImportedSectionLabel');
+  const el = document.getElementById('justImportedList');
+  if (!recentlyImportedBatch || !recentlyImportedBatch.rows || !recentlyImportedBatch.rows.length) {
+    section.style.display = 'none';
+    return;
+  }
+  const needsReview = r => r.category === 'Unsure' ||
+    (r.category === 'Transfer' && (r.subTag === 'To Others' || r.subTag === 'From Others'));
+  const clean = recentlyImportedBatch.rows.filter(r => !needsReview(r));
+  if (!clean.length) {
+    // Everything from that import needed review anyway — nothing left to
+    // summarize here, so stay out of the way rather than show an empty card.
+    section.style.display = 'none';
+    return;
+  }
+  const groups = {};
+  clean.forEach(r => {
+    const key = r.subTag ? `${r.category} · ${r.subTag}` : r.category;
+    if (!groups[key]) groups[key] = { count: 0, total: 0 };
+    groups[key].count += 1;
+    groups[key].total += r.amount;
+  });
+  const rowsHtml = Object.keys(groups).sort((a, b) => groups[b].total - groups[a].total).map(key => {
+    const g = groups[key];
+    return `<div class="just-imported-row">
+      <span class="just-imported-label">${escapeHtml(key)}</span>
+      <span class="just-imported-count">${g.count}×</span>
+      <span class="just-imported-amount">RM${g.total.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+  const total = clean.reduce((s, r) => s + r.amount, 0);
+  const when = recentlyImportedBatch.importedAt ? new Date(recentlyImportedBatch.importedAt).toLocaleString() : '';
+  section.style.display = '';
+  label.textContent = `Just imported (${clean.length})`;
+  el.innerHTML = `
+    <div class="review-entry just-imported-card">
+      <div class="review-meta">Imported ${when} · already categorized, nothing to review — just a quick double-check</div>
+      ${rowsHtml}
+      <div class="just-imported-row just-imported-total">
+        <span class="just-imported-label">Total</span>
+        <span></span>
+        <span class="just-imported-amount">RM${total.toFixed(2)}</span>
+      </div>
+      <div class="review-actions">
+        <button class="review-btn confirm" id="justImportedDismissBtn">Looks good</button>
+      </div>
+    </div>`;
+  const dismissBtn = document.getElementById('justImportedDismissBtn');
+  if (dismissBtn) {
+    dismissBtn.onclick = () => {
+      clearRecentlyImportedBatch();
+      renderJustImportedSummary();
+    };
+  }
+}
+
 function renderReviewList() {
+  renderJustImportedSummary();
   const label = document.getElementById('reviewSectionLabel');
   const el = document.getElementById('reviewList');
   const unconfirmed = allTxns.filter(t => t.remark && t.remark.indexOf('*TBC') === 0)
@@ -7065,6 +7164,15 @@ importSubmitBtn.onclick = async () => {
   importSubmitBtn.disabled = true;
   try {
     await callApi('import', { rows: pendingImportRows });
+    // Snapshot this batch for the "Just imported" summary on the Review tab
+    // — only the fields that summary needs, not full transaction objects.
+    // Replaces whatever batch was captured last time, not appended to, so
+    // this always reflects only your most recent import.
+    recentlyImportedBatch = {
+      importedAt: new Date().toISOString(),
+      rows: pendingImportRows.map(r => ({ category: r.category, subTag: r.subTag || '', amount: Number(r.amount) || 0 }))
+    };
+    localStorage.setItem('recentlyImportedBatch', JSON.stringify(recentlyImportedBatch));
     // Rows that synced a pending "*TBC" placeholder are now duplicated by
     // the real record we just imported — delete the placeholder so it
     // doesn't sit there forever as a permanent duplicate (this is exactly
@@ -7088,6 +7196,7 @@ importSubmitBtn.onclick = async () => {
 };
 
 loadData();
+
 </script>
 </body>
 </html>
