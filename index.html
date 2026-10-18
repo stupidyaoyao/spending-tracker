@@ -95,6 +95,10 @@
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 14px; }
   .cal-nav-btn { background: var(--card); color: var(--text); font-size: 18px; width: 36px; height: 36px; border-radius: 10px; border: none; }
   #calMonthLabel { font-size: 15px; font-weight: 500; }
+  .cal-month-totals { font-size: 13px; font-weight: 600; margin: 2px 0 12px; }
+  .cal-month-spend { color: #ff6961; }
+  .cal-month-income { color: #30d158; }
+  .cal-month-dot { color: var(--muted); }
   .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
   .cal-weekdays span { text-align: center; font-size: 11px; color: var(--muted); }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 16px; }
@@ -579,6 +583,22 @@
   .statement-reminder-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .statement-reminder-item span { line-height: 1.3; }
   .statement-reminder-dismiss { background: none; border: none; color: #fff; font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 6px; flex-shrink: 0; }
+  .cmp-controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 12px; }
+  .cmp-label { font-size:12px; color:var(--muted); }
+  .cmp-custom-row { display:flex; gap:6px; align-items:center; margin-bottom:6px; font-size:13px; }
+  .cmp-custom-row input { background:var(--card); color:inherit; border:1px solid var(--border,#444); border-radius:8px; padding:6px; }
+  .cmp-cards { display:flex; gap:10px; margin-bottom:8px; }
+  .cmp-card { flex:1; background:var(--card); border-radius:14px; padding:12px; min-width:0; }
+  .cmp-card-label { font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .cmp-card-val { font-size:20px; font-weight:700; }
+  .cmp-card-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+  .cmp-diff { font-weight:600; margin:6px 0; }
+  .cmp-note { font-size:11px; color:var(--muted); margin-bottom:10px; }
+  .cmp-bars-label { font-size:12px; color:var(--muted); margin:10px 0 4px; }
+  .cmp-bars { display:flex; align-items:flex-end; gap:2px; height:60px; background:var(--card); border-radius:12px; padding:4px; }
+  .cmp-bar-col { flex:1; display:flex; align-items:flex-end; min-width:0; }
+  .cmp-bar { width:100%; border-radius:3px 3px 0 0; min-height:1px; }
+
 </style>
 </head>
 <body>
@@ -595,13 +615,27 @@
     </div>
     <div class="page-tabs" id="pageTabs">
       <button class="page-tab active" data-page="main">Main</button>
-      <button class="page-tab" data-page="insights">Insights</button>
       <button class="page-tab" data-page="history">History</button>
       <button class="page-tab" data-page="review">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
     </div>
   </header>
 
   <div id="mainPage">
+    <div id="calendarPage" style="margin-bottom:14px;">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" id="calPrev">&lsaquo;</button>
+        <span id="calMonthLabel"></span>
+        <button class="cal-nav-btn" id="calNext">&rsaquo;</button>
+      </div>
+      <div class="page-updated" id="calUpdated"></div>
+      <div class="cal-month-totals" id="calMonthTotals"></div>
+      <div class="cal-weekdays">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div id="calDayPanel"></div>
+    </div>
+
     <div class="totals-all" id="totalsAll"></div>
     <div class="totals" id="totals"></div>
 
@@ -620,32 +654,6 @@
       <div class="mini-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
       <div class="mini-cal-grid" id="mainMiniCalGrid"></div>
     </div>
-
-    <div class="chart-card">
-      <div class="chart-head">
-        <span id="chartTitle">Overall</span>
-        <span id="chartTotal"></span>
-      </div>
-      <div class="chart-mode-toggle" id="chartModeToggle" style="display:none;">
-        <button class="chart-mode-btn active" data-mode="expense">Expense</button>
-        <button class="chart-mode-btn" data-mode="income">Income</button>
-      </div>
-      <div class="chart-stats" id="chartStats" style="display:none;">
-        <div class="stat" data-stat="expense"><span class="stat-label">Expense</span><span class="stat-value expense" id="statExpense"></span></div>
-        <div class="stat" data-stat="income"><span class="stat-label">Income</span><span class="stat-value income" id="statIncome"></span></div>
-        <div class="stat" data-stat="balance"><span class="stat-label">Balance</span><span class="stat-value" id="statBalance"></span></div>
-      </div>
-      <div class="stat-breakdown" id="statBreakdown"></div>
-      <div class="chart-wrap">
-        <canvas id="chart"></canvas>
-        <div class="chart-loading show" id="chartLoading"><div class="spinner"></div></div>
-      </div>
-    </div>
-
-    <div class="mini-charts-toggle-row">
-      <button class="toolbar-btn" id="miniChartsToggleBtn">Hide account breakdown ▾</button>
-    </div>
-    <div class="mini-charts" id="miniCharts"></div>
 
     <div class="filters accountfilters" id="accountfilters"></div>
     <div class="filters" id="filters"></div>
@@ -676,27 +684,63 @@
     </div>
 
     <div class="list" id="list"><div class="empty">Loading…</div></div>
-  </div>
 
-  <div id="insightsPage" style="display:none;">
+    <!-- Moved down from the top of Main (2026-10) — the breakdown chart was
+         the first thing you'd see, but it's a "look back at patterns"
+         view, not something to check before the transaction list itself.
+         Kept, just no longer the headline. -->
+    <div class="history-section-label-row" style="margin-top:20px;">
+      <div class="history-section-label">More insights</div>
+    </div>
+    <div class="chart-card" style="display:none;"><!-- pie chart removed from view (kept hidden so its render code stays harmless) -->
+      <div class="chart-head">
+        <span id="chartTitle">Overall</span>
+        <span id="chartTotal"></span>
+      </div>
+      <div class="chart-mode-toggle" id="chartModeToggle" style="display:none;">
+        <button class="chart-mode-btn active" data-mode="expense">Expense</button>
+        <button class="chart-mode-btn" data-mode="income">Income</button>
+      </div>
+      <div class="chart-stats" id="chartStats" style="display:none;">
+        <div class="stat" data-stat="expense"><span class="stat-label">Expense</span><span class="stat-value expense" id="statExpense"></span></div>
+        <div class="stat" data-stat="income"><span class="stat-label">Income</span><span class="stat-value income" id="statIncome"></span></div>
+        <div class="stat" data-stat="balance"><span class="stat-label">Balance</span><span class="stat-value" id="statBalance"></span></div>
+      </div>
+      <div class="stat-breakdown" id="statBreakdown"></div>
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+        <div class="chart-loading show" id="chartLoading"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <div class="mini-charts-toggle-row">
+      <button class="toolbar-btn" id="miniChartsToggleBtn">Hide account breakdown ▾</button>
+    </div>
+    <div class="mini-charts" id="miniCharts"></div>
+
+  <div id="insightsPage">
     <div class="insights-subnav" id="insightsSubnav">
-      <button class="insights-subtab active" data-sub="calendar">Calendar</button>
+      <button class="insights-subtab active" data-sub="compare">Compare</button>
       <button class="insights-subtab" data-sub="charts">Charts</button>
       <button class="insights-subtab" data-sub="splits">Splits</button>
     </div>
 
-    <div id="calendarPage">
-      <div class="cal-nav">
-        <button class="cal-nav-btn" id="calPrev">&lsaquo;</button>
-        <span id="calMonthLabel"></span>
-        <button class="cal-nav-btn" id="calNext">&rsaquo;</button>
+    <div id="comparePage">
+      <div class="cmp-controls">
+        <label class="cmp-label">What</label>
+        <select id="cmpScope" class="toolbar-btn"></select>
+        <label class="cmp-label">Compare</label>
+        <select id="cmpPreset" class="toolbar-btn">
+          <option value="month">This month vs last month</option>
+          <option value="week">This week vs last week</option>
+          <option value="custom">Custom periods</option>
+        </select>
       </div>
-      <div class="page-updated" id="calUpdated"></div>
-      <div class="cal-weekdays">
-        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      <div class="cmp-custom" id="cmpCustom" style="display:none;">
+        <div class="cmp-custom-row"><span>A</span><input type="date" id="cmpAFrom"><span>to</span><input type="date" id="cmpATo"></div>
+        <div class="cmp-custom-row"><span>B</span><input type="date" id="cmpBFrom"><span>to</span><input type="date" id="cmpBTo"></div>
       </div>
-      <div class="cal-grid" id="calGrid"></div>
-      <div id="calDayPanel"></div>
+      <div id="cmpResult"></div>
     </div>
 
     <div id="trendsPage" style="display:none;">
@@ -746,6 +790,7 @@
       </div>
       <div class="history-list" id="splitsInsightsList"></div>
     </div>
+  </div>
   </div>
 
   <div id="historyPage" style="display:none;">
@@ -972,18 +1017,25 @@ const CATEGORY_RULES = [
   // 'PSS' = Petronas Smart/Service Station — the merchant code banks print
   // for Petronas station card terminals (e.g. "PSS-PUCHONG JAYA MY"),
   // distinct from the "PETRONAS" text that only shows up in some statement
-  // formats.
-  { category: 'Car', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP', 'PSS-'] },
+  // formats. ' PS ' (spaces on both sides, not just a prefix) is the same
+  // idea for Petron specifically — PBank's VISA debit line abbreviates it to
+  // bare "PS" (e.g. "...728852 PS SALAK JAYA MY", confirmed against the
+  // 2026-10 PBank CSV) rather than "PSS-" or "PETRON". Spacing it on both
+  // sides avoids matching ordinary words that merely contain "PS" together
+  // (SHOPS, APPS, CORPS, etc. all fail this check).
+  { category: 'Car', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP', 'PSS-', ' PS '] },
   { category: 'Car', subTag: 'Service', keywords: ['WORKSHOP', 'BENGKEL', 'TAYAR', 'SERVICE CENTRE', 'AUTO CARE', 'CAR WASH', 'CARWASH'] },
   // Must come BEFORE the Ride rule below — "GRAB-FOOD" contains "GRAB" and
   // would otherwise match the generic Ride keyword first and get filed as a
   // car ride instead of a food order (see the 2026-10 PBank CSV import).
+  // "GRAB* A-<orderId>" is Grab's late-settled charge: it doesn't say ride vs food and posts days after the order — send to Review so you can pick and remark the order date.
+  { category: 'Unsure', keywords: ['GRAB* A-'] },
   { category: 'Food', keywords: ['GRAB-FOOD', 'GRABFOOD', 'GRAB FOOD'] },
   { category: 'Car', subTag: 'Ride', keywords: ['GRAB', 'MYCAR', 'INDRIVE'] },
   // Council/traffic compounds (e.g. MBSJ RM80) — most local-council payments
   // that show up on a bank/e-wallet statement this way are parking or
   // traffic fines, so this lives under Car rather than as its own category.
-  { category: 'Car', subTag: 'Fine', keywords: ['MBSJ', 'MBPJ', 'MBSA', 'MBI', 'DBKL', 'MPAJ', 'MPS', 'SAMAN', 'COMPOUND'] },
+  { category: 'Car', subTag: 'Fine', keywords: ['MBSJ', 'MBPJ', 'MBSA', 'MBI', 'DBKL', 'DEWAN BANDARAYA', 'MAJLIS BANDARAYA', 'MAJLIS PERBANDARAN', 'MPAJ', 'MPS', 'SAMAN', 'COMPOUND'] },
   // "Groceries" was renamed to "Shopping" to also cover online orders (see
   // the new Online subtag below) — not just grocery runs.
   { category: 'Shopping', subTag: 'Convenience Store', keywords: ['MYNEWS', '7-ELEVEN', 'KK MART'] },
@@ -1055,6 +1107,7 @@ const CATEGORY_OPTIONS = [
   { category: 'Entertainment', subTag: '', label: 'Entertainment' },
   { category: 'Entertainment', subTag: 'Subscription', label: 'Entertainment · Subscription' },
   { category: 'Sports', subTag: '', label: 'Sports' },
+  { category: 'Loss', subTag: 'Scam', label: 'Loss · Scam' },
   { category: 'Housing', subTag: 'Rent', label: 'Housing · Rent' },
   { category: 'Housing', subTag: 'Water & Electric', label: 'Housing · Water & Electric' },
   { category: 'Housing', subTag: 'WiFi', label: 'Housing · WiFi' },
@@ -1437,6 +1490,145 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+
+
+// ---- Compare view -----------------------------------------------------------
+// Pick a scope (all spending, or one category / sub-category) and two periods;
+// shows both totals, the RM / % difference and per-day bars. Uses the same
+// net-of-splits spend definition as the calendar.
+function cmpScopeMatch_(t, scope) {
+  if (scope === 'ALL') return true;
+  const [cat, sub] = scope.split('|');
+  if (t.category !== cat) return false;
+  return !sub || (t.subTag || '') === sub;
+}
+function cmpPeriodTxns_(from, to, scope) {
+  return allTxns.filter(t => t.date >= from && t.date <= to && !NON_SPEND_CATEGORIES.includes(t.category) && cmpScopeMatch_(t, scope));
+}
+function cmpFmtDate_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function cmpPresetRanges_(preset) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (preset === 'week') {
+    const dow = (today.getDay() + 6) % 7; // Monday = 0
+    const aFrom = new Date(today); aFrom.setDate(today.getDate() - dow);
+    const bFrom = new Date(aFrom); bFrom.setDate(aFrom.getDate() - 7);
+    const bTo = new Date(aFrom); bTo.setDate(aFrom.getDate() - 1);
+    return { A: [cmpFmtDate_(aFrom), cmpFmtDate_(today)], B: [cmpFmtDate_(bFrom), cmpFmtDate_(bTo)], dayCount: dow + 1, unit: 'week' };
+  }
+  const aFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+  const bFrom = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const bTo = new Date(today.getFullYear(), today.getMonth(), 0);
+  return { A: [cmpFmtDate_(aFrom), cmpFmtDate_(today)], B: [cmpFmtDate_(bFrom), cmpFmtDate_(bTo)], dayCount: today.getDate(), unit: 'month' };
+}
+function cmpDays_(from, to) {
+  const out = [];
+  const d = new Date(from + 'T00:00:00'), end = new Date(to + 'T00:00:00');
+  while (d <= end && out.length < 400) { out.push(cmpFmtDate_(d)); d.setDate(d.getDate() + 1); }
+  return out;
+}
+function cmpScopeOptionsHtml_(selected) {
+  const cats = ALL_CATEGORIES.filter(c => !NON_SPEND_CATEGORIES.includes(c) && c !== 'Unsure');
+  let html = `<option value="ALL"${selected === 'ALL' ? ' selected' : ''}>All spending</option>`;
+  cats.forEach(c => {
+    html += `<option value="${c}"${selected === c ? ' selected' : ''}>${c}</option>`;
+    (SUBTAGS_BY_CATEGORY[c] || []).filter(Boolean).forEach(sub => {
+      const v = c + '|' + sub;
+      html += `<option value="${v}"${selected === v ? ' selected' : ''}>${c} · ${sub}</option>`;
+    });
+  });
+  html += `<option value="Unsure"${selected === 'Unsure' ? ' selected' : ''}>Unsure</option>`;
+  return html;
+}
+let cmpScope = 'ALL', cmpPreset = 'month';
+function cmpBarsHtml_(days, scope, max, color) {
+  return '<div class="cmp-bars">' + days.map(d => {
+    const v = cmpPeriodTxns_(d, d, scope).reduce((s, t) => s + spendAmount(t), 0);
+    const h = max > 0 ? Math.max(0, Math.round(Math.max(v, 0) / max * 56)) : 0;
+    return `<div class="cmp-bar-col" title="${d}: RM${v.toFixed(2)}"><div class="cmp-bar" style="height:${h}px;background:${color}"></div></div>`;
+  }).join('') + '</div>';
+}
+function renderCompare() {
+  const scopeEl = document.getElementById('cmpScope');
+  if (!scopeEl) return;
+  scopeEl.innerHTML = cmpScopeOptionsHtml_(cmpScope);
+  document.getElementById('cmpPreset').value = cmpPreset;
+  document.getElementById('cmpCustom').style.display = cmpPreset === 'custom' ? '' : 'none';
+  let A, B, note = '';
+  if (cmpPreset === 'custom') {
+    const g = id => document.getElementById(id).value;
+    if (!(g('cmpAFrom') && g('cmpATo') && g('cmpBFrom') && g('cmpBTo'))) {
+      document.getElementById('cmpResult').innerHTML = '<div class="empty">Pick both periods above.</div>';
+      return;
+    }
+    A = [g('cmpAFrom'), g('cmpATo')]; B = [g('cmpBFrom'), g('cmpBTo')];
+  } else {
+    const r = cmpPresetRanges_(cmpPreset);
+    A = r.A; B = r.B;
+    note = `Previous ${r.unit}'s full total is shown; "same point" compares the first ${r.dayCount} day(s) of each.`;
+  }
+  const sum = (rng) => cmpPeriodTxns_(rng[0], rng[1], cmpScope).reduce((s, t) => s + spendAmount(t), 0);
+  const totalA = sum(A), totalB = sum(B);
+  let samePointB = null;
+  if (cmpPreset !== 'custom') {
+    const r = cmpPresetRanges_(cmpPreset);
+    const bStart = new Date(B[0] + 'T00:00:00'); bStart.setDate(bStart.getDate() + r.dayCount - 1);
+    const bEnd = cmpFmtDate_(bStart) < B[1] ? cmpFmtDate_(bStart) : B[1];
+    samePointB = sum([B[0], bEnd]);
+  }
+  const cmpBase = samePointB !== null ? samePointB : totalB;
+  const diff = totalA - cmpBase;
+  const pct = cmpBase > 0 ? (diff / cmpBase * 100) : null;
+  const dA = cmpDays_(A[0], A[1]), dB = cmpDays_(B[0], B[1]);
+  const dayVal = (d) => cmpPeriodTxns_(d, d, cmpScope).reduce((s, t) => s + spendAmount(t), 0);
+  const max = Math.max(1, ...dA.map(dayVal), ...dB.map(dayVal));
+  const diffColor = diff > 0 ? '#ff453a' : (diff < 0 ? '#30d158' : 'inherit');
+  const lbl = (rng) => rng[0] === rng[1] ? rng[0] : `${rng[0]} → ${rng[1]}`;
+  document.getElementById('cmpResult').innerHTML = `
+    <div class="cmp-cards">
+      <div class="cmp-card"><div class="cmp-card-label">A · ${lbl(A)}</div><div class="cmp-card-val">RM${totalA.toFixed(2)}</div></div>
+      <div class="cmp-card"><div class="cmp-card-label">B · ${lbl(B)}</div><div class="cmp-card-val">RM${totalB.toFixed(2)}</div>${samePointB !== null ? `<div class="cmp-card-sub">same point: RM${samePointB.toFixed(2)}</div>` : ''}</div>
+    </div>
+    <div class="cmp-diff" style="color:${diffColor}">${diff > 0 ? '▲' : (diff < 0 ? '▼' : '=')} RM${Math.abs(diff).toFixed(2)}${pct !== null ? ` (${diff >= 0 ? '+' : '-'}${Math.abs(pct).toFixed(0)}%)` : ''} ${diff > 0 ? 'more' : (diff < 0 ? 'less' : '')} than B${samePointB !== null ? ' at the same point' : ''}</div>
+    ${note ? `<div class="cmp-note">${note}</div>` : ''}
+    <div class="cmp-bars-label">A · day by day</div>${cmpBarsHtml_(dA, cmpScope, max, '#0a84ff')}
+    <div class="cmp-bars-label">B · day by day</div>${cmpBarsHtml_(dB, cmpScope, max, '#8e8e93')}`;
+}
+document.getElementById('cmpScope').onchange = e => { cmpScope = e.target.value; renderCompare(); };
+document.getElementById('cmpPreset').onchange = e => { cmpPreset = e.target.value; renderCompare(); };
+['cmpAFrom', 'cmpATo', 'cmpBFrom', 'cmpBTo'].forEach(id => { document.getElementById(id).onchange = renderCompare; });
+
+// ---- Split netting overlay ---------------------------------------------------
+// A "From Others" transfer whose remark is shared with a real spend (a split)
+// is a reimbursement of that spend. Rather than making you recategorize each
+// one by hand, treat it IN MEMORY as the same category as the spend it pays
+// back, so every total (calendar, categories, compare) nets automatically for
+// any category. Nothing is written to the sheet. Groups made only of
+// transfers (e.g. "Dad") are never touched.
+function splitGroupKey_(remark) { return String(remark || '').trim().toLowerCase(); }
+function applySplitOverlay_() {
+  allTxns.forEach(t => {
+    if (t._ovr) { t.category = t._origCat; t.subTag = t._origSub; if (t._origFlowMissing) delete t.flow; delete t._ovr; delete t._origFlowMissing; }
+  });
+  const groups = {};
+  allTxns.forEach(t => {
+    if (!isSplitLinkableRemark(t.remark)) return;
+    (groups[splitGroupKey_(t.remark)] = groups[splitGroupKey_(t.remark)] || []).push(t);
+  });
+  Object.keys(groups).forEach(k => {
+    const g = groups[k];
+    const spends = g.filter(t => !NON_SPEND_CATEGORIES.includes(t.category) && txnFlow(t) === 'out');
+    if (!spends.length) return;
+    const payer = spends.reduce((a, b) => Number(b.amount || 0) > Number(a.amount || 0) ? b : a);
+    g.forEach(t => {
+      if (t.category !== 'Transfer' || t.subTag !== 'From Others' || txnFlow(t) !== 'in') return;
+      t._ovr = true; t._origCat = t.category; t._origSub = t.subTag;
+      if (t.flow !== 'in' && t.flow !== 'out') { t._origFlowMissing = true; t.flow = 'in'; }
+      t.category = payer.category; t.subTag = payer.subTag || '';
+    });
+  });
+}
+
 async function loadData() {
   document.getElementById('list').innerHTML = '<div class="empty">Loading…</div>';
   try {
@@ -1451,6 +1643,7 @@ async function loadData() {
     document.getElementById('list').innerHTML = '<div class="empty">Error loading data. Check your connection.</div>';
     return;
   }
+  applySplitOverlay_();
   seedRecentDayExpansion();
   renderApp();
 }
@@ -1575,26 +1768,35 @@ function renderApp() {
   render();
   // Always refresh the review list/badge, regardless of which page is
   // active — the Review tab's count badge needs to stay current even while
-  // you're looking at Main/Insights, not just when you visit it.
+  // you're looking at Main, not just when you visit it.
   renderReviewList();
-  if (activePage === 'insights') {
-    if (insightsSubPage === 'calendar') renderCalendar(); else renderTrends();
+  // Insights (Calendar/Charts/Splits) lives inside Main now (2026-10 merge)
+  // rather than its own top-level tab, so its active sub-view needs
+  // rendering any time Main itself renders, not gated behind a separate
+  // page check.
+  if (activePage === 'main') {
+    renderCalendar();
+    if (insightsSubPage === 'compare') renderCompare();
+    else if (insightsSubPage === 'charts') renderTrends();
+    else if (insightsSubPage === 'splits') renderSplitsInsights(splitsFilterRemark);
   }
   if (activePage === 'history') renderHistory();
 }
 
-// Insights merges what used to be two separate top-level tabs (Calendar,
-// Trends) into one, toggled internally — the top tab bar was getting
-// crowded with 6 buttons, and these two views are both "look back at
-// spending patterns" rather than "act on something now" like Review.
-let insightsSubPage = 'calendar';
+// Insights (Calendar/Charts/Splits) used to be its own top-level tab; now
+// it's a "More insights" section near the bottom of Main (the breakdown
+// chart was getting first-glance priority over the transaction list it's
+// meant to summarize) — these three still toggle amongst themselves the
+// same way, just always visible within Main rather than behind a separate
+// page switch.
+let insightsSubPage = 'compare';
 function switchInsightsSub(sub) {
   insightsSubPage = sub;
   document.querySelectorAll('.insights-subtab').forEach(el => el.classList.toggle('active', el.dataset.sub === sub));
-  document.getElementById('calendarPage').style.display = sub === 'calendar' ? '' : 'none';
+  document.getElementById('comparePage').style.display = sub === 'compare' ? '' : 'none';
   document.getElementById('trendsPage').style.display = sub === 'charts' ? '' : 'none';
   document.getElementById('splitsInsightsPage').style.display = sub === 'splits' ? '' : 'none';
-  if (sub === 'calendar') renderCalendar();
+  if (sub === 'compare') renderCompare();
   else if (sub === 'charts') renderTrends();
   else if (sub === 'splits') renderSplitsInsights(splitsFilterRemark);
 }
@@ -1606,10 +1808,9 @@ function switchPage(page) {
   activePage = page;
   document.querySelectorAll('.page-tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   document.getElementById('mainPage').style.display = page === 'main' ? '' : 'none';
-  document.getElementById('insightsPage').style.display = page === 'insights' ? '' : 'none';
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
   document.getElementById('reviewPage').style.display = page === 'review' ? '' : 'none';
-  if (page === 'insights') switchInsightsSub(insightsSubPage);
+  if (page === 'main') switchInsightsSub(insightsSubPage);
   if (page === 'history') renderHistory();
   if (page === 'review') renderReviewList();
 }
@@ -1635,7 +1836,12 @@ function formatCompactRM(amount) {
 }
 
 function calendarDayTotal(dateStr) {
-  const dayTxns = allTxns.filter(t => t.date === dateStr && !NON_SPEND_CATEGORIES.includes(t.category));
+  // Follows the Main page's account / category / sub-category chips, so the
+  // calendar can be read per category (e.g. only Food) as well as overall.
+  const dayTxns = allTxns.filter(t => t.date === dateStr && !NON_SPEND_CATEGORIES.includes(t.category)
+    && (activeAccountFilter === 'All' || t.account === activeAccountFilter)
+    && (activeFilter === 'All' || t.category === activeFilter)
+    && (activeSubFilter === 'All' || normalizedSubTag(t.category, t.subTag || '') === activeSubFilter || (t.subTag || '') === activeSubFilter));
   return dayTxns.reduce((s, t) => s + spendAmount(t), 0);
 }
 
@@ -1694,10 +1900,23 @@ function renderCalendar() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const totalsByDay = {};
+  let monthSpend = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     totalsByDay[dateStr] = calendarDayTotal(dateStr);
+    monthSpend += totalsByDay[dateStr];
   }
+  // Income is its own category, entirely separate from calendarDayTotal
+  // (which only ever looks at spend categories — see NON_SPEND_CATEGORIES)
+  // so it's summed here independently rather than folded into the day
+  // totals above.
+  const monthPrefix = year + '-' + String(month + 1).padStart(2, '0');
+  const monthIncome = allTxns
+    .filter(t => t.category === 'Income' && (t.date || '').startsWith(monthPrefix))
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+  document.getElementById('calMonthTotals').innerHTML =
+    `<span class="cal-month-spend">Spent RM${monthSpend.toFixed(2)}</span>` +
+    (monthIncome > 0 ? ` <span class="cal-month-dot">·</span> <span class="cal-month-income">Earned RM${monthIncome.toFixed(2)}</span>` : '');
 
   let html = '';
   for (let i = 0; i < startWeekday; i++) html += '<div class="cal-day empty-cell"></div>';
@@ -1914,7 +2133,7 @@ function trendBucketsFor(txns) {
 // side as bars. Each category gets its own distinct hue here instead.
 const TREND_CATEGORY_COLORS = {
   Car: '#0a84ff', Shopping: '#ff9f0a', Food: '#30d158',
-  Entertainment: '#ffd60a', Sports: '#64d2ff', Housing: '#ff375f', Unsure: '#bf5af2'
+  Entertainment: '#ffd60a', Sports: '#64d2ff', Housing: '#ff375f', Loss: '#ff453a', Unsure: '#bf5af2'
 };
 
 // Compresses bar HEIGHT only (sign-preserving square root) so a month with
@@ -2300,7 +2519,10 @@ function renderJustImportedSummary() {
     return;
   }
   const groups = {};
-  clean.forEach(r => {
+  const xfer = { count: 0, total: 0 };
+  const spendRows = clean.filter(r => r.category !== 'Transfer' && r.category !== 'Income');
+  clean.filter(r => r.category === 'Transfer' || r.category === 'Income').forEach(r => { xfer.count += 1; xfer.total += r.amount; });
+  spendRows.forEach(r => {
     const key = r.subTag ? `${r.category} · ${r.subTag}` : r.category;
     if (!groups[key]) groups[key] = { count: 0, total: 0 };
     groups[key].count += 1;
@@ -2314,7 +2536,8 @@ function renderJustImportedSummary() {
       <span class="just-imported-amount">RM${g.total.toFixed(2)}</span>
     </div>`;
   }).join('');
-  const total = clean.reduce((s, r) => s + r.amount, 0);
+  const total = spendRows.reduce((s, r) => s + r.amount, 0);
+  const xferHtml = xfer.count ? `<div class="just-imported-row" style="opacity:.6;font-size:12px"><span class="just-imported-label">Internal transfers (not counted in total)</span><span class="just-imported-count">${xfer.count}×</span><span class="just-imported-amount">RM${xfer.total.toFixed(2)}</span></div>` : '';
   const when = recentlyImportedBatch.importedAt ? new Date(recentlyImportedBatch.importedAt).toLocaleString() : '';
   section.style.display = '';
   label.textContent = `Just imported (${clean.length})`;
@@ -2327,6 +2550,7 @@ function renderJustImportedSummary() {
         <span></span>
         <span class="just-imported-amount">RM${total.toFixed(2)}</span>
       </div>
+      ${xferHtml}
       <div class="review-actions">
         <button class="review-btn confirm" id="justImportedDismissBtn">Looks good</button>
       </div>
@@ -2728,7 +2952,7 @@ function renderTotals(txns, incomeTxns) {
 // "needs review" flag.
 const CHART_COLORS = {
   Car: '#ff453a', Shopping: '#ff9f0a', Food: '#ff6b35', Entertainment: '#ffd60a',
-  Housing: '#ff7a9c', Unsure: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
+  Housing: '#ff7a9c', Loss: '#ff453a', Unsure: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
 };
 
 // Not real spending — Transfer covers wallet top-ups (Card Reload), P2P
@@ -3169,7 +3393,7 @@ function renderStatBreakdown(base) {
 // Unsure sits last — it's the "needs a real category" bucket, not something
 // you'd usually filter to on purpose, so it shouldn't compete for attention
 // with the real spending categories at the front of the row.
-const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Sports', 'Housing', 'Transfer', 'Income', 'Unsure'];
+const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Sports', 'Housing', 'Loss', 'Transfer', 'Income', 'Unsure'];
 
 // Top-level "which real-world account" filter — All / TNG / HL Bank / PBank
 // — a separate dimension from the category filters below it. Which account
@@ -3340,6 +3564,7 @@ function attachAlsoTaggedHandlers() {
 }
 
 function render() {
+  try { if (typeof renderCalendar === 'function' && document.getElementById('calGrid')) renderCalendar(); } catch (e) {}
   // Reset here — the grouped branch below (any mode except "None") turns
   // this back on, since expand/collapse-all only makes sense once rows are
   // actually grouped into headers.
@@ -4680,10 +4905,15 @@ function remarkGroups() {
   const byRemark = {};
   allTxns.forEach(t => {
     if (!isSplitLinkableRemark(t.remark)) return;
-    (byRemark[t.remark] = byRemark[t.remark] || []).push(t);
+    (byRemark[splitGroupKey_(t.remark)] = byRemark[splitGroupKey_(t.remark)] || []).push(t);
   });
-  const list = Object.keys(byRemark).map(remark => {
-    const txns = byRemark[remark].slice().sort((a, b) => txnTimestamp(b) - txnTimestamp(a));
+  const list = Object.keys(byRemark).filter(k => {
+    const g = byRemark[k];
+    // Money-moving-only groups (e.g. "Dad") aren't splits — hide them once they have 2+ rows.
+    return !(g.length >= 2 && g.every(t => (t._ovr ? t._origCat : t.category) === 'Transfer'));
+  }).map(key => {
+    const txns = byRemark[key].slice().sort((a, b) => txnTimestamp(b) - txnTimestamp(a));
+    const remark = txns[0].remark;
     let totalOut = 0, totalIn = 0;
     txns.forEach(t => {
       const amt = Number(t.amount || 0);
@@ -4745,7 +4975,7 @@ function renderSplitsInsights(filterRemark) {
   const backBtn = document.getElementById('splitsInsightsBackBtn');
   const sortSel = document.getElementById('splitsSortBy');
   backBtn.style.display = filterRemark ? '' : 'none';
-  const groups = filterRemark ? remarkGroups().filter(g => g.remark === filterRemark) : splitGroups();
+  const groups = filterRemark ? remarkGroups().filter(g => splitGroupKey_(g.remark) === splitGroupKey_(filterRemark)) : splitGroups();
   // Sort control only makes sense on the full-browse view — a single
   // filtered group has nothing to sort against.
   sortSel.style.display = (!filterRemark && groups.length > 1) ? '' : 'none';
@@ -4773,12 +5003,17 @@ function renderSplitsInsights(filterRemark) {
     };
   });
 }
-// Jumps to the Insights > Splits sub-tab, filtered to one group's detail —
-// called when tapping a shared note on any transaction row.
+// Jumps to the Insights > Splits sub-view, filtered to one group's detail —
+// called when tapping a shared note on any transaction row. Insights lives
+// inside Main now, so this switches to Main (if not already there) and
+// scrolls its Splits section into view, rather than switching to a
+// separate page the way it used to.
 function openSplitsInsights(filterRemark) {
   splitsFilterRemark = filterRemark || null;
-  switchPage('insights');
+  switchPage('main');
   switchInsightsSub('splits');
+  const subnav = document.getElementById('insightsSubnav');
+  if (subnav) subnav.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 document.getElementById('splitsInsightsBackBtn').onclick = () => {
   splitsFilterRemark = null;
@@ -5459,16 +5694,53 @@ function parsePBankStatementLines(lines) {
   return txns;
 }
 
+
+// ---- PDF password handling ------------------------------------------------
+// window.prompt() is blocked/returns blank in some browsers (iOS home-screen
+// apps, webviews); pdf.js then re-asks forever and the import hangs. This uses
+// an in-page dialog, remembers the last working password on this device, and
+// gives up on cancel or after a few wrong tries.
+function askPdfPassword_(wrong) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML = '<div style="background:#fff;color:#111;border-radius:14px;padding:18px;max-width:340px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4)">'
+      + '<div style="font-weight:600;margin-bottom:6px">PDF password</div>'
+      + '<div style="font-size:13px;opacity:.75;margin-bottom:10px">' + (wrong ? 'Incorrect password — try again.' : 'This PDF is password-protected.') + '</div>'
+      + '<input type="password" id="pdfPwdInput" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px;font-size:16px;border-radius:8px;border:1px solid #888;margin-bottom:12px">'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end"><button id="pdfPwdCancel" style="padding:8px 14px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit">Cancel</button>'
+      + '<button id="pdfPwdOk" style="padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff">OK</button></div></div>';
+    document.body.appendChild(ov);
+    const inp = ov.querySelector('#pdfPwdInput');
+    const done = v => { ov.remove(); resolve(v); };
+    ov.querySelector('#pdfPwdOk').onclick = () => done(inp.value);
+    ov.querySelector('#pdfPwdCancel').onclick = () => done(null);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(inp.value); });
+    setTimeout(() => inp.focus(), 50);
+  });
+}
+function attachPdfPasswordHandler_(loadingTask) {
+  let tries = 0;
+  const KEY = 'pdfPasswordSaved';
+  loadingTask.onPassword = async (callback, reason) => {
+    let saved = '';
+    try { saved = localStorage.getItem(KEY) || ''; } catch (e) {}
+    if (tries === 0 && reason === 1 && saved) { tries++; callback(saved); return; }
+    tries++;
+    if (tries > 4) { loadingTask.destroy(); return; }
+    const pwd = await askPdfPassword_(reason === 2);
+    if (!pwd) { loadingTask.destroy(); return; }
+    try { localStorage.setItem(KEY, pwd); } catch (e) {}
+    callback(pwd);
+  };
+}
+
 async function parseBankAPdfFile(file) {
   if (!window.pdfjsLib) throw new Error('PDF reader failed to load — check your connection and try again.');
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: buf });
-  loadingTask.onPassword = (callback, reason) => {
-    const msg = reason === 2 ? 'Incorrect password — try again:' : 'This PDF is password-protected. Enter the password:';
-    const pwd = window.prompt(msg);
-    callback(pwd || '');
-  };
+  attachPdfPasswordHandler_(loadingTask);
   const pdf = await loadingTask.promise;
   let allLines = [];
   for (let p = 1; p <= pdf.numPages; p++) {
@@ -5829,11 +6101,7 @@ async function extractPdfRecords(file) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: buf });
-  loadingTask.onPassword = (callback, reason) => {
-    const msg = reason === 2 ? 'Incorrect password — try again:' : 'This PDF is password-protected. Enter the password:';
-    const pwd = window.prompt(msg);
-    callback(pwd || '');
-  };
+  attachPdfPasswordHandler_(loadingTask);
   const pdf = await loadingTask.promise;
   let records = [];
   let rawDump = null;
@@ -6028,7 +6296,12 @@ function extractCardParkingNames_(rowItems) {
     .sort((a, b) => b.y - a.y).map(it => stripTrailingFacilityCode_(it.str));
   return {
     location: applyCardLocationKnownFixes_(reconstructCardLocationLines_(locLines)),
-    operator: reconstructCardLocationLines_(opLines)
+    operator: reconstructCardLocationLines_(opLines.reduce((acc, l) => {
+      // Operator codes like SM_SONICBOOM wrap mid-word ("SM_SONICB" / "OOM"): glue a short all-caps tail onto a space-less underscore code.
+      if (acc.length && /^[A-Z]{1,4}$/.test(l) && /^[A-Z0-9]+_[A-Z0-9_]+$/.test(acc[acc.length - 1])) acc[acc.length - 1] += l;
+      else acc.push(l);
+      return acc;
+    }, []))
   };
 }
 
@@ -6068,7 +6341,7 @@ function parseCardPdfPageItems(items) {
     const timeStr = dateCandidates.find(s => /^\d{1,2}:\d{2}:\d{2}$/.test(s)) || '';
     if (!dateStr) continue;
 
-    const typeStr = rowItems.filter(it => it.x >= CARD_TYPE_COL[0] && it.x < CARD_TYPE_COL[1]).map(it => it.str).join(' ');
+    const typeStr = rowItems.filter(it => it.x >= CARD_TYPE_COL[0] && it.x < CARD_TYPE_COL[1]).map(it => it.str).join(' ').replace(/^\s*Tran\s+Type\s+/i, '');
     const amtStr = rowItems.filter(it => it.x >= CARD_AMOUNT_COL[0] && it.x < CARD_AMOUNT_COL[1]).map(it => it.str).join(' ');
     const amtMatches = amtStr.match(/\d+\.\d{2}/g);
     if (!amtMatches || !amtMatches.length) continue;
@@ -6096,7 +6369,7 @@ async function extractCardPdfRecords(file) {
   if (!window.pdfjsLib) throw new Error('PDF reader failed to load — check your connection and try again.');
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const lt_ = pdfjsLib.getDocument({ data: buf }); attachPdfPasswordHandler_(lt_); const pdf = await lt_.promise;
   let records = [];
   let sawOnline = false;
   let statementEnd = null;
@@ -6135,7 +6408,7 @@ async function detectPdfStatementKind_(file) {
   try {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const lt_ = pdfjsLib.getDocument({ data: buf }); attachPdfPasswordHandler_(lt_); const pdf = await lt_.promise;
     const page = await pdf.getPage(1);
     const content = await page.getTextContent();
     const text = content.items.map(it => it.str || '').join(' ');
