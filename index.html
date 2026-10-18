@@ -597,6 +597,12 @@
   .cmp-bars-label { font-size:12px; color:var(--muted); margin:10px 0 4px; }
   .cmp-bars { display:flex; align-items:flex-end; gap:2px; height:60px; background:var(--card); border-radius:12px; padding:4px; }
   .cmp-bar-col { flex:1; display:flex; align-items:flex-end; min-width:0; }
+  .cmp-month-row { display:grid; grid-template-columns:52px 1fr 64px 44px; gap:6px; align-items:center; margin:5px 0; font-size:13px; }
+  .cmp-month-label { color:var(--muted); }
+  .cmp-month-barwrap { background:var(--card); border-radius:6px; height:14px; overflow:hidden; }
+  .cmp-month-bar { background:#0a84ff; height:100%; border-radius:6px; }
+  .cmp-month-val { text-align:right; font-weight:600; }
+  .cmp-month-delta { font-size:11px; }
   .cmp-bar { width:100%; border-radius:3px 3px 0 0; min-height:1px; }
 
 </style>
@@ -610,6 +616,7 @@
   <header>
     <div class="header-top">
       <h1>Spending</h1>
+      <button class="icon-btn" id="resetFiltersBtn" title="Back to All" aria-label="Reset filters">↺</button>
       <button class="icon-btn" id="shareViewLinkBtn" title="Copy read-only share link" aria-label="Copy read-only share link">🔗</button>
       <button class="icon-btn" id="hideNumbersBtn" title="Hide balance" aria-label="Hide balance">👁️</button>
     </div>
@@ -690,7 +697,7 @@
          view, not something to check before the transaction list itself.
          Kept, just no longer the headline. -->
     <div class="history-section-label-row" style="margin-top:20px;">
-      <div class="history-section-label">More insights</div>
+      <button class="toolbar-btn" id="insightsToggleBtn" style="width:100%;text-align:left;">More insights (Compare, Splits) ▸</button>
     </div>
     <div class="chart-card" style="display:none;"><!-- pie chart removed from view (kept hidden so its render code stays harmless) -->
       <div class="chart-head">
@@ -713,15 +720,14 @@
       </div>
     </div>
 
-    <div class="mini-charts-toggle-row">
+    <div class="mini-charts-toggle-row" style="display:none;">
       <button class="toolbar-btn" id="miniChartsToggleBtn">Hide account breakdown ▾</button>
     </div>
-    <div class="mini-charts" id="miniCharts"></div>
+    <div class="mini-charts" id="miniCharts" style="display:none;"></div>
 
-  <div id="insightsPage">
+  <div id="insightsPage" style="display:none;">
     <div class="insights-subnav" id="insightsSubnav">
       <button class="insights-subtab active" data-sub="compare">Compare</button>
-      <button class="insights-subtab" data-sub="charts">Charts</button>
       <button class="insights-subtab" data-sub="splits">Splits</button>
     </div>
 
@@ -733,6 +739,7 @@
         <select id="cmpPreset" class="toolbar-btn">
           <option value="month">This month vs last month</option>
           <option value="week">This week vs last week</option>
+          <option value="months">Month by month (last 12)</option>
           <option value="custom">Custom periods</option>
         </select>
       </div>
@@ -832,9 +839,7 @@
 <!-- Resets every Main-page filter back to "All" (account/category/subtag/
      search/date range) and jumps to the Main page — a quick way back to the
      unfiltered view instead of clearing each filter chip one by one. -->
-<div class="fab-row-left">
-  <button class="fab secondary" id="resetFiltersBtn" title="Back to All">↺</button>
-</div>
+
 
 <!-- Add transaction sheet -->
 <div class="sheet-backdrop" id="addBackdrop">
@@ -1107,6 +1112,8 @@ const CATEGORY_OPTIONS = [
   { category: 'Entertainment', subTag: '', label: 'Entertainment' },
   { category: 'Entertainment', subTag: 'Subscription', label: 'Entertainment · Subscription' },
   { category: 'Sports', subTag: '', label: 'Sports' },
+  { category: 'Social', subTag: 'Condolence', label: 'Social · Condolence' },
+  { category: 'Social', subTag: 'Gift', label: 'Social · Gift' },
   { category: 'Loss', subTag: 'Scam', label: 'Loss · Scam' },
   { category: 'Housing', subTag: 'Rent', label: 'Housing · Rent' },
   { category: 'Housing', subTag: 'Water & Electric', label: 'Housing · Water & Electric' },
@@ -1548,12 +1555,50 @@ function cmpBarsHtml_(days, scope, max, color) {
     return `<div class="cmp-bar-col" title="${d}: RM${v.toFixed(2)}"><div class="cmp-bar" style="height:${h}px;background:${color}"></div></div>`;
   }).join('') + '</div>';
 }
+
+// Month-by-month view: last 12 months for the chosen scope, each with its
+// total, change vs the month before, and a bar scaled to the biggest month.
+function renderCompareMonths_() {
+  const now = new Date();
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const from = cmpFmtDate_(d);
+    const to = cmpFmtDate_(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    const total = cmpPeriodTxns_(from, to, cmpScope).reduce((s, t) => s + spendAmount(t), 0);
+    months.push({ label: d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }), total, partial: i === 0 });
+  }
+  const max = Math.max(1, ...months.map(m => m.total));
+  const nonEmpty = months.filter(m => m.total > 0 && !m.partial);
+  const avg = nonEmpty.length ? nonEmpty.reduce((s, m) => s + m.total, 0) / nonEmpty.length : 0;
+  const rows = months.slice().reverse().map((m, idx, arr) => {
+    const prev = arr[idx + 1];
+    let delta = '';
+    if (prev && prev.total > 0) {
+      const diff = m.total - prev.total;
+      const pct = diff / prev.total * 100;
+      delta = `<span style="color:${diff > 0 ? '#ff453a' : '#30d158'}">${diff > 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(0)}%</span>`;
+    }
+    const w = Math.max(0, Math.round(Math.max(m.total, 0) / max * 100));
+    return `<div class="cmp-month-row">
+      <div class="cmp-month-label">${m.label}${m.partial ? ' *' : ''}</div>
+      <div class="cmp-month-barwrap"><div class="cmp-month-bar" style="width:${w}%"></div></div>
+      <div class="cmp-month-val">RM${m.total.toFixed(0)}</div>
+      <div class="cmp-month-delta">${delta}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('cmpCustom').style.display = 'none';
+  document.getElementById('cmpResult').innerHTML = `
+    <div class="cmp-note">Average of full months: RM${avg.toFixed(0)} · * = month in progress · ▲/▼ is vs the month before</div>
+    ${rows}`;
+}
 function renderCompare() {
   const scopeEl = document.getElementById('cmpScope');
   if (!scopeEl) return;
   scopeEl.innerHTML = cmpScopeOptionsHtml_(cmpScope);
   document.getElementById('cmpPreset').value = cmpPreset;
   document.getElementById('cmpCustom').style.display = cmpPreset === 'custom' ? '' : 'none';
+  if (cmpPreset === 'months') { renderCompareMonths_(); return; }
   let A, B, note = '';
   if (cmpPreset === 'custom') {
     const g = id => document.getElementById(id).value;
@@ -1776,9 +1821,10 @@ function renderApp() {
   // page check.
   if (activePage === 'main') {
     renderCalendar();
-    if (insightsSubPage === 'compare') renderCompare();
-    else if (insightsSubPage === 'charts') renderTrends();
-    else if (insightsSubPage === 'splits') renderSplitsInsights(splitsFilterRemark);
+    if (document.getElementById('insightsPage').style.display !== 'none') {
+      if (insightsSubPage === 'compare') renderCompare();
+      else if (insightsSubPage === 'splits') renderSplitsInsights(splitsFilterRemark);
+    }
   }
   if (activePage === 'history') renderHistory();
 }
@@ -1800,6 +1846,13 @@ function switchInsightsSub(sub) {
   else if (sub === 'charts') renderTrends();
   else if (sub === 'splits') renderSplitsInsights(splitsFilterRemark);
 }
+document.getElementById('insightsToggleBtn').onclick = () => {
+  const pg = document.getElementById('insightsPage');
+  const open = pg.style.display === 'none';
+  pg.style.display = open ? '' : 'none';
+  document.getElementById('insightsToggleBtn').textContent = open ? 'More insights (Compare, Splits) ▾' : 'More insights (Compare, Splits) ▸';
+  if (open) switchInsightsSub(insightsSubPage);
+};
 document.querySelectorAll('.insights-subtab').forEach(el => {
   el.onclick = () => switchInsightsSub(el.dataset.sub);
 });
@@ -1835,6 +1888,22 @@ function formatCompactRM(amount) {
   return sign + abs.toFixed(0);
 }
 
+// When the Transfer or Income chip is picked, the calendar lights up days that
+// have those records instead of going blank (they're never "spending", so the
+// normal heat map has nothing to show). net = money in minus money out.
+function calendarNonSpendMode_() { return activeFilter === 'Transfer' || activeFilter === 'Income'; }
+function calendarDayNonSpend_(dateStr) {
+  let net = 0, count = 0, inAmt = 0, outAmt = 0;
+  allTxns.forEach(t => {
+    if (t.date !== dateStr || t.category !== activeFilter) return;
+    if (activeAccountFilter !== 'All' && t.account !== activeAccountFilter) return;
+    if (activeSubFilter !== 'All' && normalizedSubTag(t.category, t.subTag || '') !== activeSubFilter && (t.subTag || '') !== activeSubFilter) return;
+    const amt = Number(t.amount || 0);
+    if (txnFlow(t) === 'in') { net += amt; inAmt += amt; } else { net -= amt; outAmt += amt; }
+    count++;
+  });
+  return { net, count, inAmt, outAmt };
+}
 function calendarDayTotal(dateStr) {
   // Follows the Main page's account / category / sub-category chips, so the
   // calendar can be read per category (e.g. only Food) as well as overall.
@@ -1900,11 +1969,19 @@ function renderCalendar() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const totalsByDay = {};
+  const nonSpendMode = calendarNonSpendMode_();
+  const nonSpendByDay = {};
+  let monthIn = 0, monthOut = 0;
   let monthSpend = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     totalsByDay[dateStr] = calendarDayTotal(dateStr);
     monthSpend += totalsByDay[dateStr];
+    if (nonSpendMode) {
+      const ns = calendarDayNonSpend_(dateStr);
+      nonSpendByDay[dateStr] = ns;
+      monthIn += ns.inAmt; monthOut += ns.outAmt;
+    }
   }
   // Income is its own category, entirely separate from calendarDayTotal
   // (which only ever looks at spend categories — see NON_SPEND_CATEGORIES)
@@ -1914,9 +1991,10 @@ function renderCalendar() {
   const monthIncome = allTxns
     .filter(t => t.category === 'Income' && (t.date || '').startsWith(monthPrefix))
     .reduce((s, t) => s + Number(t.amount || 0), 0);
-  document.getElementById('calMonthTotals').innerHTML =
-    `<span class="cal-month-spend">Spent RM${monthSpend.toFixed(2)}</span>` +
-    (monthIncome > 0 ? ` <span class="cal-month-dot">·</span> <span class="cal-month-income">Earned RM${monthIncome.toFixed(2)}</span>` : '');
+  document.getElementById('calMonthTotals').innerHTML = nonSpendMode
+    ? `<span class="cal-month-spend">${activeFilter === 'Income' ? 'Out' : 'Moved out'} RM${monthOut.toFixed(2)}</span> <span class="cal-month-dot">·</span> <span class="cal-month-income">${activeFilter === 'Income' ? 'In' : 'Moved in'} RM${monthIn.toFixed(2)}</span>`
+    : `<span class="cal-month-spend">Spent RM${monthSpend.toFixed(2)}</span>` +
+      (monthIncome > 0 ? ` <span class="cal-month-dot">·</span> <span class="cal-month-income">Earned RM${monthIncome.toFixed(2)}</span>` : '');
 
   let html = '';
   for (let i = 0; i < startWeekday; i++) html += '<div class="cal-day empty-cell"></div>';
@@ -1926,7 +2004,16 @@ function renderCalendar() {
     let styleAttr = '';
     let numStyle = '';
     let amtStyle = '';
-    if (total > 0) {
+    let cellAmtText = null;
+    if (nonSpendMode) {
+      const ns = nonSpendByDay[dateStr];
+      if (ns && ns.count) {
+        styleAttr = ' style="background:rgba(10,132,255,.55);"';
+        numStyle = ' style="color:#fff;opacity:0.9;"';
+        amtStyle = ' style="color:#fff;"';
+        cellAmtText = ns.net === 0 ? ('×' + ns.count) : ((ns.net > 0 ? '+RM' : '-RM') + (Math.abs(ns.net) >= 1000 ? (Math.abs(ns.net) / 1000).toFixed(1) + 'K' : Math.abs(ns.net).toFixed(0)));
+      }
+    } else if (total > 0) {
       const rgb = heatColorForAmount(total);
       const txt = heatTextColor(rgb);
       styleAttr = ` style="background:rgb(${rgb[0]},${rgb[1]},${rgb[2]});"`;
@@ -1938,7 +2025,7 @@ function renderCalendar() {
     html += `<button class="cal-day ${selectedClass}" data-date="${dateStr}"${styleAttr}>
       ${incomeDot}
       <span class="cal-day-num"${numStyle}>${d}</span>
-      ${total !== 0 ? `<span class="cal-day-amt"${amtStyle}>${formatCompactRM(total)}</span>` : ''}
+      ${cellAmtText !== null ? `<span class="cal-day-amt"${amtStyle}>${cellAmtText}</span>` : (!nonSpendMode && total !== 0 ? `<span class="cal-day-amt"${amtStyle}>${formatCompactRM(total)}</span>` : '')}
     </button>`;
   }
   document.getElementById('calGrid').innerHTML = html;
@@ -2133,7 +2220,7 @@ function trendBucketsFor(txns) {
 // side as bars. Each category gets its own distinct hue here instead.
 const TREND_CATEGORY_COLORS = {
   Car: '#0a84ff', Shopping: '#ff9f0a', Food: '#30d158',
-  Entertainment: '#ffd60a', Sports: '#64d2ff', Housing: '#ff375f', Loss: '#ff453a', Unsure: '#bf5af2'
+  Entertainment: '#ffd60a', Sports: '#64d2ff', Housing: '#ff375f', Loss: '#ff453a', Social: '#ff9ff3', Unsure: '#bf5af2'
 };
 
 // Compresses bar HEIGHT only (sign-preserving square root) so a month with
@@ -2952,7 +3039,7 @@ function renderTotals(txns, incomeTxns) {
 // "needs review" flag.
 const CHART_COLORS = {
   Car: '#ff453a', Shopping: '#ff9f0a', Food: '#ff6b35', Entertainment: '#ffd60a',
-  Housing: '#ff7a9c', Loss: '#ff453a', Unsure: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
+  Housing: '#ff7a9c', Loss: '#ff453a', Social: '#ff9ff3', Unsure: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
 };
 
 // Not real spending — Transfer covers wallet top-ups (Card Reload), P2P
@@ -3393,7 +3480,7 @@ function renderStatBreakdown(base) {
 // Unsure sits last — it's the "needs a real category" bucket, not something
 // you'd usually filter to on purpose, so it shouldn't compete for attention
 // with the real spending categories at the front of the row.
-const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Sports', 'Housing', 'Loss', 'Transfer', 'Income', 'Unsure'];
+const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Sports', 'Social', 'Housing', 'Loss', 'Transfer', 'Income', 'Unsure'];
 
 // Top-level "which real-world account" filter — All / TNG / HL Bank / PBank
 // — a separate dimension from the category filters below it. Which account
@@ -4723,7 +4810,7 @@ function attachReviewConfirmHandlers() {
     btn.onclick = async () => {
       const row = Number(btn.dataset.row);
       const isIncoming = btn.dataset.direction === 'in';
-      const remark = prompt(isIncoming
+      const remark = await askTextInline_(isIncoming
         ? 'Who sent you this transfer? (required to confirm)'
         : 'Who/what was this transfer for? (required to confirm)');
       if (remark === null) return;
@@ -5011,6 +5098,8 @@ function renderSplitsInsights(filterRemark) {
 function openSplitsInsights(filterRemark) {
   splitsFilterRemark = filterRemark || null;
   switchPage('main');
+  document.getElementById('insightsPage').style.display = '';
+  document.getElementById('insightsToggleBtn').textContent = 'More insights (Compare, Splits) ▾';
   switchInsightsSub('splits');
   const subnav = document.getElementById('insightsSubnav');
   if (subnav) subnav.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -5700,6 +5789,28 @@ function parsePBankStatementLines(lines) {
 // apps, webviews); pdf.js then re-asks forever and the import hangs. This uses
 // an in-page dialog, remembers the last working password on this device, and
 // gives up on cancel or after a few wrong tries.
+// In-page replacement for window.prompt() (blocked/blank on iOS home-screen
+// apps, which silently made buttons like Review > "Who was this for?" do nothing).
+function askTextInline_(message, initial) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML = '<div style="background:#fff;color:#111;border-radius:14px;padding:18px;max-width:340px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4)">'
+      + '<div style="font-size:14px;margin-bottom:10px" id="askTxtMsg"></div>'
+      + '<input type="text" id="askTxtInput" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px;font-size:16px;border-radius:8px;border:1px solid #888;margin-bottom:12px">'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end"><button id="askTxtCancel" style="padding:8px 14px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit">Cancel</button>'
+      + '<button id="askTxtOk" style="padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff">OK</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#askTxtMsg').textContent = message;
+    const inp = ov.querySelector('#askTxtInput');
+    inp.value = initial || '';
+    const done = v => { ov.remove(); resolve(v); };
+    ov.querySelector('#askTxtOk').onclick = () => done(inp.value);
+    ov.querySelector('#askTxtCancel').onclick = () => done(null);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(inp.value); });
+    setTimeout(() => inp.focus(), 50);
+  });
+}
 function askPdfPassword_(wrong) {
   return new Promise(resolve => {
     const ov = document.createElement('div');
