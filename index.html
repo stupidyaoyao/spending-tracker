@@ -606,6 +606,53 @@
   .commit-presets { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
   .commit-preset { padding:8px 12px; border-radius:999px; border:1.5px solid #30d158; background:transparent; color:#30d158; font-size:13px; }
   body.view-only #helpBtn { display:inline-flex !important; }
+  .page-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .page-tab { white-space: nowrap; padding: 8px 13px; }
+  #filters, .search-row { display: none !important; }
+  .cat-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .cat-tile { text-align: left; border: 1.5px solid var(--tc); background: color-mix(in srgb, var(--tc) 14%, transparent); color: var(--text); border-radius: 12px; padding: 9px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .cat-tile.active { background: var(--tc); color: #111; }
+  .ct-name { font-weight: 700; font-size: 14px; }
+  .ct-sub { font-size: 11px; opacity: .8; }
+  .txn2 { display: block; border-left: 4px solid var(--cc, #8e8e93); padding: 10px 12px; border-radius: 12px; }
+  .txn2 .dot { display: none; }
+  .txn-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .txn2 .merchant { flex: 1; min-width: 0; }
+  .txn2 .merchant-text { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; flex: 1 1 100%; }
+  .txn2 .amount { white-space: nowrap; }
+  .txn-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+  .txn2 .txn-actions { flex-direction: row; gap: 14px; align-items: center; }
+  .txn2 .cat-select-row { flex: 1; min-width: 0; }
+  .txn2 .txn-cat-select { margin-top: 0; font-size: 12px; padding: 5px 8px; color: var(--text); border-color: var(--cc); }
+  .txn2 .txn-extratag-select, .txn2 .txn-extratag-amount { margin-top: 0; }
+  .rv-row .txn-top { cursor: pointer; }
+  .rv-chev { color: var(--muted); margin-right: 6px; }
+  .rv-collapsed .txn-bottom, .rv-collapsed .remark, .rv-collapsed .review-remember, .rv-collapsed .review-actions, .rv-collapsed .transfer-hint { display: none; }
+  .list .txn2 { margin-bottom: 8px; }
+  .note-topics { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; }
+  .nt-label { font-size:12px; color:var(--muted); width:100%; }
+  .nt-chip { padding:4px 11px; border-radius:999px; border:1.5px solid; background:transparent; font-size:13px; font-weight:600; }
+  .note-similar { font-size:12px; color:var(--muted); margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .nt-sim { border:1px dashed #00c7be; color:#00c7be; background:transparent; border-radius:999px; padding:2px 10px; font-size:12px; }
+  .notes-sort-banner { display:flex; justify-content:space-between; align-items:center; background:rgba(255,159,10,.14); border-left:4px solid #ff9f0a; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:14px; }
+  .notes-sort-banner button { background:#ff9f0a; color:#111; border:0; border-radius:8px; padding:6px 12px; font-weight:600; }
+  .note-edit { background:transparent; border:0; color:var(--muted); font-size:12px; text-decoration:underline; margin:-4px 0 10px 4px; }
+  .lock-row { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:13px; color:#30d158; }
+  .lock-btn { border:1px solid #8e8e93; background:transparent; color:var(--muted); border-radius:8px; padding:5px 10px; font-size:12px; }
+  .lock-go { border-color:#30d158; color:#30d158; font-weight:600; }
+  .cash-card { background:rgba(162,132,94,.18); border-left:4px solid #a2845e; border-radius:12px; padding:10px 12px; margin-bottom:10px; }
+  .cash-t { font-weight:700; color:#d2b48c; margin-bottom:4px; }
+  .cash-row { display:flex; justify-content:space-between; gap:8px; font-size:14px; }
+  .cash-hint { font-size:11px; color:var(--muted); margin-top:6px; }
+  .cal-day-panel { border-top: 3px solid #0a84ff; }
+  .cal-day-panel-head { color: #0a84ff; font-weight: 700; }
+  .cal-account-header { color: #bf5af2; border-bottom: 1px solid rgba(191,90,242,.35); padding-bottom: 3px; }
+  .cmp-card:nth-child(1) { border-top: 3px solid #0a84ff; }
+  .cmp-card:nth-child(2) { border-top: 3px solid #ff9f0a; }
+  .link-card, .commit-row, .commit-card, .owed-card, .cash-card { box-shadow: inset 0 0 0 1px rgba(255,255,255,.04); }
+  .sheet-inner { border-top: 4px solid #0a84ff; border-radius: 16px 16px 0 0; }
+  .txn2:hover { background: color-mix(in srgb, var(--cc) 8%, var(--card)); }
+  .list .txn2 { background: color-mix(in srgb, var(--cc) 6%, var(--card)); }
   .link-seg { display:flex; gap:6px; margin:6px 0 8px; }
   .link-seg button { flex:1; padding:8px 0; border-radius:999px; border:1.5px solid; background:transparent; font-weight:600; font-size:14px; }
   .link-help { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.4; }
@@ -661,12 +708,14 @@
     <div class="header-top">
       <h1>Spending</h1>
       <button class="icon-btn" id="resetFiltersBtn" title="Back to All" aria-label="Reset filters">↺</button>
+      <button class="icon-btn" id="searchBtn" title="Search" aria-label="Search">🔍</button>
       <button class="icon-btn" id="shareViewLinkBtn" title="Share" aria-label="Share">🔗</button>
       <button class="icon-btn" id="helpBtn" title="Help for this page" aria-label="Help" style="color:#0a84ff;font-weight:700;">?</button>
       <button class="icon-btn" id="hideNumbersBtn" title="Hide balance" aria-label="Hide balance">👁️</button>
     </div>
     <div class="page-tabs" id="pageTabs">
       <button class="page-tab active" data-page="main" style="--tc:#0a84ff">Main</button>
+      <button class="page-tab" data-page="categories" style="--tc:#ff6b81">Categories</button>
       <button class="page-tab" data-page="insights" style="--tc:#bf5af2">Insights</button>
       <button class="page-tab" data-page="history" style="--tc:#00c7be">History</button>
       <button class="page-tab" data-page="review" style="--tc:#ff9f0a">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
@@ -688,6 +737,9 @@
       <div class="cal-grid" id="calGrid"></div>
       <div id="calDayPanel"></div>
     </div>
+  </div>
+  <div id="categoriesPage" style="display:none;">
+    <div class="cat-tiles" id="catTiles"></div>
 
     <div class="totals-all" id="totalsAll" style="display:none;"></div>
     <div class="totals" id="totals" style="display:none;"></div>
@@ -867,6 +919,7 @@
          this is just a quick "does this look right?" glance, separate from
          the sections below which DO need something from you. Disappears
          once dismissed or after your next import. -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="toolbar-btn" id="reviewExpandAllBtn">Expand all</button></div>
     <div id="claimsOwed" style="display:none;"></div>
     <div id="reviewDatesSection" style="display:none;">
       <div class="history-section-label-row">
@@ -1012,10 +1065,12 @@
         <button data-mode="note" style="--c:#00c7be">Note</button>
       </div>
       <div class="link-help" id="linkHelp"></div>
+      <div class="note-topics" id="noteTopics"></div>
       <div class="split-picker-list" id="splitPickerList"></div>
       <div class="field">
         <label id="splitPickerInputLabel"></label>
         <input type="text" id="splitPickerInput" placeholder="">
+        <div id="noteSimilar" class="note-similar"></div>
       </div>
       <div class="field">
         <label>Also count this record as (optional)</label>
@@ -1247,7 +1302,7 @@ const CATEGORY_OPTIONS = [
   // during Review when they decide a withdrawal is genuinely "to cash"
   // rather than something else. See categorize()/CATEGORY_RULES: neither
   // touches this subtag.
-  { category: 'Transfer', subTag: 'To Cash', label: 'Transfer · To Cash' },
+  { category: 'Transfer', subTag: 'To Cash', label: 'Transfer · Cash withdrawal' },
   // Unsure sits last in the dropdown too — it's the fallback "not categorized
   // yet" bucket, not something worth scanning past every time you pick a
   // real category.
@@ -1745,6 +1800,380 @@ document.getElementById('hideNumbersBtn').onclick = () => {
   };
 })();
 
+
+// ===== Categories tab: big colour tiles instead of a long row of chips =====
+function renderCatTiles_(accountTxns) {
+  const el = document.getElementById('catTiles');
+  if (!el) return;
+  const now = new Date(), ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const by = {};
+  accountTxns.forEach(t => {
+    const c = t.category; if (!c) return;
+    const o = by[c] = by[c] || { n: 0, mTotal: 0 };
+    o.n++;
+    if (!NON_SPEND_CATEGORIES.includes(c) && t.date && t.date.slice(0, 7) === ym) o.mTotal += spendAmount(t);
+  });
+  const cats = ALL_CATEGORIES.filter(c => by[c]);
+  const tile = (c, label, sub, color) => `<button class="cat-tile${c === activeFilter ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="--tc:${color}"><span class="ct-name">${escapeHtml(label)}</span><span class="ct-sub">${sub}</span></button>`;
+  el.innerHTML = tile('All', 'All', accountTxns.length + ' records', '#0a84ff') +
+    cats.map(c => tile(c, c, NON_SPEND_CATEGORIES.includes(c) ? by[c].n + ' records' : 'This month RM' + by[c].mTotal.toFixed(0), colorFor(c))).join('');
+  renderCashCard_();
+  el.querySelectorAll('.cat-tile').forEach(b => { b.onclick = () => { activeFilter = b.dataset.cat; activeSubFilter = 'All'; render(); }; });
+}
+document.addEventListener('click', e => {
+  const tg = e.target.closest && e.target.closest('[data-rv-toggle]');
+  if (!tg) return;
+  if (e.target.closest('select,button,input,a')) return;
+  const row = Number(tg.dataset.rvToggle);
+  if (reviewAllOpen) {
+    reviewAllOpen = false;
+    document.querySelectorAll('.rv-row').forEach(r => reviewExpanded.add(Number(r.dataset.row)));
+    document.getElementById('reviewExpandAllBtn').textContent = 'Expand all';
+    reviewExpanded.delete(row);
+  } else if (reviewExpanded.has(row)) reviewExpanded.delete(row); else reviewExpanded.add(row);
+  renderReviewList();
+});
+
+
+// ===== Review: expand / collapse all =====
+let reviewAllOpen = false;
+document.getElementById('reviewExpandAllBtn').onclick = () => {
+  reviewAllOpen = !reviewAllOpen;
+  reviewExpanded.clear();
+  document.getElementById('reviewExpandAllBtn').textContent = reviewAllOpen ? 'Collapse all' : 'Expand all';
+  renderReviewList();
+};
+
+// ===== PIN check (1020) =====
+const APP_PIN_ = '1020';
+function askPin_(message, withReason) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100001;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:14px;padding:18px;max-width:320px;width:100%">
+      <div style="font-weight:700;margin-bottom:4px">${escapeHtml(message)}</div>
+      <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" placeholder="Password" style="width:100%;box-sizing:border-box;padding:10px;font-size:18px;border-radius:8px;border:1px solid #888;margin:8px 0">
+      ${withReason ? '<input id="pinWhy" type="text" placeholder="Reason" style="width:100%;box-sizing:border-box;padding:10px;font-size:15px;border-radius:8px;border:1px solid #888;margin-bottom:8px">' : ''}
+      <div id="pinErr" style="color:#c00;font-size:12px;min-height:16px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button id="pinNo" style="padding:8px 12px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit">Cancel</button><button id="pinOk" style="padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff">OK</button></div></div>`;
+    document.body.appendChild(ov);
+    const q = id => ov.querySelector('#' + id);
+    q('pinIn').focus();
+    const done = v => { ov.remove(); resolve(v); };
+    q('pinNo').onclick = () => done(null);
+    const ok = () => {
+      if (q('pinIn').value !== APP_PIN_) { q('pinErr').textContent = 'Wrong password.'; return; }
+      if (withReason && !q('pinWhy').value.trim()) { q('pinErr').textContent = 'Please type a reason.'; return; }
+      done(withReason ? q('pinWhy').value.trim() : true);
+    };
+    q('pinOk').onclick = ok;
+    q('pinIn').onkeydown = e => { if (e.key === 'Enter') ok(); };
+  });
+}
+document.getElementById('hideNumbersBtn').onclick = () => {
+  if (VIEW_ONLY) return;
+  showMenu_('Privacy on this screen', [
+    { label: 'Show everything', desc: 'Needs your password.', color: '#30d158', active: !balanceHidden, run: async () => { if (!balanceHidden) return; if (!(await askPin_('Enter password to show income and balances'))) return; balanceHidden = false; localStorage.setItem('balanceHidden', '0'); applyBalanceHidden(); } },
+    { label: 'Hide income & balances', desc: 'Use when someone is looking at your screen.', color: '#ff9f0a', active: balanceHidden, run: () => { balanceHidden = true; localStorage.setItem('balanceHidden', '1'); applyBalanceHidden(); } },
+    { label: 'Demo (fake data)', desc: 'Sample version with made-up numbers. Needs your password.', color: '#bf5af2', run: async () => { if (!(await askPin_('Enter password to open the demo'))) return; location.href = location.pathname.replace(/[^/]*$/, '') + 'demo.html'; } }
+  ]);
+};
+
+// ===== Two-step category picker =====
+function openCatSheet_(sel) {
+  const opts = [...sel.options].map(o => ({ v: o.value, l: o.textContent, cur: o.selected }));
+  const groups = {};
+  const order = [];
+  let keep = null;
+  opts.forEach(o => {
+    if (!o.v) { keep = o; return; }
+    const c = o.v.split('|')[0];
+    if (!groups[c]) { groups[c] = []; order.push(c); }
+    groups[c].push(o);
+  });
+  const curCat = (opts.find(o => o.cur) || { v: '' }).v.split('|')[0];
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:10px';
+  const choose = v => { ov.remove(); sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); };
+  const step1 = () => {
+    ov.innerHTML = `<div style="background:#1c1c20;color:#f5f5f7;border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
+      <div style="font-weight:700;margin-bottom:8px">Pick a category</div>
+      ${keep ? '<button data-keep="1" style="width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:1px solid #555;background:transparent;color:inherit">Keep as it is</button>' : ''}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">
+      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:10px;border-radius:12px;border:1.5px solid ${colorFor(c)};background:${c === curCat ? colorFor(c) : colorFor(c) + '22'};color:${c === curCat ? '#111' : '#f5f5f7'};font-weight:600">${escapeHtml(c)}${groups[c].length > 1 ? ' ›' : ''}</button>`).join('')}</div>
+      <button data-x="1" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:0;background:#333;color:#f5f5f7">Cancel</button></div>`;
+    ov.querySelectorAll('[data-c]').forEach(b => { b.onclick = () => { const g = groups[b.dataset.c]; if (g.length === 1) choose(g[0].v); else step2(b.dataset.c); }; });
+    const k = ov.querySelector('[data-keep]'); if (k) k.onclick = () => choose('');
+    ov.querySelector('[data-x]').onclick = () => ov.remove();
+  };
+  const step2 = c => {
+    const col = colorFor(c);
+    ov.innerHTML = `<div style="background:#1c1c20;color:#f5f5f7;border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
+      <div style="font-weight:700;margin-bottom:8px;color:${col}">${escapeHtml(c)} · pick a type</div>
+      ${groups[c].map((o, i) => { const sub = o.l.indexOf(' · ') >= 0 ? o.l.split(' · ').slice(1).join(' · ') : o.l + ' (general)'; return `<button data-i="${i}" style="display:block;width:100%;text-align:left;padding:11px 12px;margin-bottom:6px;border-radius:10px;border:1px solid ${o.cur ? col : '#444'};background:${o.cur ? col + '33' : 'transparent'};color:inherit">${escapeHtml(sub)}</button>`; }).join('')}
+      <div style="display:flex;gap:8px;margin-top:6px"><button data-back="1" style="flex:1;padding:9px;border-radius:10px;border:0;background:#333;color:#f5f5f7">‹ Back</button><button data-x="1" style="flex:1;padding:9px;border-radius:10px;border:0;background:#333;color:#f5f5f7">Cancel</button></div></div>`;
+    ov.querySelectorAll('[data-i]').forEach(b => { b.onclick = () => choose(groups[c][Number(b.dataset.i)].v); });
+    ov.querySelector('[data-back]').onclick = step1;
+    ov.querySelector('[data-x]').onclick = () => ov.remove();
+  };
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  step1();
+}
+(function () {
+  const SEL = 'select.txn-cat-select, #linkCountAs, select.pd-cat';
+  const block = e => {
+    const sel = e.target.closest && e.target.closest(SEL);
+    if (!sel) return;
+    e.preventDefault();
+    if (e.type === 'click') { sel.blur(); openCatSheet_(sel); }
+  };
+  ['mousedown', 'touchstart', 'pointerdown', 'click'].forEach(t => document.addEventListener(t, block, { capture: true, passive: false }));
+})();
+
+// ===== Tap a bar / month row to see the amount =====
+(function () {
+  let tip = null, timer = null;
+  document.addEventListener('click', e => {
+    const el = e.target.closest && e.target.closest('.cmp-bar-col[title], [data-tip]');
+    if (!el) return;
+    const text = el.getAttribute('data-tip') || el.getAttribute('title');
+    if (tip) tip.remove();
+    tip = document.createElement('div');
+    tip.textContent = text;
+    const r = el.getBoundingClientRect();
+    tip.style.cssText = `position:fixed;z-index:100002;background:#fff;color:#111;padding:6px 10px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 3px 12px rgba(0,0,0,.4);left:${Math.max(8, Math.min(window.innerWidth - 190, r.left - 40))}px;top:${Math.max(8, r.top - 40)}px;pointer-events:none`;
+    document.body.appendChild(tip);
+    clearTimeout(timer); timer = setTimeout(() => { tip && tip.remove(); tip = null; }, 2600);
+  });
+})();
+
+// ===== Search =====
+let searchOpen_ = false;
+function openSearch_() {
+  let ov = document.getElementById('searchOverlay');
+  if (ov) { ov.remove(); }
+  ov = document.createElement('div');
+  ov.id = 'searchOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#0b0b0d;z-index:9000;overflow:auto;padding:14px 14px 60px';
+  const accts = [...new Set(allTxns.map(t => t.account).filter(Boolean))];
+  const inp = 'background:#17171b;color:#f5f5f7;border:1.5px solid';
+  ov.innerHTML = `<div style="max-width:720px;margin:0 auto">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <input id="sQ" type="search" placeholder="Search name, amount, note…" autocomplete="off" style="flex:1;${inp} #0a84ff;border-radius:12px;padding:11px 12px;font-size:16px">
+      <button id="sClose" style="padding:10px 14px;border-radius:12px;border:0;background:#2c2c2e;color:#f5f5f7">Close</button></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <select id="sCat" style="${inp} #30d158;border-radius:999px;padding:6px 10px"><option value="">Category</option>${ALL_CATEGORIES.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
+      <select id="sAcc" style="${inp} #bf5af2;border-radius:999px;padding:6px 10px"><option value="">Account</option>${accts.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
+      <input id="sFrom" type="date" style="${inp} #ff9f0a;border-radius:999px;padding:5px 8px"><input id="sTo" type="date" style="${inp} #ff9f0a;border-radius:999px;padding:5px 8px">
+      <input id="sMin" type="number" placeholder="RM from" style="${inp} #00c7be;border-radius:999px;padding:6px 10px;width:90px"><input id="sMax" type="number" placeholder="RM to" style="${inp} #00c7be;border-radius:999px;padding:6px 10px;width:90px">
+    </div>
+    <div id="sSummary" style="color:#8e8e93;font-size:13px;margin-bottom:8px"></div>
+    <div class="list" id="sList"></div></div>`;
+  document.body.appendChild(ov);
+  searchOpen_ = true;
+  const g = id => ov.querySelector('#' + id);
+  g('sClose').onclick = () => { ov.remove(); searchOpen_ = false; };
+  ['sQ', 'sCat', 'sAcc', 'sFrom', 'sTo', 'sMin', 'sMax'].forEach(id => { g(id).oninput = g(id).onchange = runSearch_; });
+  g('sQ').focus();
+  runSearch_();
+}
+function runSearch_() {
+  const ov = document.getElementById('searchOverlay');
+  if (!ov) return;
+  const v = id => ov.querySelector('#' + id).value;
+  const q = v('sQ').trim().toLowerCase(), cat = v('sCat'), acc = v('sAcc'), from = v('sFrom'), to = v('sTo');
+  const min = v('sMin') === '' ? null : Number(v('sMin')), max = v('sMax') === '' ? null : Number(v('sMax'));
+  const any = q || cat || acc || from || to || min !== null || max !== null;
+  const out = ov.querySelector('#sList'), sum = ov.querySelector('#sSummary');
+  if (!any) { sum.textContent = 'Type a name, an amount like 184, or pick a filter.'; out.innerHTML = ''; return; }
+  const res = allTxns.filter(t => {
+    if (cat && t.category !== cat) return false;
+    if (acc && t.account !== acc) return false;
+    if (from && t.date < from) return false;
+    if (to && t.date > to) return false;
+    const a = Number(t.amount) || 0;
+    if (min !== null && a < min) return false;
+    if (max !== null && a > max) return false;
+    if (q) {
+      const hay = [t.merchant, t.notes, t.remark, t.subTag, t.category, t.account, a.toFixed(2)].join(' ').toLowerCase();
+      return q.split(/\s+/).every(w => hay.includes(w));
+    }
+    return true;
+  }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const outT = res.filter(t => txnFlow(t) === 'out' && !NON_SPEND_CATEGORIES.includes(t.category)).reduce((s, t) => s + spendAmount(t), 0);
+  const inT = res.filter(t => txnFlow(t) === 'in').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  sum.innerHTML = `${res.length} result${res.length === 1 ? '' : 's'} · spent <b style="color:#ff453a">RM${outT.toFixed(2)}</b>${VIEW_ONLY ? '' : ` · received <b style="color:#30d158">RM${inT.toFixed(2)}</b>`}${res.length > 100 ? ' · showing first 100' : ''}`;
+  out.innerHTML = res.slice(0, 100).map(t => renderTxnRow(t)).join('') || '<div class="empty">No matches.</div>';
+  attachCatSelectHandlers(); attachExtraTagHandlers(); attachExtraTagAmountHandlers(); attachRemarkHandlers(); attachLinkHandlers();
+}
+function searchRefresh_() { if (document.getElementById('searchOverlay')) runSearch_(); }
+document.getElementById('searchBtn').onclick = openSearch_;
+
+// ===== Step-by-step tour for the (?) button =====
+const TOURS = {
+  main: [['#calGrid', 'Each day shows what you spent. Tap a day to see its records.'], ['#calMonthLabel', 'Use the arrows next to the month to move to another month.'], ['#searchBtn', 'Search by name, amount, category, account or dates.'], ['#shareViewLinkBtn', 'Share a Friends link or a Demo link.'], ['#hideNumbersBtn', 'Hide income and balances when someone is watching. Needs your password to show again.'], ['#pageTabs', 'These tabs are the main sections of the app.']],
+  categories: [['#catTiles', 'Tap a colour tile to see only that category. This month total is shown on each tile.'], ['#subfilters', 'Then pick a sub-type to narrow it down.'], ['#list', 'Records are listed below. Change a category with the coloured box.']],
+  compare: [['#cmpScope', 'Pick what to compare: all spending or one category.'], ['#cmpPreset', 'Pick the periods: this month vs last, week, or month by month.'], ['#cmpOneOff', 'Leave out big once-only items like a car deposit.']],
+  splits: [['#linksChips', 'Filter by Split, Claim or Note.'], ['#splitsInsightsList', 'Cards that still need money or settling are listed first.']],
+  commit: [['#commitSummary', 'Fixed and Flexible monthly totals, and how much is paid this month.'], ['#commitList', 'Green means paid, orange is due soon, red is missing. Tap one to edit it.'], ['#commitAddBtn', 'Add a new commitment here.']],
+  history: [['#historyList', 'A log of what was added, changed or imported.']],
+  review: [['#claimsOwed', 'Work costs not paid back yet.'], ['#reviewExpandAllBtn', 'Open or close every row at once.'], ['#reviewList', 'Tap a row to open it, pick a category, then Confirm.']]
+};
+function startTour_() {
+  const key = currentHelpKey_();
+  const steps = (TOURS[key] || TOURS.main).filter(s => { const el = document.querySelector(s[0]); return el && el.offsetParent !== null; });
+  if (!steps.length) { openHelp_(); return; }
+  let i = 0;
+  const hole = document.createElement('div'), bub = document.createElement('div');
+  hole.style.cssText = 'position:fixed;z-index:100003;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.72);border:2px solid #0a84ff;pointer-events:none;transition:all .2s';
+  bub.style.cssText = 'position:fixed;z-index:100004;background:#fff;color:#111;border-radius:12px;padding:12px;max-width:290px;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+  document.body.appendChild(hole); document.body.appendChild(bub);
+  const end = () => { hole.remove(); bub.remove(); };
+  const show = () => {
+    const el = document.querySelector(steps[i][0]);
+    el.scrollIntoView({ block: 'center' });
+    setTimeout(() => {
+      const r = el.getBoundingClientRect();
+      hole.style.left = (r.left - 4) + 'px'; hole.style.top = (r.top - 4) + 'px'; hole.style.width = (r.width + 8) + 'px'; hole.style.height = (r.height + 8) + 'px';
+      const below = r.bottom + 150 < window.innerHeight;
+      bub.innerHTML = `<div style="font-size:11px;color:#0a84ff;font-weight:700">Step ${i + 1} of ${steps.length}</div>
+        <div style="font-size:14px;margin:4px 0 10px">${escapeHtml(steps[i][1])}</div>
+        <div style="display:flex;gap:8px;justify-content:space-between"><button id="tkEnd" style="border:0;background:transparent;color:#666">Skip</button><span><button id="tkMore" style="border:0;background:transparent;color:#0a84ff">Full guide</button> <button id="tkNext" style="padding:7px 14px;border-radius:8px;border:0;background:#0a84ff;color:#fff">${i === steps.length - 1 ? 'Done' : 'Next'}</button></span></div>`;
+      bub.style.left = Math.max(8, Math.min(window.innerWidth - 300, r.left)) + 'px';
+      bub.style.top = below ? (r.bottom + 14) + 'px' : Math.max(8, r.top - 150) + 'px';
+      bub.querySelector('#tkNext').onclick = () => { if (++i >= steps.length) end(); else show(); };
+      bub.querySelector('#tkEnd').onclick = end;
+      bub.querySelector('#tkMore').onclick = () => { end(); openHelp_(); };
+    }, 250);
+  };
+  show();
+}
+document.getElementById('helpBtn').onclick = startTour_;
+
+
+// ===== Notes: topic > note =====
+let noteTopic = null;
+let notesTopicView = null;
+const DEFAULT_TOPICS = ['Health', 'Trips', 'Work', 'Friends', 'Family'];
+const TOPIC_COLORS = ['#ff6b81', '#0a84ff', '#ff9f0a', '#30d158', '#bf5af2', '#00c7be', '#ffd60a', '#ff8a65'];
+function noteGroups_() { return remarkGroups().filter(g => g.kind === 'note'); }
+function allTopics_() {
+  const set = new Set(DEFAULT_TOPICS);
+  noteGroups_().forEach(g => { const tp = parseNote_(g.remark).topic; if (tp) set.add(tp); });
+  return [...set];
+}
+function topicColor_(t) { const l = allTopics_(); const i = l.indexOf(t); return i < 0 ? '#8e8e93' : TOPIC_COLORS[i % TOPIC_COLORS.length]; }
+function noteGroupsForPicker_(groups) {
+  if (noteTopic) return groups.filter(g => parseNote_(g.remark).topic === noteTopic);
+  return groups.slice(0, 8);
+}
+function renderNoteTopics_() {
+  const el = document.getElementById('noteTopics');
+  if (!el) return;
+  if (linkMode !== 'note') { el.innerHTML = ''; document.getElementById('noteSimilar').innerHTML = ''; return; }
+  el.innerHTML = '<div class="nt-label">Topic</div>' + allTopics_().map(tp => `<button data-tp="${escapeHtml(tp)}" class="nt-chip" style="border-color:${topicColor_(tp)};${noteTopic === tp ? `background:${topicColor_(tp)};color:#111;` : `color:${topicColor_(tp)};`}">${escapeHtml(tp)}</button>`).join('') + '<button data-tp="__new__" class="nt-chip" style="border-color:#8e8e93;color:#8e8e93">+ New topic</button>';
+  el.querySelectorAll('.nt-chip').forEach(b => { b.onclick = async () => {
+    if (b.dataset.tp === '__new__') { const n = await askTextInline_('Name the new topic (e.g. Pets, Car)'); if (n && n.trim()) { noteTopic = n.trim(); } }
+    else noteTopic = (noteTopic === b.dataset.tp) ? null : b.dataset.tp;
+    renderLinkPicker_();
+  }; });
+  updateSimilar_();
+}
+function updateSimilar_() {
+  const el = document.getElementById('noteSimilar');
+  if (!el) return;
+  const v = document.getElementById('splitPickerInput').value.trim().toLowerCase();
+  if (linkMode !== 'note' || v.length < 3) { el.innerHTML = ''; return; }
+  const first = v.split(/\s+/)[0];
+  const hits = noteGroups_().filter(g => { const nm = parseNote_(g.remark).name.toLowerCase(); return nm !== v && (nm.includes(v) || v.includes(nm) || (first.length >= 3 && nm.split(/\s+/)[0] === first)); }).slice(0, 3);
+  el.innerHTML = hits.length ? 'Similar: ' + hits.map(g => `<button class="nt-sim" data-r="${escapeHtml(stripMark_(g.remark))}">${escapeHtml(stripMark_(g.remark))}</button>`).join('') : '';
+  el.querySelectorAll('.nt-sim').forEach(b => { b.onclick = () => { const pn = parseNote_(b.dataset.r); noteTopic = pn.topic || null; document.getElementById('splitPickerInput').value = pn.name; renderLinkPicker_(); }; });
+}
+document.getElementById('splitPickerInput').addEventListener('input', updateSimilar_);
+
+function notesViewHtml_() {
+  const groups = noteGroups_();
+  const open = groups.filter(g => !g.done), done = groups.filter(g => g.done);
+  const unsorted = open.filter(g => !parseNote_(g.remark).topic);
+  let html = '';
+  if (unsorted.length && !VIEW_ONLY) html += `<div class="notes-sort-banner"><span>${unsorted.length} note${unsorted.length === 1 ? '' : 's'} need a topic</span><button id="notesSortBtn">Sort them</button></div>`;
+  if (notesTopicView) {
+    const list = notesTopicView === '__done__' ? done : open.filter(g => (parseNote_(g.remark).topic || 'Unsorted') === notesTopicView);
+    const col = notesTopicView === '__done__' ? '#8e8e93' : topicColor_(notesTopicView);
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px"><button class="toolbar-btn" id="notesBack">← Topics</button><b style="color:${col}">${notesTopicView === '__done__' ? 'Done' : escapeHtml(notesTopicView)}</b>${(notesTopicView === '__done__' || notesTopicView === 'Unsorted' || VIEW_ONLY) ? '<span></span>' : '<button class="toolbar-btn" id="notesRename">Rename</button>'}</div>`;
+    html += list.length ? list.map(g => splitGroupCardHtml(g) + (VIEW_ONLY ? '' : `<button class="note-edit" data-edit="${escapeHtml(stripMark_(g.remark))}">Rename or move this note</button>`)).join('') : '<div class="empty">Nothing here.</div>';
+    return html;
+  }
+  const by = {};
+  open.forEach(g => { const tp = parseNote_(g.remark).topic || 'Unsorted'; (by[tp] = by[tp] || []).push(g); });
+  const tiles = Object.keys(by).map(tp => { const net = by[tp].reduce((a, g) => a + g.net, 0); const col = tp === 'Unsorted' ? '#8e8e93' : topicColor_(tp); return `<button class="cat-tile" data-topic="${escapeHtml(tp)}" style="--tc:${col}"><span class="ct-name">${escapeHtml(tp)}</span><span class="ct-sub">${by[tp].length} note${by[tp].length === 1 ? '' : 's'} · RM${net.toFixed(0)}</span></button>`; });
+  if (done.length) tiles.push(`<button class="cat-tile" data-topic="__done__" style="--tc:#8e8e93"><span class="ct-name">🔒 Done</span><span class="ct-sub">${done.length} note${done.length === 1 ? '' : 's'}</span></button>`);
+  html += tiles.length ? `<div class="cat-tiles">${tiles.join('')}</div>` : '<div class="empty">No notes yet. Tap the ✎ on a record and choose Note.</div>';
+  return html;
+}
+async function renameRemarkEverywhere_(oldKey, newFull) {
+  const g = remarkGroups().find(x => splitGroupKey_(x.remark) === splitGroupKey_(oldKey));
+  if (!g) return;
+  for (const t of g.txns) await callApi('updateRemark', { row: t.row, remark: newFull + (isDoneRemark_(t.remark) ? DONE_MARK : '') });
+  await loadData();
+}
+function wireNotesView_(el) {
+  el.querySelectorAll('[data-topic]').forEach(b => { b.onclick = () => { notesTopicView = b.dataset.topic; renderSplitsInsights(null); }; });
+  const back = el.querySelector('#notesBack'); if (back) back.onclick = () => { notesTopicView = null; renderSplitsInsights(null); };
+  const ren = el.querySelector('#notesRename');
+  if (ren) ren.onclick = async () => {
+    const n = await askTextInline_('Rename topic "' + notesTopicView + '"', notesTopicView);
+    if (!n || !n.trim() || n.trim() === notesTopicView) return;
+    const old = notesTopicView, nw = n.trim();
+    for (const g of noteGroups_().filter(g => parseNote_(g.remark).topic === old)) await renameRemarkEverywhere_(g.remark, nw + TOPIC_SEP + parseNote_(g.remark).name);
+    notesTopicView = nw; renderSplitsInsights(null);
+  };
+  el.querySelectorAll('.note-edit').forEach(b => { b.onclick = async () => {
+    const n = await askTextInline_('Edit as Topic › Note. Type an existing note to merge into it.', b.dataset.edit);
+    if (n && n.trim() && n.trim() !== b.dataset.edit) await renameRemarkEverywhere_(b.dataset.edit, n.trim());
+  }; });
+  const sb = el.querySelector('#notesSortBtn'); if (sb) sb.onclick = openSortNotes_;
+}
+function suggestTopic_(g) {
+  const txt = (parseNote_(g.remark).name + ' ' + g.txns.map(t => t.merchant + ' ' + t.category).join(' ')).toLowerCase();
+  const rules = [['Health', /clinic|doctor|dental|dentist|pharm|medic|hospital|health/], ['Trips', /trip|hotel|flight|travel|cameron|genting|resort|airbnb/], ['Work', /prop|work|salary|company|client|shoot|servauto|office/], ['Family', /dad|mum|mom|family|birthday|angpao|parent/], ['Friends', /makan|drink|treat|dinner|lunch|friend|jiejie|team|party/]];
+  const hit = rules.find(r => r[1].test(txt));
+  return hit ? hit[0] : 'Unsorted';
+}
+function openSortNotes_() {
+  const list = noteGroups_().filter(g => !g.done && !parseNote_(g.remark).topic);
+  if (!list.length) return;
+  const topics = allTopics_();
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100000;display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:14px;padding:14px;max-width:420px;width:100%;max-height:85vh;overflow:auto">
+    <div style="font-weight:700;margin-bottom:4px">Sort your notes</div><div style="font-size:12px;color:#555;margin-bottom:10px">I suggested a topic for each one. Change anything, then Save. Nothing changes until you save.</div>
+    ${list.map((g, i) => { const sg = suggestTopic_(g); return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><span style="flex:1;font-size:14px">${escapeHtml(parseNote_(g.remark).name)}</span><select data-i="${i}" style="padding:7px;border-radius:8px;border:1px solid #888">${topics.map(tp => `<option${tp === sg ? ' selected' : ''}>${escapeHtml(tp)}</option>`).join('')}<option value=""${sg === 'Unsorted' ? ' selected' : ''}>Leave unsorted</option></select></div>`; }).join('')}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button id="snNo" style="padding:8px 12px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit">Cancel</button><button id="snOk" style="padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff">Save</button></div></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#snNo').onclick = () => ov.remove();
+  ov.querySelector('#snOk').onclick = async () => {
+    const picks = [...ov.querySelectorAll('select')].map(sel => ({ g: list[Number(sel.dataset.i)], tp: sel.value }));
+    ov.remove();
+    for (const p of picks) if (p.tp) {
+      for (const t of p.g.txns) await callApi('updateRemark', { row: t.row, remark: p.tp + TOPIC_SEP + parseNote_(p.g.remark).name + (isDoneRemark_(t.remark) ? DONE_MARK : '') });
+    }
+    await loadData();
+  };
+}
+
+// ===== Cash summary (Categories tab) =====
+function renderCashCard_() {
+  let el = document.getElementById('cashCard');
+  if (!el) { el = document.createElement('div'); el.id = 'cashCard'; document.getElementById('categoriesPage').insertBefore(el, document.getElementById('catTiles')); }
+  const wd = allTxns.filter(t => t.category === 'Transfer' && t.subTag === 'To Cash' && txnFlow(t) === 'out').reduce((a, t) => a + Number(t.amount || 0), 0);
+  const sp = allTxns.filter(t => t.account === 'Cash' && txnFlow(t) === 'out' && !NON_SPEND_CATEGORIES.includes(t.category)).reduce((a, t) => a + spendAmount(t), 0);
+  if (!wd && !sp) { el.innerHTML = ''; return; }
+  const left = wd - sp;
+  el.innerHTML = `<div class="cash-card"><div class="cash-t">💵 Cash</div><div class="cash-row"><span>Withdrawn <b>RM${wd.toFixed(0)}</b></span><span>Spent <b>RM${sp.toFixed(0)}</b></span><span style="color:${left < -0.5 ? '#ff453a' : '#30d158'}">Left <b>RM${left.toFixed(0)}</b></span></div><div class="cash-hint">Withdrawals are not counted as spending. Add what you spend in cash under the Cash account.</div></div>`;
+}
+
 document.querySelectorAll('.chart-mode-btn').forEach(btn => {
   btn.onclick = () => {
     overallChartMode = btn.dataset.mode;
@@ -1823,6 +2252,7 @@ rebuildSubtagIndex_();
 let customTags = [];
 function applyCustomTags_() {
   customTags.forEach(ct => {
+    if (String(ct.category).indexOf('__') === 0) return;
     if (CATEGORY_OPTIONS.some(o => o.category === ct.category && o.subTag.toLowerCase() === ct.subTag.toLowerCase())) return;
     const opt = { category: ct.category, subTag: ct.subTag, label: ct.category + ' · ' + ct.subTag };
     let idx = CATEGORY_OPTIONS.findIndex(o => o.category === ct.category && o.subTag === '__new__');
@@ -1939,8 +2369,8 @@ function renderCompareMonths_() {
     }
     const w = Math.max(0, Math.round(Math.max(m.total, 0) / max * 100));
     return `<div class="cmp-month-row">
-      <div class="cmp-month-label">${m.label}${m.partial ? ' *' : ''}</div>
-      <div class="cmp-month-barwrap"><div class="cmp-month-bar" style="width:${w}%"></div></div>
+      <div class="cmp-month-label" data-tip="${m.label}: RM${m.total.toFixed(2)}">${m.label}${m.partial ? ' *' : ''}</div>
+      <div class="cmp-month-barwrap" data-tip="${m.label}: RM${m.total.toFixed(2)}"><div class="cmp-month-bar" style="width:${w}%"></div></div>
       <div class="cmp-month-val">RM${m.total.toFixed(0)}</div>
       <div class="cmp-month-delta">${delta}</div>
     </div>`;
@@ -2009,7 +2439,12 @@ document.getElementById('cmpPreset').onchange = e => { cmpPreset = e.target.valu
 // back, so every total (calendar, categories, compare) nets automatically for
 // any category. Nothing is written to the sheet. Groups made only of
 // transfers (e.g. "Dad") are never touched.
-function splitGroupKey_(remark) { return String(remark || '').trim().toLowerCase(); }
+const DONE_MARK = ' ✓';
+function isDoneRemark_(r) { return /\s✓$/.test(String(r || '')); }
+function stripMark_(r) { return String(r || '').replace(/\s✓$/, ''); }
+const TOPIC_SEP = ' › ';
+function parseNote_(r) { const x = stripMark_(r); const i = x.indexOf(TOPIC_SEP); return i < 0 ? { topic: '', name: x } : { topic: x.slice(0, i).trim(), name: x.slice(i + TOPIC_SEP.length).trim() }; }
+function splitGroupKey_(remark) { return stripMark_(remark).trim().toLowerCase(); }
 function origCat_(t) { return t._ovr ? t._origCat : t.category; }
 function origSub_(t) { return t._ovr ? t._origSub : t.subTag; }
 // Split / Claim / Note, told apart by the word in the remark ("... split",
@@ -2209,6 +2644,7 @@ function renderStatementReminder() {
 
 function renderApp() {
   refreshPendingReloadSync();
+  if (typeof searchRefresh_ === 'function') searchRefresh_();
   renderBalanceBanner();
   renderStatementReminder();
   render();
@@ -2258,6 +2694,7 @@ function switchPage(page) {
   activePage = page;
   document.querySelectorAll('.page-tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   document.getElementById('mainPage').style.display = page === 'main' ? '' : 'none';
+  document.getElementById('categoriesPage').style.display = page === 'categories' ? '' : 'none';
   document.getElementById('insightsTab').style.display = page === 'insights' ? '' : 'none';
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
   document.getElementById('reviewPage').style.display = page === 'review' ? '' : 'none';
@@ -4102,6 +4539,7 @@ function render() {
   // below operates on, same as how the category filter narrows further.
   const accountTxns = activeAccountFilter === 'All' ? allTxns : allTxns.filter(t => t.account === activeAccountFilter);
   renderFilters(accountTxns);
+  renderCatTiles_(accountTxns);
   const categoryTxns = activeFilter === 'All' ? accountTxns : accountTxns.filter(t => t.category === activeFilter);
   renderSubFilters(categoryTxns);
   let filtered = categoryTxns;
@@ -4357,7 +4795,7 @@ function txnFlow(t) {
   if (t.flow === 'in' || t.flow === 'out') return t.flow;
   if (t.category === 'Income') return 'in';
   if (t.category === 'Transfer') {
-    if (t.subTag === 'To Others') return 'out';
+    if (t.subTag === 'To Others' || t.subTag === 'To Cash') return 'out';
     // The TNG eWallet's own "Card Reload" leg is money LEAVING the wallet
     // to fund the physical Card — the literal "Card Reload" merchant text
     // (from the CARD RELOAD keyword match) always means this specific
@@ -5008,6 +5446,7 @@ function reloadPairLabel(t, syncMatch) {
   return flow === 'in' ? `${otherShort} > ${mine}` : `${mine} > ${otherShort}`;
 }
 
+const reviewExpanded = new Set();
 function renderTxnRow(t, opts) {
   opts = opts || {};
   const isReloadRow = t.category === 'Transfer' && RELOAD_SUBTAGS.includes(t.subTag);
@@ -5083,7 +5522,7 @@ function renderTxnRow(t, opts) {
   // here too (same check the Splits feature uses), otherwise it would show
   // up looking exactly like a real linked split note on the row.
   const remarkHtml = (t.remark && !isTbc && isSplitLinkableRemark(t.remark))
-    ? `<div class="remark" data-remark="${escapeHtml(t.remark)}" title="Click to see every transaction sharing this note">${escapeHtml(t.remark)}</div>`
+    ? `<div class="remark" data-remark="${escapeHtml(t.remark)}" title="Click to see every transaction sharing this note">${isDoneRemark_(t.remark) ? '🔒 ' : ''}${escapeHtml(stripMark_(t.remark))}</div>`
     : '';
   const hint = transferHint(t);
   const hintHtml = hint ? `<div class="transfer-hint">(${escapeHtml(hint)})</div>` : '';
@@ -5137,15 +5576,20 @@ function renderTxnRow(t, opts) {
   const canBreakDown = t._partOf === undefined && txnFlow(t) === 'out' && !NON_SPEND_CATEGORIES.includes(t.category) && t.category !== 'Unsure';
   const partsBtnHtml = canBreakDown ? `<button class="parts-btn parts-icon" data-parts-row="${t.row}" title="Break this payment into several categories">⇆</button>` : '';
   const deleteBtnHtml = isTbc ? '' : `<button class="txn-delete-btn" data-row="${t.row}" title="Delete this transaction">✕</button>`;
+  const rvKey = opts.reviewMode ? ' rv-row' : '';
+  const rvCollapsed = (opts.reviewMode && !(reviewAllOpen || reviewExpanded.has(t.row))) ? ' rv-collapsed' : '';
+  const chev = opts.reviewMode ? `<span class="rv-chev">${rvCollapsed ? '▸' : '▾'}</span>` : '';
   return `
-    <div class="txn" data-row="${t.row}">
-      <div class="dot" style="background:${colorFor(t.category)}"></div>
-      <div class="info">
-        <div class="merchant"><span class="merchant-text">${txnTitle(t)}</span>${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${syncedFlagHtml}</div>
-        ${hintHtml}
-        ${typeHintHtml}
-        <div class="meta"><span class="date-edit" data-edit-date="${t.row}" title="Tap to change the paid date">${new Date(t.date).toLocaleDateString()}</span> · ${t.time || 'No time record'} · ${t.account || 'TNG'}${clockChipHtml_(t)}${claimChipHtml_(t)}</div>
-        ${remarkHtml}
+    <div class="txn txn2${rvKey}${rvCollapsed}" data-row="${t.row}" style="--cc:${colorFor(t.category)}">
+      <div class="txn-top"${opts.reviewMode ? ` data-rv-toggle="${t.row}"` : ''}>
+        <div class="merchant">${chev}<span class="merchant-text">${txnTitle(t)}</span>${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${syncedFlagHtml}</div>
+        <div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
+      </div>
+      ${hintHtml}
+      ${typeHintHtml}
+      <div class="meta"><span class="date-edit" data-edit-date="${t.row}" title="Tap to change the paid date">${new Date(t.date).toLocaleDateString()}</span> · ${t.time || 'No time record'} · ${t.account || 'TNG'}${clockChipHtml_(t)}${claimChipHtml_(t)}</div>
+      ${remarkHtml}
+      <div class="txn-bottom">
         <div class="cat-select-row">
           ${t._partOf !== undefined
             ? `<span class="part-label" style="border-left:3px solid ${colorFor(t.category)};">${escapeHtml(t.category)}${t.subTag ? ' · ' + escapeHtml(t.subTag) : ''} <span style="color:var(--muted)">· part ${t._partIdx + 1} of ${t._partCount} of RM${t._partTotal.toFixed(2)}</span></span><button class="parts-btn" data-parts-row="${t._partOf}">Edit parts</button>`
@@ -5154,15 +5598,14 @@ function renderTxnRow(t, opts) {
           ${extraAmountHtml}
           ${opts.reviewMode ? `<button class="review-btn confirm review-confirm-cat-btn" data-row="${t.row}">Confirm</button>` : ''}
         </div>
-        ${reviewRememberHtml}
-        ${reviewConfirmHtml}
+        <div class="txn-actions">
+          ${remarkBtnHtml}
+          ${partsBtnHtml}
+          ${deleteBtnHtml}
+        </div>
       </div>
-      <div class="txn-actions">
-        <div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
-        ${remarkBtnHtml}
-        ${partsBtnHtml}
-        ${deleteBtnHtml}
-      </div>
+      ${reviewRememberHtml}
+      ${reviewConfirmHtml}
     </div>`;
 }
 
@@ -5454,12 +5897,13 @@ function remarkGroups() {
   }).map(key => {
     const txns = byRemark[key].slice().sort((a, b) => txnTimestamp(b) - txnTimestamp(a));
     const remark = txns[0].remark;
+    const done = txns.every(t => isDoneRemark_(t.remark));
     let totalOut = 0, totalIn = 0;
     txns.forEach(t => {
       const amt = Number(t.amount || 0);
       if (txnFlow(t) === 'in') totalIn += amt; else totalOut += amt;
     });
-    return { remark, txns, count: txns.length, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date, firstDate: txns[txns.length - 1].date, kind: linkKindFromRemark_(remark, txns) };
+    return { remark, txns, count: txns.length, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date, firstDate: txns[txns.length - 1].date, kind: linkKindFromRemark_(remark, txns), done };
   });
   list.sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
   return list;
@@ -5480,6 +5924,44 @@ function linkStatus_(g) {
   if (g.kind === 'split') return g.totalIn > 0 ? { text: 'Settled', cls: 'ok' } : { text: 'Waiting for friends', cls: 'warn' };
   return { text: 'Note group', cls: 'info' };
 }
+function lockRowHtml_(g) {
+  if (VIEW_ONLY) return '';
+  const key = escapeHtml(splitGroupKey_(g.remark));
+  if (g.done) return `<div class="lock-row"><span>🔒 ${g.kind === 'note' ? 'Done' : 'Settled'}</span><button class="lock-btn" data-unlock="${key}">${g.kind === 'note' ? 'Reopen' : 'Unlock'}</button></div>`;
+  const owed = g.totalOut - g.totalIn;
+  const ready = g.kind === 'note' ? true : (g.kind === 'claim' ? owed <= 0.005 : g.totalIn > 0);
+  return ready ? `<div class="lock-row"><span></span><button class="lock-btn lock-go" data-lock="${key}">${g.kind === 'note' ? 'Mark done ✓' : 'Mark settled 🔒'}</button></div>` : '';
+}
+async function setGroupDone_(key, on) {
+  const g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
+  if (!g) return;
+  for (const t of g.txns) {
+    const base = stripMark_(t.remark);
+    await callApi('updateRemark', { row: t.row, remark: on ? base + DONE_MARK : base });
+  }
+  await loadData();
+}
+async function logUnlock_(what, why) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  try { await callApi('addCustomTag', { category: '__log__', subTag: stamp + ' unlock ' + what + ': ' + why }); } catch (e) {}
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('.lock-btn');
+  if (!b) return;
+  if (b.dataset.lock) {
+    const key = b.dataset.lock, g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
+    showMenu_(`${g && g.kind === 'note' ? 'Mark done' : 'Mark settled'}: ${stripMark_(g ? g.remark : key)}`, [
+      { label: 'Yes, lock it', desc: g && g.kind === 'note' ? 'Moves to Done. You can reopen it any time.' : 'It cannot be changed unless you enter your password and a reason.', color: '#30d158', run: () => setGroupDone_(key, true) },
+      { label: 'Not yet', desc: 'Leave it open.', color: '#8e8e93', run: () => {} }]);
+  } else if (b.dataset.unlock) {
+    const key = b.dataset.unlock, g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
+    if (g && g.kind === 'note') { await setGroupDone_(key, false); return; }
+    const why = await askPin_('Unlock "' + key + '". Enter password and reason', true);
+    if (!why) return;
+    await logUnlock_(key, why);
+    await setGroupDone_(key, false);
+  }
+}, true);
 function splitGroupCardHtml(g) {
   const color = LINK_COLORS[g.kind];
   const st = linkStatus_(g);
@@ -5510,13 +5992,14 @@ function splitGroupCardHtml(g) {
     <div class="split-group link-card" data-remark="${escapeHtml(g.remark)}" style="border-left:4px solid ${color};">
       <div class="split-group-header">
         <div>
-          <div class="split-group-name">${escapeHtml(g.remark)}</div>
+          <div class="split-group-name">${g.done ? '🔒 ' : ''}${escapeHtml(stripMark_(g.remark))}</div>
           <div class="split-group-daterange"><span class="link-kind" style="color:${color}">${LINK_LABELS[g.kind]}</span> · ${g.count} record${g.count === 1 ? '' : 's'} · ${dateRangeText}</div>
         </div>
         <span class="link-chip link-chip-${st.cls}">${st.text}</span>
       </div>
       <div class="split-group-rows">${rowsHtml}</div>
       ${statsHtml}
+      ${lockRowHtml_(g)}
       <button class="toolbar-btn split-group-viewlist" data-remark="${escapeHtml(g.remark)}">Show in transaction list →</button>
     </div>`;
 }
@@ -5541,12 +6024,17 @@ function renderSplitsInsights(filterRemark) {
     all.forEach(g => counts[g.kind]++);
     const chip = (key, text, color) => `<button class="links-chip${linksFilter === key ? ' active' : ''}" data-filter="${key}" style="${linksFilter === key ? `background:${color};color:#fff;border-color:${color};` : `border-color:${color};color:${color};`}">${text} ${counts[key]}</button>`;
     chipsEl.innerHTML = chip('all', 'All', '#8e8e93') + chip('split', 'Splits', LINK_COLORS.split) + chip('claim', 'Claims', LINK_COLORS.claim) + chip('note', 'Notes', LINK_COLORS.note);
-    chipsEl.querySelectorAll('.links-chip').forEach(b => { b.onclick = () => { linksFilter = b.dataset.filter; renderSplitsInsights(null); }; });
+    counts.note = linkGroups_().filter(g => g.kind === 'note').length;
+    chipsEl.innerHTML = chip('all', 'All', '#8e8e93') + chip('split', 'Splits', LINK_COLORS.split) + chip('claim', 'Claims', LINK_COLORS.claim) + chip('note', 'Notes', LINK_COLORS.note);
+    chipsEl.querySelectorAll('.links-chip').forEach(b => { b.onclick = () => { linksFilter = b.dataset.filter; notesTopicView = null; renderSplitsInsights(null); }; });
     const shown = all.filter(g => linksFilter === 'all' || g.kind === linksFilter);
     const attention = shown.filter(g => (g.kind === 'claim' && g.totalOut - g.totalIn > 0.005) || (g.kind === 'split' && g.totalIn === 0));
     const rest = shown.filter(g => !attention.includes(g)).sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
     label.textContent = 'Links';
-    if (!shown.length) {
+    if (linksFilter === 'note') {
+      el.innerHTML = notesViewHtml_();
+      wireNotesView_(el);
+    } else if (!shown.length) {
       el.innerHTML = '<div class="empty">Nothing here yet. Tap the ✎ on a record to link it as a Split, Claim or Note.</div>';
     } else {
       el.innerHTML = (attention.length ? `<div class="link-section-title" style="color:#ff9f0a;">Needs attention (${attention.length})</div>` + attention.map(splitGroupCardHtml).join('') : '') +
@@ -5612,7 +6100,9 @@ function renderLinkPicker_() {
     b.style.borderColor = b.style.getPropertyValue('--c');
   });
   document.getElementById('linkHelp').textContent = LINK_HELP[linkMode];
-  const groups = remarkGroups().filter(g => g.kind === linkMode);
+  let groups = remarkGroups().filter(g => g.kind === linkMode && !g.done);
+  if (linkMode === 'note') groups = noteGroupsForPicker_(groups);
+  renderNoteTopics_();
   const listEl = document.getElementById('splitPickerList');
   const label = document.getElementById('splitPickerInputLabel');
   const input = document.getElementById('splitPickerInput');
@@ -5628,20 +6118,28 @@ function renderLinkPicker_() {
   } else {
     listEl.innerHTML = groups.map(g => `
       <div class="split-picker-option${g.remark === currentRemark ? ' selected' : ''}" data-remark="${escapeHtml(g.remark)}" style="border-left:3px solid ${LINK_COLORS[linkMode]};">
-        <span>${escapeHtml(g.remark)}</span>
+        <span>${escapeHtml(linkMode === 'note' ? parseNote_(g.remark).name : g.remark)}</span>
         <span class="spo-count">${g.count >= 2 ? `${g.count} records · net ${formatSignedRM(g.net)}` : '1 record so far'}</span>
       </div>`).join('');
     listEl.querySelectorAll('.split-picker-option').forEach(opt => {
-      opt.onclick = () => { if (linkMode === 'note') { input.value = opt.dataset.remark; } else { saveLinkChoice_(opt.dataset.remark); } };
+      opt.onclick = () => { if (linkMode === 'note') { const pn = parseNote_(opt.dataset.remark); noteTopic = pn.topic || null; input.value = pn.name; renderLinkPicker_(); } else { saveLinkChoice_(opt.dataset.remark); } };
     });
   }
 }
-function openSplitPicker(row) {
+async function openSplitPicker(row) {
+  const t0 = allTxns.find(x => x.row === row);
+  if (t0 && isDoneRemark_(t0.remark) && linkKindFromRemark_(t0.remark, null) !== 'note') {
+    const why = await askPin_('This link is settled. Enter password and reason to change it', true);
+    if (!why) return;
+    await logUnlock_(stripMark_(t0.remark), why);
+  }
   splitPickerRow = row;
   const t = allTxns.find(x => x.row === row);
   const currentRemark = (t && isSplitLinkableRemark(t.remark)) ? t.remark : '';
   linkMode = currentRemark ? (linkKindFromRemark_(currentRemark, null) === 'note' ? 'note' : linkKindFromRemark_(currentRemark, null)) : (t && txnFlow(t) === 'in' ? 'split' : 'split');
-  document.getElementById('splitPickerInput').value = currentRemark;
+  const pnote = parseNote_(currentRemark);
+  noteTopic = (linkMode === 'note' && pnote.topic) ? pnote.topic : null;
+  document.getElementById('splitPickerInput').value = linkMode === 'note' ? pnote.name : stripMark_(currentRemark);
   const sel = document.getElementById('linkCountAs');
   sel.innerHTML = '<option value="">Keep as it is</option>' + categoryOptionsHtml('', '', t ? t.account : '');
   sel.value = '';
@@ -5681,6 +6179,15 @@ document.getElementById('splitPickerClose').onclick = closeSplitPicker;
 document.querySelectorAll('#linkSeg button').forEach(b => { b.onclick = () => { linkMode = b.dataset.mode; renderLinkPicker_(); }; });
 document.getElementById('splitPickerSave').onclick = () => {
   let val = document.getElementById('splitPickerInput').value.trim();
+  if (linkMode === 'note') {
+    if (!val) { saveLinkChoice_(''); return; }
+    const full = noteTopic ? noteTopic + TOPIC_SEP + val : val;
+    const t = allTxns.find(x => x.row === splitPickerRow);
+    showMenu_('Confirm this note', [
+      { label: full, desc: `Attached to: ${t ? txnTitle(t) + ' · RM' + Number(t.amount).toFixed(2) : 'this record'}. Totals do not change.`, color: '#00c7be', run: () => saveLinkChoice_(full) },
+      { label: 'Go back', desc: 'Change the note.', color: '#8e8e93', run: () => {} }]);
+    return;
+  }
   if (val) {
     const existingNames = remarkGroups().map(g => g.remark);
     if (!existingNames.includes(val)) {
