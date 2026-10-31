@@ -672,6 +672,32 @@
   .who-chip { border: 1px dashed var(--accent); color: var(--accent); background: transparent; border-radius: 999px; padding: 0 8px; font-size: 11px; margin-left: 6px; }
   .card-records { margin-top: 8px; }
   .card-toggle { width: 100%; margin-top: 6px; }
+  #accountfilters, #subfilters { display: none !important; }
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+  .fb-box { flex: 1; border: 0; background: var(--card2); color: var(--text); border-radius: 12px; padding: 9px 12px; text-align: left; }
+  .fb-l { display: block; font-size: 11px; color: var(--muted); }
+  .fb-v { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .fb-v b { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .fb-v i { color: var(--muted); font-style: normal; }
+  .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .soft-chip { border: 0; background: var(--card2); color: var(--text); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+  .soft-chip.on { background: color-mix(in srgb, var(--c, var(--accent)) 25%, var(--card2)); box-shadow: inset 0 0 0 1px var(--c, var(--accent)); }
+  .soft-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; } .soft-row:empty { display: none; }
+  .soft-label { font-size: 11px; color: var(--muted); width: 100%; text-transform: uppercase; letter-spacing: .06em; }
+  .cal-toprow { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+  .cal-toprow .cal-view-seg { margin: 0; }
+  .cal-toprow .cal-legend { margin: 0; }
+  .links-chip, .nt-chip { border: 0 !important; background: var(--card2) !important; color: var(--text) !important; border-left: 3px solid var(--c, var(--muted)) !important; border-radius: 10px !important; }
+  .links-chip.active, .nt-chip.on { background: var(--c, var(--accent)) !important; color: #fff !important; }
+  .link-seg button { border: 0 !important; background: var(--card2) !important; color: var(--text) !important; border-left: 3px solid var(--c) !important; border-radius: 10px !important; }
+  .link-seg button.on { background: var(--c) !important; color: #fff !important; }
+  .s-in { background: var(--card2); color: var(--text); border: 0; border-radius: 12px; padding: 10px; font-size: 14px; width: 100%; }
+  .s-btn { border: 0; background: var(--card2); color: var(--text); border-radius: 12px; padding: 12px 14px; }
+  .s-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .s-f { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); border-left: 3px solid var(--c); padding-left: 8px; }
+  .locked-list { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 8px; }
+  .locked-row { display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 14px; cursor: pointer; }
+  .locked-row .lr-amt { color: var(--muted); white-space: nowrap; }
+  .locked-detail { padding: 8px; background: var(--card2); }
   .link-seg { display:flex; gap:6px; margin:6px 0 8px; }
   .link-seg button { flex:1; padding:8px 0; border-radius:999px; border:1.5px solid; background:transparent; font-weight:600; font-size:14px; }
   .link-help { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.4; }
@@ -765,7 +791,8 @@
 
   <div id="mainPage">
     <div id="calendarPage" style="margin-bottom:14px;">
-      <div class="cal-view-seg" id="calViewSeg"><button data-v="month" class="on">Month</button><button data-v="week">Week</button><button data-v="year">Year</button></div>
+      <div class="cal-toprow"><div class="cal-view-seg" id="calViewSeg"><button data-v="month" class="on">Month</button><button data-v="week">Week</button><button data-v="year">Year</button></div>
+      <div class="cal-legend" id="calLegend"><span>Less</span><i style="background:#f7e3a1"></i><i style="background:#f3c274"></i><i style="background:#ee9f5f"></i><i style="background:#e57a52"></i><i style="background:#c9533f"></i><span>More</span></div></div>
       <div class="cal-nav">
         <button class="cal-nav-btn" id="calPrev">&lsaquo;</button>
         <span id="calMonthLabel"></span>
@@ -777,10 +804,15 @@
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
       </div>
       <div class="cal-grid" id="calGrid"></div>
-      <div class="cal-legend" id="calLegend"><span>Less</span><i style="background:#f7e3a1"></i><i style="background:#f3c274"></i><i style="background:#ee9f5f"></i><i style="background:#e57a52"></i><i style="background:#c9533f"></i><span>More</span></div>
+
       <div id="calDayPanel"></div>
     </div>
-    <div class="cat-strip" id="catTiles"></div>
+    <div class="cat-strip" id="catTiles" style="display:none"></div>
+    <div class="filter-bar" id="filterBar">
+      <button class="fb-box" id="fbCat"><span class="fb-l">Category</span><span class="fb-v"><b id="fbCatV">All</b><i>▾</i></span></button>
+      <button class="fb-box" id="fbAcc"><span class="fb-l">Account</span><span class="fb-v"><b id="fbAccV">All</b><i>▾</i></span></button>
+    </div>
+    <div class="filter-chips" id="filterChips"></div>
     <div id="mainBrowse">
 
     <div class="totals-all" id="totalsAll" style="display:none;"></div>
@@ -886,6 +918,7 @@
           <option value="custom">Custom periods</option>
         </select>
       </div>
+      <div class="soft-row" id="cmpSubChips"></div>
       <div class="cmp-custom" id="cmpCustom" style="display:none;">
         <div class="cmp-custom-row"><span>A</span><input type="date" id="cmpAFrom"><span>to</span><input type="date" id="cmpATo"></div>
         <div class="cmp-custom-row"><span>B</span><input type="date" id="cmpBFrom"><span>to</span><input type="date" id="cmpBTo"></div>
@@ -1704,6 +1737,9 @@ function ordSuffix_(n) { n = Number(n); return (n % 10 === 1 && n !== 11) ? 'st'
 function commitStatus_(c) {
   const now = new Date();
   const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const startYm = (c.cycle !== 'yearly' && Number(c.dueMonth) > 12) ? Number(c.dueMonth) : 0;
+  const nowYm = now.getFullYear() * 100 + now.getMonth() + 1;
+  if (startYm && nowYm < startYm) return { key: 'later', text: 'Starts ' + new Date(Math.floor(startYm / 100), startYm % 100 - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), color: '#8a97b2', paid: 0, due: 0, notStarted: true };
   const dueThisMonth = c.cycle !== 'yearly' || Number(c.dueMonth) === now.getMonth() + 1;
   const kws = String(c.match || c.name || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
   let paid = 0, hits = 0;
@@ -1724,7 +1760,7 @@ function renderCommitments_() {
   if (!list) return;
   document.getElementById('commitAddBtn').style.display = VIEW_ONLY ? 'none' : '';
   const act = commitments.filter(c => c.active !== 'no' && c.active !== false);
-  const sumM = a => a.reduce((x, c) => x + commitMonthly_(c), 0);
+  const sumM = a => a.reduce((x, c) => x + ((Number(c.dueMonth) > 12 && c.cycle !== 'yearly' && commitStatus_(c).notStarted) ? 0 : commitMonthly_(c)), 0);
   const sts = act.map(c => ({ c, st: commitStatus_(c) }));
   const fixedS = sts.filter(x => x.c.kind !== 'flexible'), flexS = sts.filter(x => x.c.kind === 'flexible');
   const dueTotal = sts.reduce((a, x) => a + x.st.due, 0);
@@ -1767,6 +1803,7 @@ function openCommitDialog_(c) {
       <label style="${lab};flex:1">Pay on day<input id="cmDay" type="number" min="1" max="31" style="${inp}" value="${c.dueDay || 1}"></label>
       <label style="${lab};flex:1">How often<select id="cmCycle" style="${inp}"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label>
     </div>
+    <label style="${lab}" id="cmStartWrap">Starts from (optional)<input id="cmStart" type="month" style="${inp}" value="${(Number(c.dueMonth) > 12 && c.cycle !== 'yearly') ? String(c.dueMonth).slice(0, 4) + '-' + String(c.dueMonth).slice(4) : ''}"></label>
     <label style="${lab}" id="cmMonthWrap">Which month (yearly)<select id="cmMonth" style="${inp}">${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select></label>
     <div style="${lab}">Type</div>
     <div style="display:flex;gap:6px;margin-top:3px"><button id="cmFixed" style="flex:1;padding:8px;border-radius:999px;border:1.5px solid #3fae78">Fixed</button><button id="cmFlex" style="flex:1;padding:8px;border-radius:999px;border:1.5px solid #d9894a">Flexible</button></div>
@@ -1783,6 +1820,7 @@ function openCommitDialog_(c) {
   q('cmMonth').value = c.dueMonth || 1;
   const paint = () => {
     q('cmMonthWrap').style.display = q('cmCycle').value === 'yearly' ? '' : 'none';
+    q('cmStartWrap').style.display = q('cmCycle').value === 'yearly' ? 'none' : '';
     q('cmFixed').style.background = kind === 'fixed' ? '#3fae78' : 'transparent'; q('cmFixed').style.color = kind === 'fixed' ? '#fff' : '#111';
     q('cmFlex').style.background = kind === 'flexible' ? '#d9894a' : 'transparent'; q('cmFlex').style.color = kind === 'flexible' ? '#fff' : '#111';
     q('cmKindHelp').textContent = kind === 'fixed' ? 'Must pay (rent, loan, family). You cannot easily stop it.' : 'Can cancel (streaming, apps, gym). Good place to save money.';
@@ -1795,7 +1833,7 @@ function openCommitDialog_(c) {
     const name = q('cmName').value.trim();
     if (!name) { alert('Please give it a name.'); return; }
     const rec = { id: c.id || undefined, name, amount: Number(q('cmAmt').value) || 0, dueDay: Number(q('cmDay').value) || 1, cycle: q('cmCycle').value,
-      dueMonth: q('cmCycle').value === 'yearly' ? Number(q('cmMonth').value) : 0, kind, match: q('cmMatch').value.trim(), active: true, notes: c.notes || '' };
+      dueMonth: q('cmCycle').value === 'yearly' ? Number(q('cmMonth').value) : (q('cmStart').value ? Number(q('cmStart').value.replace('-', '')) : 0), kind, match: q('cmMatch').value.trim(), active: true, notes: c.notes || '' };
     ov.remove();
     await callApi('saveCommitment', { commitment: rec });
     await loadData();
@@ -1976,7 +2014,7 @@ document.getElementById('hideNumbersBtn').onclick = () => {
 };
 
 // ===== Two-step category picker =====
-function openCatSheet_(sel) {
+function openCatSheet_(sel, keepLabel) {
   const opts = [...sel.options].map(o => ({ v: o.value, l: o.textContent, cur: o.selected }));
   const groups = {};
   const order = [];
@@ -1994,7 +2032,7 @@ function openCatSheet_(sel) {
   const step1 = () => {
     ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
       <div style="font-weight:700;margin-bottom:8px">Pick a category</div>
-      ${keep ? '<button data-keep="1" style="width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:1px solid #555;background:transparent;color:inherit">Keep as it is</button>' : ''}
+      ${keep ? '<button data-keep="1" style="width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:0;background:var(--card2);color:inherit">' + (keepLabel || 'Keep as it is') + '</button>' : ''}
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
       ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:11px 12px;border-radius:10px;border:0;border-left:4px solid ${colorFor(c)};background:color-mix(in srgb, ${colorFor(c)} ${c === curCat ? 30 : 12}%, var(--card2));color:var(--text);font-weight:600;font-size:14px">${escapeHtml(c)}${groups[c].length > 1 ? ' <span style="color:var(--muted)">›</span>' : ''}</button>`).join('')}</div>
       <button data-x="1" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div>`;
@@ -2053,23 +2091,26 @@ function openSearch_() {
   ov.id = 'searchOverlay';
   ov.style.cssText = 'position:fixed;inset:0;background:var(--bg);color:var(--text);z-index:9000;overflow:auto;padding:14px 14px 60px';
   const accts = [...new Set(allTxns.map(t => t.account).filter(Boolean))];
-  const inp = 'background:var(--card);color:var(--text);border:1.5px solid';
   ov.innerHTML = `<div style="max-width:720px;margin:0 auto">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <input id="sQ" type="search" placeholder="Search name, amount, note…" autocomplete="off" style="flex:1;${inp} #4a8be8;border-radius:12px;padding:11px 12px;font-size:16px">
-      <button id="sClose" style="padding:10px 14px;border-radius:12px;border:0;background:var(--card2);color:var(--text)">Close</button></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-      <select id="sCat" style="${inp} #3fae78;border-radius:999px;padding:6px 10px"><option value="">Category</option>${ALL_CATEGORIES.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
-      <select id="sAcc" style="${inp} #8d6fe0;border-radius:999px;padding:6px 10px"><option value="">Account</option>${accts.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
-      <input id="sFrom" type="date" style="${inp} #d9894a;border-radius:999px;padding:5px 8px"><input id="sTo" type="date" style="${inp} #d9894a;border-radius:999px;padding:5px 8px">
-      <input id="sMin" type="number" placeholder="RM from" style="${inp} #2fa7a1;border-radius:999px;padding:6px 10px;width:90px"><input id="sMax" type="number" placeholder="RM to" style="${inp} #2fa7a1;border-radius:999px;padding:6px 10px;width:90px">
+      <input id="sQ" class="s-in" type="search" placeholder="Search name, amount, note…" autocomplete="off" style="flex:1;font-size:16px;padding:12px">
+      <button id="sFilt" class="s-btn">Filters</button>
+      <button id="sClose" class="s-btn">Close</button></div>
+    <div id="sPanel" class="s-panel" style="display:none">
+      <label class="s-f" style="--c:#e0794a">Category<select id="sCat" class="s-in"><option value="">Any</option>${ALL_CATEGORIES.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select></label>
+      <label class="s-f" style="--c:#8d6fe0">Account<select id="sAcc" class="s-in"><option value="">Any</option>${accts.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select></label>
+      <label class="s-f" style="--c:#d9894a">From date<input id="sFrom" class="s-in" type="date"></label>
+      <label class="s-f" style="--c:#d9894a">To date<input id="sTo" class="s-in" type="date"></label>
+      <label class="s-f" style="--c:#2fa7a1">RM from<input id="sMin" class="s-in" type="number" inputmode="decimal"></label>
+      <label class="s-f" style="--c:#2fa7a1">RM to<input id="sMax" class="s-in" type="number" inputmode="decimal"></label>
     </div>
-    <div id="sSummary" style="color:#8e8e93;font-size:13px;margin-bottom:8px"></div>
+    <div id="sSummary" style="color:var(--muted);font-size:13px;margin-bottom:8px"></div>
     <div class="list" id="sList"></div></div>`;
   document.body.appendChild(ov);
   searchOpen_ = true;
   const g = id => ov.querySelector('#' + id);
   g('sClose').onclick = () => { ov.remove(); searchOpen_ = false; };
+  g('sFilt').onclick = () => { const pn = g('sPanel'); pn.style.display = pn.style.display === 'none' ? '' : 'none'; };
   ['sQ', 'sCat', 'sAcc', 'sFrom', 'sTo', 'sMin', 'sMax'].forEach(id => { g(id).oninput = g(id).onchange = runSearch_; });
   g('sQ').focus();
   runSearch_();
@@ -2168,7 +2209,7 @@ function renderNoteTopics_() {
   const el = document.getElementById('noteTopics');
   if (!el) return;
   if (linkMode !== 'note') { el.innerHTML = ''; document.getElementById('noteSimilar').innerHTML = ''; return; }
-  el.innerHTML = '<div class="nt-label">Topic</div>' + allTopics_().map(tp => `<button data-tp="${escapeHtml(tp)}" class="nt-chip" style="border-color:${topicColor_(tp)};${noteTopic === tp ? `background:${topicColor_(tp)};color:#111;` : `color:${topicColor_(tp)};`}">${escapeHtml(tp)}</button>`).join('') + '<button data-tp="__new__" class="nt-chip" style="border-color:#8e8e93;color:#8e8e93">+ New topic</button>';
+  el.innerHTML = '<div class="nt-label">Topic</div>' + allTopics_().map(tp => `<button data-tp="${escapeHtml(tp)}" class="nt-chip${noteTopic === tp ? ' on' : ''}" style="--c:${topicColor_(tp)}">${escapeHtml(tp)}</button>`).join('') + '<button data-tp="__new__" class="nt-chip" style="--c:#8a97b2">+ New topic</button>';
   el.querySelectorAll('.nt-chip').forEach(b => { b.onclick = async () => {
     if (b.dataset.tp === '__new__') { const n = await askTextInline_('Name the new topic (e.g. Pets, Car)'); if (n && n.trim()) { noteTopic = n.trim(); } }
     else noteTopic = (noteTopic === b.dataset.tp) ? null : b.dataset.tp;
@@ -2268,8 +2309,7 @@ function renderCashCard_() {
   if (!wd && !sp) { el.innerHTML = ''; return; }
   const left = wd - sp;
   const cashRows = allTxns.filter(t => t.account === 'Cash' || (t.category === 'Transfer' && t.subTag === 'To Cash')).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 15);
-  el.innerHTML = `<div class="cash-card"><div class="cash-t">💵 Cash</div><div class="cash-row"><span>Withdrawn <b>RM${wd.toFixed(0)}</b></span><span>Spent <b>RM${sp.toFixed(0)}</b></span><span style="color:${left < -0.5 ? '#e0685c' : '#3fae78'}">Left <b>RM${left.toFixed(0)}</b></span></div><div class="cash-hint">Withdrawals are not counted as spending. Add what you spend in cash under the Cash account.</div></div><div class="history-section-label" style="margin-top:10px">Cash records</div>${cashRows.map(t => renderTxnRow(t)).join('')}`;
-  attachCatSelectHandlers(); attachRemarkHandlers(); attachLinkHandlers();
+  el.innerHTML = `<div class="cash-card"><div class="cash-t">💵 Cash</div><div class="cash-row"><span>Withdrawn <b>RM${wd.toFixed(0)}</b></span><span>Spent <b>RM${sp.toFixed(0)}</b></span><span style="color:${left < -0.5 ? '#e0685c' : '#3fae78'}">Left <b>RM${left.toFixed(0)}</b></span></div><div class="cash-hint">Withdrawals are not counted as spending. Add what you spend in cash under the Cash account.</div></div><div class="history-section-label" style="margin-top:10px">Cash records</div><div class="locked-list">${cashRows.map(t => `<div class="locked-row" data-jump-row="${t.row}"><span>${new Date(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · ${escapeHtml(txnTitle(t))}</span><span class="lr-amt">${txnFlow(t) === 'in' ? '+' : '-'}RM${Number(t.amount).toFixed(2)}</span></div>`).join('')}</div><div class="cash-hint" style="margin-top:6px">Tap a record to open it in Main, where you can edit it.</div>`;
 }
 
 
@@ -2377,6 +2417,57 @@ document.addEventListener('click', async e => {
   await callApi('updateRemark', { row, remark: 'People' + TOPIC_SEP + nm.trim() });
   await loadData();
 });
+
+
+// ===== Filter bar (Category / Account) =====
+function renderFilterBar_() {
+  const cv = document.getElementById('fbCatV'), av = document.getElementById('fbAccV'), ch = document.getElementById('filterChips');
+  if (!cv) return;
+  cv.textContent = activeFilter === 'All' ? 'All' : activeFilter + (activeSubFilter !== 'All' ? ' · ' + activeSubFilter : '');
+  av.textContent = activeAccountFilter;
+  let h = '';
+  if (activeFilter !== 'All') h += `<button class="soft-chip on" data-x="cat" style="--c:${colorFor(activeFilter)}">${escapeHtml(cv.textContent)} ✕</button>`;
+  if (activeAccountFilter !== 'All') h += `<button class="soft-chip on" data-x="acc">${escapeHtml(activeAccountFilter)} ✕</button>`;
+  ch.innerHTML = h;
+  ch.querySelectorAll('[data-x]').forEach(b => { b.onclick = () => { if (b.dataset.x === 'cat') { activeFilter = 'All'; activeSubFilter = 'All'; } else activeAccountFilter = 'All'; render(); }; });
+}
+document.getElementById('fbCat').onclick = () => {
+  const sel = document.createElement('select');
+  sel.innerHTML = '<option value="">All categories</option>' + CATEGORY_OPTIONS.filter(o => o.subTag !== '__new__').map(o => `<option value="${optionValue(o)}">${escapeHtml(o.label)}</option>`).join('');
+  sel.value = activeFilter === 'All' ? '' : activeFilter + '|' + (activeSubFilter === 'All' ? '' : activeSubFilter);
+  sel.onchange = () => { const v = sel.value; if (!v) { activeFilter = 'All'; activeSubFilter = 'All'; } else { const parts = v.split('|'); activeFilter = parts[0]; activeSubFilter = parts[1] || 'All'; } render(); };
+  openCatSheet_(sel, 'All categories');
+};
+document.getElementById('fbAcc').onclick = () => {
+  showMenu_('Account', ['All'].concat(ACCOUNTS).map(a => ({ label: a, desc: a === 'All' ? 'Every account' : '', color: '#4a8be8', active: a === activeAccountFilter, run: () => { activeAccountFilter = a; render(); } })));
+};
+
+
+// ===== Auto-lock fully claimed claims =====
+const autoLocked_ = new Set();
+async function autoLockClaims_() {
+  if (VIEW_ONLY) return;
+  const ready = remarkGroups().filter(g => g.kind === 'claim' && !g.done && g.totalOut > 0 && g.totalOut - g.totalIn <= 0.005 && !autoLocked_.has(splitGroupKey_(g.remark)));
+  if (!ready.length) return;
+  for (const g of ready) {
+    autoLocked_.add(splitGroupKey_(g.remark));
+    for (const t of g.txns) { t.remark = stripMark_(t.remark) + DONE_MARK; await callApi('updateRemark', { row: t.row, remark: t.remark }); }
+  }
+  renderApp();
+}
+// ===== History: cash records as a short read-only list =====
+function jumpToRecord_(row) {
+  const t = allTxns.find(x => x.row === row); if (!t) return;
+  const d = new Date(t.date + 'T00:00:00');
+  calendarMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  selectedCalendarDay = t.date;
+  activeFilter = 'All'; activeSubFilter = 'All'; activeAccountFilter = 'All';
+  calView = 'month';
+  document.querySelectorAll('#calViewSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === 'month'));
+  switchPage('main'); render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.addEventListener('click', e => { const r = e.target.closest && e.target.closest('[data-jump-row]'); if (r) jumpToRecord_(Number(r.dataset.jumpRow)); });
 
 document.querySelectorAll('.chart-mode-btn').forEach(btn => {
   btn.onclick = () => {
@@ -2526,16 +2617,21 @@ function cmpDays_(from, to) {
 }
 function cmpScopeOptionsHtml_(selected) {
   const cats = ALL_CATEGORIES.filter(c => !NON_SPEND_CATEGORIES.includes(c) && c !== 'Unsure');
-  let html = `<option value="ALL"${selected === 'ALL' ? ' selected' : ''}>All spending</option>`;
-  cats.forEach(c => {
-    html += `<option value="${c}"${selected === c ? ' selected' : ''}>${c}</option>`;
-    (SUBTAGS_BY_CATEGORY[c] || []).filter(Boolean).forEach(sub => {
-      const v = c + '|' + sub;
-      html += `<option value="${v}"${selected === v ? ' selected' : ''}>${c} · ${sub}</option>`;
-    });
-  });
-  html += `<option value="Unsure"${selected === 'Unsure' ? ' selected' : ''}>Unsure</option>`;
+  const cur = String(selected || 'ALL').split('|')[0];
+  let html = `<option value="ALL"${cur === 'ALL' ? ' selected' : ''}>All spending</option>`;
+  cats.forEach(c => { html += `<option value="${c}"${cur === c ? ' selected' : ''}>${c}</option>`; });
+  html += `<option value="Unsure"${cur === 'Unsure' ? ' selected' : ''}>Unsure</option>`;
   return html;
+}
+function renderCmpSubs_() {
+  const el = document.getElementById('cmpSubChips');
+  if (!el) return;
+  const [cat, sub] = String(cmpScope).split('|');
+  const subs = cat === 'ALL' ? [] : (SUBTAGS_BY_CATEGORY[cat] || []).filter(x => x && x !== '__new__');
+  if (!subs.length) { el.innerHTML = ''; return; }
+  const chip = (v, label, on) => `<button class="soft-chip${on ? ' on' : ''}" data-v="${escapeHtml(v)}">${escapeHtml(label)}</button>`;
+  el.innerHTML = '<span class="soft-label">More detail</span>' + chip(cat, 'All ' + cat, !sub) + subs.map(x => chip(cat + '|' + x, x, sub === x)).join('');
+  el.querySelectorAll('.soft-chip').forEach(b => { b.onclick = () => { cmpScope = b.dataset.v; renderCompare(); }; });
 }
 let cmpScope = 'ALL', cmpPreset = 'month';
 let cmpLeaveOutOneOff = true;
@@ -2588,6 +2684,7 @@ function renderCompare() {
   const scopeEl = document.getElementById('cmpScope');
   if (!scopeEl) return;
   scopeEl.innerHTML = cmpScopeOptionsHtml_(cmpScope);
+  renderCmpSubs_();
   document.getElementById('cmpPreset').value = cmpPreset;
   document.getElementById('cmpCustom').style.display = cmpPreset === 'custom' ? '' : 'none';
   if (cmpPreset === 'months') { renderCompareMonths_(); return; }
@@ -2732,6 +2829,7 @@ async function loadData() {
   seedRecentDayExpansion();
   renderApp();
   autoApplyPeople_();
+  autoLockClaims_();
 }
 
 // Opens the Main list to a useful default on first load: the last 7 days'
@@ -4796,6 +4894,7 @@ function render() {
   const accountTxns = activeAccountFilter === 'All' ? allTxns : allTxns.filter(t => t.account === activeAccountFilter);
   renderFilters(accountTxns);
   renderCatTiles_(accountTxns);
+  renderFilterBar_();
   const categoryTxns = activeFilter === 'All' ? accountTxns : accountTxns.filter(t => t.category === activeFilter);
   renderSubFilters(categoryTxns);
   let filtered = categoryTxns;
@@ -4968,7 +5067,7 @@ function render() {
   // it's grouped by.
   const isCollapsible = groupMode !== 'none';
   if (isCollapsible && order.length) {
-    const allExpanded = order.every(k => expandedGroups.has(k));
+    const allExpanded = order.some(k => expandedGroups.has(k));
     const secondary = document.getElementById('toolbarSecondary');
     const btn = document.getElementById('expandAllBtn');
     secondary.style.display = '';
@@ -6190,7 +6289,7 @@ function lockRowHtml_(g) {
   if (g.done) return `<div class="lock-row"><span>🔒 Settled</span><button class="lock-btn" data-unlock="${key}">${g.kind === 'note' ? 'Reopen' : 'Unlock'}</button></div>`;
   const owed = g.totalOut - g.totalIn;
   const ready = g.kind === 'note' ? true : (g.kind === 'claim' ? owed <= 0.005 : g.totalIn > 0);
-  return true ? `<div class="lock-row"><span></span><button class="lock-btn lock-go" data-lock="${key}">Mark settled 🔒</button></div>` : '';
+  return true ? `<div class="lock-row"><span></span><button class="lock-btn lock-go" data-lock="${key}">${g.kind === 'note' ? 'Mark settled' : 'Lock'} 🔒</button></div>` : '';
 }
 async function setGroupDone_(key, on) {
   const g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
@@ -6210,7 +6309,7 @@ document.addEventListener('click', async e => {
   if (!b) return;
   if (b.dataset.lock) {
     const key = b.dataset.lock, g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
-    showMenu_(`Mark settled: ${stripMark_(g ? g.remark : key)}`, [
+    showMenu_(`Lock: ${stripMark_(g ? g.remark : key)}`, [
       { label: 'Yes, lock it', desc: g && g.kind === 'note' ? 'Moves to Settled. You can reopen it any time.' : ((g && g.kind === 'claim' && g.totalOut - g.totalIn > 0.005) ? `RM${(g.totalOut - g.totalIn).toFixed(2)} is still unpaid. Settle anyway? ` : '') + 'It cannot be changed unless you enter your password and a reason.', color: '#3fae78', run: () => setGroupDone_(key, true) },
       { label: 'Not yet', desc: 'Leave it open.', color: '#8e8e93', run: () => {} }]);
   } else if (b.dataset.unlock) {
@@ -6283,13 +6382,13 @@ function renderSplitsInsights(filterRemark) {
     chipsEl.style.display = '';
     const counts = { all: all.length, split: 0, claim: 0, note: 0 };
     all.forEach(g => counts[g.kind]++);
-    const chip = (key, text, color) => `<button class="links-chip${linksFilter === key ? ' active' : ''}" data-filter="${key}" style="${linksFilter === key ? `background:${color};color:#fff;border-color:${color};` : `border-color:${color};color:${color};`}">${text} ${counts[key]}</button>`;
+    const chip = (key, text, color) => `<button class="links-chip${linksFilter === key ? ' active' : ''}" data-filter="${key}" style="--c:${color}">${text} ${counts[key]}</button>`;
     chipsEl.innerHTML = chip('all', 'All', '#8e8e93') + chip('split', 'Splits', LINK_COLORS.split) + chip('claim', 'Claims', LINK_COLORS.claim) + chip('note', 'Notes', LINK_COLORS.note);
     counts.note = linkGroups_().filter(g => g.kind === 'note').length;
     chipsEl.innerHTML = chip('all', 'All', '#8e8e93') + chip('split', 'Splits', LINK_COLORS.split) + chip('claim', 'Claims', LINK_COLORS.claim) + chip('note', 'Notes', LINK_COLORS.note);
     chipsEl.querySelectorAll('.links-chip').forEach(b => { b.onclick = () => { linksFilter = b.dataset.filter; notesTopicView = null; renderSplitsInsights(null); }; });
     const shown = all.filter(g => linksFilter === 'all' || g.kind === linksFilter);
-    const attention = shown.filter(g => (g.kind === 'claim' && g.totalOut - g.totalIn > 0.005) || (g.kind === 'split' && g.totalIn === 0));
+    const attention = shown.filter(g => !g.done && (g.kind === 'claim' && g.totalOut - g.totalIn > 0.005) || (g.kind === 'split' && g.totalIn === 0));
     const rest = shown.filter(g => !attention.includes(g)).sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
     label.textContent = 'Links';
     if (linksFilter === 'note') {
@@ -6298,8 +6397,11 @@ function renderSplitsInsights(filterRemark) {
     } else if (!shown.length) {
       el.innerHTML = '<div class="empty">Nothing here yet. Tap the ✎ on a record to link it as a Split, Claim or Note.</div>';
     } else {
-      el.innerHTML = (attention.length ? `<div class="link-section-title" style="color:#d9894a;">Needs attention (${attention.length})</div>` + attention.map(splitGroupCardHtml).join('') : '') +
-        (rest.length ? `<div class="link-section-title" style="color:#3fae78;">${attention.length ? 'Done' : 'All'} (${rest.length})</div>` + rest.map(splitGroupCardHtml).join('') : '');
+      const openRest = rest.filter(g => !g.done), locked = rest.filter(g => g.done);
+      el.innerHTML = (attention.length ? `<div class="link-section-title">Needs attention (${attention.length})</div>` + attention.map(splitGroupCardHtml).join('') : '') +
+        (openRest.length ? `<div class="link-section-title">Open (${openRest.length})</div>` + openRest.map(splitGroupCardHtml).join('') : '') +
+        (locked.length ? `<div class="link-section-title">Locked (${locked.length})</div><div class="locked-list">` + locked.map(g => `<div class="locked-row" data-lk="${escapeHtml(splitGroupKey_(g.remark))}"><span>🔒 ${escapeHtml(stripMark_(g.remark))}</span><span class="lr-amt">RM${Math.abs(g.net).toFixed(0)}</span></div><div class="locked-detail" style="display:none">${splitGroupCardHtml(g)}</div>`).join('') + '</div>' : '');
+      el.querySelectorAll('.locked-row').forEach(r => { r.onclick = () => { const d = r.nextElementSibling; d.style.display = d.style.display === 'none' ? '' : 'none'; }; });
     }
   }
   updateLinksBadge_();
@@ -6347,12 +6449,7 @@ const LINK_HELP = {
 function renderLinkPicker_() {
   const t = allTxns.find(x => x.row === splitPickerRow);
   const currentRemark = (t && isSplitLinkableRemark(t.remark)) ? t.remark : '';
-  document.querySelectorAll('#linkSeg button').forEach(b => {
-    const on = b.dataset.mode === linkMode;
-    b.style.background = on ? b.style.getPropertyValue('--c') : 'transparent';
-    b.style.color = on ? '#fff' : b.style.getPropertyValue('--c');
-    b.style.borderColor = b.style.getPropertyValue('--c');
-  });
+  document.querySelectorAll('#linkSeg button').forEach(b => { b.classList.toggle('on', b.dataset.mode === linkMode); });
   document.getElementById('linkHelp').textContent = LINK_HELP[linkMode];
   let groups = remarkGroups().filter(g => g.kind === linkMode && !g.done);
   if (linkMode === 'note') groups = noteGroupsForPicker_(groups);
