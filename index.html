@@ -583,6 +583,50 @@
   .statement-reminder-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .statement-reminder-item span { line-height: 1.3; }
   .statement-reminder-dismiss { background: none; border: none; color: #fff; font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 6px; flex-shrink: 0; }
+  .page-tab { border-color: var(--tc, transparent); color: var(--tc, var(--text)); }
+  .page-tab.active { background: var(--tc, #0a84ff); color: #fff; }
+  .insights-subtab { color: var(--tc, var(--muted)); border: 1.5px solid transparent; }
+  .insights-subtab.active { background: var(--tc, #1e1e22); color: #fff; }
+  .history-section-label { color: #bf5af2; font-weight: 600; }
+  .cmp-card:nth-child(1) .cmp-card-val { color: #0a84ff; }
+  .cmp-card:nth-child(2) .cmp-card-val { color: #ff9f0a; }
+  .cmp-oneoff { font-size: 12px; color: var(--muted); display:flex; align-items:center; gap:4px; width:100%; }
+  .help-dot { border:1px solid #0a84ff; color:#0a84ff; background:transparent; border-radius:50%; width:18px; height:18px; font-size:11px; line-height:1; padding:0; vertical-align:middle; }
+  .owed-card { background: rgba(255,159,10,.14); border-left:4px solid #ff9f0a; border-radius:12px; padding:12px; margin-bottom:12px; }
+  .owed-title { font-weight:700; color:#ff9f0a; margin-bottom:6px; }
+  .owed-row { display:flex; justify-content:space-between; font-size:14px; padding:2px 0; }
+  .owed-hint { font-size:11px; color: var(--muted); margin-top:6px; }
+  .commit-cards { display:flex; gap:8px; margin-bottom:10px; }
+  .commit-card { flex:1; background: var(--card); border-top:3px solid var(--cc); border-radius:12px; padding:10px; }
+  .cc-l { font-size:11px; color: var(--muted); } .cc-v { font-size:22px; font-weight:700; color: var(--cc); }
+  .commit-paidbar { background: var(--card); border-radius:12px; padding:10px; margin-bottom:6px; font-size:13px; }
+  .commit-row { display:flex; justify-content:space-between; align-items:center; gap:8px; background: var(--card); border-radius:12px; padding:12px; margin-bottom:8px; }
+  .commit-name { font-weight:600; } .commit-sub { font-size:12px; color: var(--muted); }
+  .commit-add { width:100%; padding:11px; border-radius:12px; border:1.5px dashed #30d158; background:transparent; color:#30d158; font-weight:600; margin-top:6px; }
+  .commit-presets { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .commit-preset { padding:8px 12px; border-radius:999px; border:1.5px solid #30d158; background:transparent; color:#30d158; font-size:13px; }
+  body.view-only #helpBtn { display:inline-flex !important; }
+  .link-seg { display:flex; gap:6px; margin:6px 0 8px; }
+  .link-seg button { flex:1; padding:8px 0; border-radius:999px; border:1.5px solid; background:transparent; font-weight:600; font-size:14px; }
+  .link-help { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.4; }
+  .links-chips { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px; }
+  .links-chip { padding:5px 12px; border-radius:999px; border:1.5px solid; background:transparent; font-size:13px; font-weight:600; }
+  .link-section-title { font-weight:700; font-size:13px; margin:12px 0 6px; }
+  .link-card { background:var(--card); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .link-kind { font-weight:700; }
+  .link-chip { font-size:11px; padding:2px 10px; border-radius:999px; white-space:nowrap; align-self:flex-start; }
+  .link-chip-ok { background:rgba(48,209,88,.2); color:#30d158; }
+  .link-chip-warn { background:rgba(255,159,10,.22); color:#ff9f0a; }
+  .link-chip-info { background:rgba(0,199,190,.2); color:#00c7be; }
+  .link-bar { height:6px; background:rgba(142,142,147,.25); border-radius:3px; margin:8px 0; }
+  .link-bar-fill { height:6px; background:#30d158; border-radius:3px; }
+  .part-label { padding-left:8px; font-size:14px; flex:1; }
+  .parts-btn { background:transparent; border:1px solid var(--border,#444); color:var(--muted); border-radius:8px; padding:2px 8px; font-size:12px; }
+  .parts-icon { border:0; font-size:16px; padding:0 4px; }
+  .clock-chip { font-size:11px; padding:1px 8px; border-radius:999px; margin-left:6px; cursor:pointer; white-space:nowrap; }
+  .clock-warn { background:rgba(255,159,10,.22); color:#ff9f0a; }
+  .clock-note { background:rgba(142,142,147,.22); color:var(--muted); }
+  .date-edit { text-decoration:underline dotted; text-underline-offset:3px; cursor:pointer; }
   .cmp-controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 12px; }
   .cmp-label { font-size:12px; color:var(--muted); }
   .cmp-custom-row { display:flex; gap:6px; align-items:center; margin-bottom:6px; font-size:13px; }
@@ -617,13 +661,15 @@
     <div class="header-top">
       <h1>Spending</h1>
       <button class="icon-btn" id="resetFiltersBtn" title="Back to All" aria-label="Reset filters">↺</button>
-      <button class="icon-btn" id="shareViewLinkBtn" title="Copy read-only share link" aria-label="Copy read-only share link">🔗</button>
+      <button class="icon-btn" id="shareViewLinkBtn" title="Share" aria-label="Share">🔗</button>
+      <button class="icon-btn" id="helpBtn" title="Help for this page" aria-label="Help" style="color:#0a84ff;font-weight:700;">?</button>
       <button class="icon-btn" id="hideNumbersBtn" title="Hide balance" aria-label="Hide balance">👁️</button>
     </div>
     <div class="page-tabs" id="pageTabs">
-      <button class="page-tab active" data-page="main">Main</button>
-      <button class="page-tab" data-page="history">History</button>
-      <button class="page-tab" data-page="review">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
+      <button class="page-tab active" data-page="main" style="--tc:#0a84ff">Main</button>
+      <button class="page-tab" data-page="insights" style="--tc:#bf5af2">Insights</button>
+      <button class="page-tab" data-page="history" style="--tc:#00c7be">History</button>
+      <button class="page-tab" data-page="review" style="--tc:#ff9f0a">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
     </div>
   </header>
 
@@ -696,9 +742,7 @@
          the first thing you'd see, but it's a "look back at patterns"
          view, not something to check before the transaction list itself.
          Kept, just no longer the headline. -->
-    <div class="history-section-label-row" style="margin-top:20px;">
-      <button class="toolbar-btn" id="insightsToggleBtn" style="width:100%;text-align:left;">More insights (Compare, Splits) ▸</button>
-    </div>
+
     <div class="chart-card" style="display:none;"><!-- pie chart removed from view (kept hidden so its render code stays harmless) -->
       <div class="chart-head">
         <span id="chartTitle">Overall</span>
@@ -725,10 +769,15 @@
     </div>
     <div class="mini-charts" id="miniCharts" style="display:none;"></div>
 
-  <div id="insightsPage" style="display:none;">
+
+  </div>
+
+  <div id="insightsTab" style="display:none;">
+  <div id="insightsPage">
     <div class="insights-subnav" id="insightsSubnav">
-      <button class="insights-subtab active" data-sub="compare">Compare</button>
-      <button class="insights-subtab" data-sub="splits">Splits</button>
+      <button class="insights-subtab active" data-sub="compare" style="--tc:#bf5af2">Compare</button>
+      <button class="insights-subtab" data-sub="splits" style="--tc:#00c7be">Links</button>
+      <button class="insights-subtab" data-sub="commit" style="--tc:#30d158">Commitments</button>
     </div>
 
     <div id="comparePage">
@@ -736,6 +785,7 @@
         <label class="cmp-label">What</label>
         <select id="cmpScope" class="toolbar-btn"></select>
         <label class="cmp-label">Compare</label>
+        <label class="cmp-oneoff"><input type="checkbox" id="cmpOneOff" checked> Leave out one-offs (deposits) <button class="help-dot" data-help="oneoff">?</button></label>
         <select id="cmpPreset" class="toolbar-btn">
           <option value="month">This month vs last month</option>
           <option value="week">This week vs last week</option>
@@ -748,6 +798,12 @@
         <div class="cmp-custom-row"><span>B</span><input type="date" id="cmpBFrom"><span>to</span><input type="date" id="cmpBTo"></div>
       </div>
       <div id="cmpResult"></div>
+    </div>
+
+    <div id="commitPage" style="display:none;">
+      <div id="commitSummary"></div>
+      <div id="commitList"></div>
+      <button class="commit-add" id="commitAddBtn">+ Add a commitment</button>
     </div>
 
     <div id="trendsPage" style="display:none;">
@@ -788,13 +844,10 @@
          attachLinkHandlers/openSplitsInsights). -->
     <div id="splitsInsightsPage" style="display:none;">
       <div class="history-section-label-row">
-        <div class="history-section-label" id="splitsInsightsLabel">Split groups</div>
-        <select id="splitsSortBy" class="toolbar-btn" style="display:none;">
-          <option value="date">Sort: Newest first</option>
-          <option value="amount">Sort: Amount</option>
-        </select>
-        <button class="toolbar-btn" id="splitsInsightsBackBtn" style="display:none;">← All splits</button>
+        <div class="history-section-label" id="splitsInsightsLabel">Links</div>
+        <button class="toolbar-btn" id="splitsInsightsBackBtn" style="display:none;">← All links</button>
       </div>
+      <div class="links-chips" id="linksChips"></div>
       <div class="history-list" id="splitsInsightsList"></div>
     </div>
   </div>
@@ -814,6 +867,13 @@
          this is just a quick "does this look right?" glance, separate from
          the sections below which DO need something from you. Disappears
          once dismissed or after your next import. -->
+    <div id="claimsOwed" style="display:none;"></div>
+    <div id="reviewDatesSection" style="display:none;">
+      <div class="history-section-label-row">
+        <div class="history-section-label" id="reviewDatesLabel" style="color:#ff9f0a;">Dates to confirm</div>
+      </div>
+      <div class="list" id="reviewDatesList"></div>
+    </div>
     <div id="justImportedSection" style="display:none;">
       <div class="history-section-label-row">
         <div class="history-section-label" id="justImportedSectionLabel">Just imported</div>
@@ -945,15 +1005,26 @@
   <div class="sheet">
     <div class="sheet-inner">
       <span class="close-x" id="splitPickerClose">✕</span>
-      <h2>Link to a split</h2>
+      <h2>Link this record <button class="help-dot" data-help="linkdlg">?</button></h2>
+      <div class="link-seg" id="linkSeg">
+        <button data-mode="split" style="--c:#0a84ff">Split</button>
+        <button data-mode="claim" style="--c:#ff9f0a">Claim</button>
+        <button data-mode="note" style="--c:#00c7be">Note</button>
+      </div>
+      <div class="link-help" id="linkHelp"></div>
       <div class="split-picker-list" id="splitPickerList"></div>
       <div class="field">
-        <label>Or type a new split's name — we'll add "split" for you</label>
-        <input type="text" id="splitPickerInput" placeholder="e.g. Sushi 31/7">
+        <label id="splitPickerInputLabel"></label>
+        <input type="text" id="splitPickerInput" placeholder="">
+      </div>
+      <div class="field">
+        <label>Also count this record as (optional)</label>
+        <select id="linkCountAs"></select>
+        <label class="preview-remember" style="margin-top:6px;"><input type="checkbox" id="linkRemember"> Remember for this merchant next time</label>
       </div>
       <div class="split-picker-actions">
         <button class="btn" id="splitPickerSave">Save</button>
-        <button class="split-picker-clear" id="splitPickerClear">Clear</button>
+        <button class="split-picker-clear" id="splitPickerClear">Clear link</button>
       </div>
     </div>
   </div>
@@ -989,7 +1060,10 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRudNZs6s441X9
 // fetch(), not callApi()), so blocking writes there is a real safety net
 // independent of whether every single mutating button also got hidden by
 // the body.view-only CSS further down.
-const VIEW_ONLY = new URLSearchParams(location.search).get('mode') === 'view';
+const QS_ = new URLSearchParams(location.search);
+const DEMO = window.__DEMO__ || null;            // demo.html: fake data, no connection to the sheet
+const FRIENDS = QS_.get('view') === 'friends';   // friends link: real spending, income hidden
+const VIEW_ONLY = QS_.get('mode') === 'view' || FRIENDS || !!DEMO;
 
 // POST helper. Uses Content-Type: text/plain so the request stays a CORS
 // "simple request" (no OPTIONS preflight) — Apps Script web apps can't
@@ -1012,13 +1086,13 @@ async function callApi(action, extra) {
 // the user reviews/confirms it.
 const CATEGORY_RULES = [
   { category: 'Transfer', subTag: 'Card Reload', keywords: ['CARD RELOAD'] },
-  { category: 'Car', subTag: 'Toll', keywords: [
+  { category: 'Transport', subTag: 'Toll', keywords: [
     'SPE', 'KESAS', 'LDP', 'MEX', 'BESRAYA', 'SUKE', 'SMART',
     'PLAZA LOKE YEW', 'AWAN BESAR', 'PUCHONG SELATAN', 'SG RAMAL',
     'SALAK SELATAN', 'PETALING JAYA', 'ALAM DAMAI', 'BUKIT TERATAI',
     'AMPANG', 'SUNWAY', 'DAMANSARA', 'PANTAI DALAM', 'PUCHONG BARAT'
   ] },
-  { category: 'Car', subTag: 'Parking', keywords: ['PARKING', 'CARPARK', 'CAR PARK'] },
+  { category: 'Transport', subTag: 'Parking', keywords: ['PARKING', 'CARPARK', 'CAR PARK'] },
   // 'PSS' = Petronas Smart/Service Station — the merchant code banks print
   // for Petronas station card terminals (e.g. "PSS-PUCHONG JAYA MY"),
   // distinct from the "PETRONAS" text that only shows up in some statement
@@ -1028,19 +1102,19 @@ const CATEGORY_RULES = [
   // 2026-10 PBank CSV) rather than "PSS-" or "PETRON". Spacing it on both
   // sides avoids matching ordinary words that merely contain "PS" together
   // (SHOPS, APPS, CORPS, etc. all fail this check).
-  { category: 'Car', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP', 'PSS-', ' PS '] },
-  { category: 'Car', subTag: 'Service', keywords: ['WORKSHOP', 'BENGKEL', 'TAYAR', 'SERVICE CENTRE', 'AUTO CARE', 'CAR WASH', 'CARWASH'] },
+  { category: 'Transport', subTag: 'Fuel', keywords: ['PETRONAS', 'SHELL', 'PETRON', 'CALTEX', 'BHP', 'PSS-', ' PS '] },
+  { category: 'Transport', subTag: 'Service', keywords: ['WORKSHOP', 'BENGKEL', 'TAYAR', 'SERVICE CENTRE', 'AUTO CARE', 'CAR WASH', 'CARWASH'] },
   // Must come BEFORE the Ride rule below — "GRAB-FOOD" contains "GRAB" and
   // would otherwise match the generic Ride keyword first and get filed as a
   // car ride instead of a food order (see the 2026-10 PBank CSV import).
   // "GRAB* A-<orderId>" is Grab's late-settled charge: it doesn't say ride vs food and posts days after the order — send to Review so you can pick and remark the order date.
   { category: 'Unsure', keywords: ['GRAB* A-'] },
   { category: 'Food', keywords: ['GRAB-FOOD', 'GRABFOOD', 'GRAB FOOD'] },
-  { category: 'Car', subTag: 'Ride', keywords: ['GRAB', 'MYCAR', 'INDRIVE'] },
+  { category: 'Transport', subTag: 'Ride', keywords: ['GRAB', 'MYCAR', 'INDRIVE'] },
   // Council/traffic compounds (e.g. MBSJ RM80) — most local-council payments
   // that show up on a bank/e-wallet statement this way are parking or
   // traffic fines, so this lives under Car rather than as its own category.
-  { category: 'Car', subTag: 'Fine', keywords: ['MBSJ', 'MBPJ', 'MBSA', 'MBI', 'DBKL', 'DEWAN BANDARAYA', 'MAJLIS BANDARAYA', 'MAJLIS PERBANDARAN', 'MPAJ', 'MPS', 'SAMAN', 'COMPOUND'] },
+  { category: 'Loss', subTag: 'Fines', keywords: ['MBSJ', 'MBPJ', 'MBSA', 'MBI', 'DBKL', 'DEWAN BANDARAYA', 'MAJLIS BANDARAYA', 'MAJLIS PERBANDARAN', 'MPAJ', 'MPS', 'SAMAN', 'COMPOUND'] },
   // "Groceries" was renamed to "Shopping" to also cover online orders (see
   // the new Online subtag below) — not just grocery runs.
   { category: 'Shopping', subTag: 'Convenience Store', keywords: ['MYNEWS', '7-ELEVEN', 'KK MART'] },
@@ -1053,34 +1127,33 @@ const CATEGORY_RULES = [
   ] },
   { category: 'Shopping', subTag: 'Online', keywords: ['PINDUODUO', 'GWP', 'SHOPEE', 'LAZADA', 'TAOBAO'] },
   // Health/skincare shops — pharmacies specifically, not general Shopping.
-  { category: 'Shopping', subTag: 'Pharmacies', keywords: [
+  { category: 'Health', subTag: 'Pharmacy', keywords: [
     'GUARDIAN', 'WATSON', 'CARING PHARMACY', 'BIG PHARMACY', 'ALPRO PHARMACY',
     'HEALTH LANE', 'AEON WELLNESS'
   ] },
   // Grooming — haircuts, salons, spas. Lives under Shopping (things you
   // spend on yourself) alongside Pharmacies rather than as its own
   // top-level category.
-  { category: 'Shopping', subTag: 'Personal Care', keywords: [
-    'SALON', 'HAIR', 'BARBER', 'SPA'
-  ] },
+  { category: 'Personal Care', subTag: 'Haircut', keywords: ['BARBER', 'HAIR'] },
+  { category: 'Personal Care', subTag: 'Spa', keywords: ['SALON', 'SPA'] },
   { category: 'Food', keywords: [
     'KOPITIAM', 'RESTORAN', 'RESTAURANT', 'MIXED RICE', 'KITCHEN',
     'BURGER', 'RAMEN', 'CHAGEE', 'LAUK', 'BUN', 'THONG KEE', 'YCS',
     'CAFE', 'MAKAN', 'CIKTA', 'SUSHI'
   ] },
   { category: 'Entertainment', keywords: ['CTRL PLAY', 'CINEMA', 'GSC', 'TGV', 'LIBRARY', 'PC BANG', 'CYBERCAFE', 'ZAIKO'] },
-  { category: 'Entertainment', subTag: 'Subscription', keywords: [
-    'APPLE SERVICES', 'NETFLIX', 'SPOTIFY', 'APP STORE', 'GOOGLE PLAY',
-    'ANTHROPIC', 'CLAUDE', 'EXITLAG'
-  ] },
+  { category: 'Subscriptions', subTag: 'Streaming', keywords: ['NETFLIX', 'SPOTIFY', 'DISNEY', 'YOUTUBE'] },
+  { category: 'Subscriptions', subTag: 'Gaming', keywords: ['EXITLAG', 'STEAM'] },
+  { category: 'Subscriptions', subTag: 'Apps & Software', keywords: ['APPLE SERVICES', 'APP STORE', 'GOOGLE PLAY', 'ANTHROPIC', 'CLAUDE'] },
   { category: 'Sports', keywords: [
     'SPORTS CENTRE', 'SPORT CENTRE', 'GYM', 'FITNESS', 'BADMINTON',
     'FUTSAL', 'SWIMMING POOL'
   ] },
   { category: 'Housing', subTag: 'Rent', keywords: ['RENT'] },
-  { category: 'Housing', subTag: 'Water & Electric', keywords: ['TNB', 'SYABAS', 'AIR SELANGOR', 'INDAH WATER'] },
+  { category: 'Bills', subTag: 'Water & Electric', keywords: ['TNB', 'SYABAS', 'AIR SELANGOR', 'INDAH WATER'] },
   { category: 'Housing', subTag: 'WiFi', keywords: ['UNIFI', 'TIME FIBRE', 'MAXIS FIBRE'] },
-  { category: 'Housing', subTag: 'Carpark Rent', keywords: ['CARPARK RENT'] },
+  { category: 'Bills', subTag: 'Phone', keywords: ['CELCOM', 'XOX', 'MAXIS', 'DIGI', 'U MOBILE', 'UMOBILE'] },
+  { category: 'Transport', subTag: 'Parking', keywords: ['CARPARK RENT'] },
   // "PMB..." reference codes are Public Bank Mutual (unit trust) payouts —
   // matches the existing two live PMB rows, both filed as Income > Interest.
   // creditOnly: a PMB DIRECT DEBIT line (money leaving to BUY into the fund,
@@ -1096,29 +1169,61 @@ const EXCLUDE_TYPES = [];
 
 // Flattened category+subtag choices offered in dropdowns.
 const CATEGORY_OPTIONS = [
-  { category: 'Car', subTag: 'Toll', label: 'Car · Toll' },
-  { category: 'Car', subTag: 'Parking', label: 'Car · Parking' },
-  { category: 'Car', subTag: 'Fuel', label: 'Car · Fuel' },
-  { category: 'Car', subTag: 'Service', label: 'Car · Service' },
-  { category: 'Car', subTag: 'Ride', label: 'Car · Ride' },
-  { category: 'Car', subTag: 'Fine', label: 'Car · Fine' },
+  { category: 'Food', subTag: '', label: 'Food' },
+  { category: 'Food', subTag: 'Delivery', label: 'Food · Delivery' },
+  { category: 'Transport', subTag: 'Toll', label: 'Transport · Toll' },
+  { category: 'Transport', subTag: 'Parking', label: 'Transport · Parking' },
+  { category: 'Transport', subTag: 'Fuel', label: 'Transport · Fuel' },
+  { category: 'Transport', subTag: 'Service', label: 'Transport · Service' },
+  { category: 'Transport', subTag: 'Ride', label: 'Transport · Ride' },
+  { category: 'Vehicle', subTag: 'Deposit', label: 'Vehicle · Deposit / Down payment' },
+  { category: 'Vehicle', subTag: 'Loan', label: 'Vehicle · Loan' },
+  { category: 'Vehicle', subTag: 'Insurance', label: 'Vehicle · Insurance' },
+  { category: 'Vehicle', subTag: 'Road Tax', label: 'Vehicle · Road tax' },
+  { category: 'Vehicle', subTag: 'Registration', label: 'Vehicle · Registration' },
   { category: 'Shopping', subTag: 'Convenience Store', label: 'Shopping · Convenience Store' },
   { category: 'Shopping', subTag: 'Hypermarket', label: 'Shopping · Hypermarket' },
   { category: 'Shopping', subTag: 'Online', label: 'Shopping · Online' },
-  { category: 'Shopping', subTag: 'Pharmacies', label: 'Shopping · Pharmacies' },
-  { category: 'Shopping', subTag: 'Personal Care', label: 'Shopping · Personal Care' },
+  { category: 'Shopping', subTag: 'Clothing', label: 'Shopping · Clothing' },
+  { category: 'Shopping', subTag: 'Electronics', label: 'Shopping · Electronics' },
+  { category: 'Shopping', subTag: 'Household', label: 'Shopping · Household' },
   { category: 'Shopping', subTag: '', label: 'Shopping · Other' },
-  { category: 'Food', subTag: '', label: 'Food' },
+  { category: 'Health', subTag: 'Pharmacy', label: 'Health · Pharmacy / medicine' },
+  { category: 'Health', subTag: 'Supplements', label: 'Health · Supplements' },
+  { category: 'Health', subTag: 'Supplies', label: 'Health · Supplies (masks etc.)' },
+  { category: 'Health', subTag: 'Medical', label: 'Health · Medical' },
+  { category: 'Personal Care', subTag: 'Haircut', label: 'Personal Care · Haircut' },
+  { category: 'Personal Care', subTag: 'Skincare', label: 'Personal Care · Skincare / toiletries' },
+  { category: 'Personal Care', subTag: 'Spa', label: 'Personal Care · Spa / massage' },
+  { category: 'Personal Care', subTag: '', label: 'Personal Care · Other' },
   { category: 'Entertainment', subTag: '', label: 'Entertainment' },
-  { category: 'Entertainment', subTag: 'Subscription', label: 'Entertainment · Subscription' },
+  { category: 'Subscriptions', subTag: 'Streaming', label: 'Subscriptions · Streaming' },
+  { category: 'Subscriptions', subTag: 'Apps & Software', label: 'Subscriptions · Apps & software' },
+  { category: 'Subscriptions', subTag: 'Gaming', label: 'Subscriptions · Gaming' },
   { category: 'Sports', subTag: '', label: 'Sports' },
   { category: 'Social', subTag: 'Condolence', label: 'Social · Condolence' },
-  { category: 'Social', subTag: 'Gift', label: 'Social · Gift' },
-  { category: 'Loss', subTag: 'Scam', label: 'Loss · Scam' },
+  { category: 'Social', subTag: 'Gift', label: 'Social · Gift / angpao' },
+  { category: 'Social', subTag: 'Treat', label: 'Social · Treat' },
   { category: 'Housing', subTag: 'Rent', label: 'Housing · Rent' },
-  { category: 'Housing', subTag: 'Water & Electric', label: 'Housing · Water & Electric' },
   { category: 'Housing', subTag: 'WiFi', label: 'Housing · WiFi' },
-  { category: 'Housing', subTag: 'Carpark Rent', label: 'Housing · Carpark Rent' },
+  { category: 'Bills', subTag: 'Phone', label: 'Bills · Phone' },
+  { category: 'Bills', subTag: 'Internet', label: 'Bills · Internet' },
+  { category: 'Bills', subTag: 'Water & Electric', label: 'Bills · Water & Electric' },
+  { category: 'Work Expenses', subTag: 'Props', label: 'Work Expenses · Props' },
+  { category: 'Work Expenses', subTag: 'Equipment', label: 'Work Expenses · Equipment' },
+  { category: 'Work Expenses', subTag: '', label: 'Work Expenses · Other' },
+  { category: 'Services', subTag: 'Legal', label: 'Services · Legal' },
+  { category: 'Services', subTag: 'Cleaning', label: 'Services · Cleaning' },
+  { category: 'Services', subTag: 'Repairs', label: 'Services · Repairs' },
+  { category: 'Services', subTag: '__new__', label: 'Services · + New type…' },
+  { category: 'Loss', subTag: 'Scam', label: 'Loss · Scam' },
+  { category: 'Loss', subTag: 'Fines', label: 'Loss · Fines' },
+  { category: 'Loss', subTag: 'Charges', label: 'Loss · Bank charges' },
+  { category: 'Savings & Investment', subTag: 'Invest', label: 'Savings & Investment' },
+  { category: 'Income', subTag: 'Salary', label: 'Income · Salary' },
+  { category: 'Income', subTag: 'Interest', label: 'Income · Interest' },
+  { category: 'Income', subTag: 'Claim Paid Back', label: 'Income · Claim paid back' },
+  { category: 'Income', subTag: 'Other', label: 'Income · Other' },
   // Card Reload (eWallet top-up from a bank card) and TNG Card Top-up
   // (physical card top-up — see Code.gs renameCardTopUps() for how the two
   // get told apart) used to be their own dropdown/filter entries. They're
@@ -1143,9 +1248,6 @@ const CATEGORY_OPTIONS = [
   // rather than something else. See categorize()/CATEGORY_RULES: neither
   // touches this subtag.
   { category: 'Transfer', subTag: 'To Cash', label: 'Transfer · To Cash' },
-  { category: 'Income', subTag: 'Salary', label: 'Income · Salary' },
-  { category: 'Income', subTag: 'Interest', label: 'Income · Interest' },
-  { category: 'Income', subTag: 'Other', label: 'Income · Other' },
   // Unsure sits last in the dropdown too — it's the fallback "not categorized
   // yet" bucket, not something worth scanning past every time you pick a
   // real category.
@@ -1185,6 +1287,8 @@ let accountBalances = [];
 // doesn't match trueBalanceFor(account); drives the yellow "!" banner shown
 // at the top of every page. See renderBalanceBanner() below.
 let balanceAlerts = [];
+let commitments = [];
+let friendsView = false;
 
 // Real running balance for one account: the anchor you gave (asOfBalance,
 // as of asOfDate) plus every transaction on that account dated AFTER the
@@ -1211,7 +1315,7 @@ function trueBalanceFor(account) {
   // predate every account's anchor date, so this change doesn't move
   // today's numbers — it only affects new imports going forward.
   const relevant = allTxns.filter(t => t.account === account);
-  const after = relevant.filter(t => t.date > anchor.asOfDate);
+  const after = relevant.filter(t => (t.postedDate || t.date) > anchor.asOfDate);
   const delta = after.reduce((s, t) => s + (txnFlow(t) === 'in' ? Number(t.amount || 0) : -Number(t.amount || 0)), 0);
   return anchor.asOfBalance + delta;
 }
@@ -1278,7 +1382,7 @@ function categorize(description, type) {
   // actually belongs (confirmed against the 2026-09/10 TNG eWallet
   // statement, which has real examples of both).
   if (type === 'PayDirect Payment') {
-    const tollRule = CATEGORY_RULES.find(r => r.category === 'Car' && r.subTag === 'Toll');
+    const tollRule = CATEGORY_RULES.find(r => r.category === 'Transport' && r.subTag === 'Toll');
     // The literal word "TOLL" (e.g. "BATU TOLL PLAZA", "SEGAMBUT TOLL
     // PLAZA") is checked on its own, separately from the specific plaza-name
     // keyword list below — those two don't contain any of SPE/KESAS/LDP/etc,
@@ -1286,7 +1390,7 @@ function categorize(description, type) {
     // "TOLL" right in the name (caught by testing every PayDirect Payment
     // merchant in the real 2026-09/10 statement before shipping this).
     const isToll = text.includes('TOLL') || (tollRule && tollRule.keywords.some(kw => text.includes(kw)));
-    return { category: 'Car', subTag: isToll ? 'Toll' : 'Parking' };
+    return { category: 'Transport', subTag: isToll ? 'Toll' : 'Parking' };
   }
 
   for (const rule of CATEGORY_RULES) {
@@ -1302,6 +1406,7 @@ function categorize(description, type) {
 }
 
 let allTxns = [];
+let allTxnsRaw = [];
 // HL Bank split into two real accounts (2026-09): "HL Bank 1" is the old
 // physical account (all pre-split rows renamed to this via Code.gs's
 // splitHLBankAccount()), "HL Bank 2" is the newly opened one. Kept as two
@@ -1353,7 +1458,7 @@ let miniChartsExpanded = false;
 // Balance + per-account/Card true balances) for showing the app to someone
 // else without revealing how much money you actually have. Persisted so it
 // stays off/on across visits rather than resetting every reload.
-let balanceHidden = VIEW_ONLY ? true : localStorage.getItem('balanceHidden') === '1';
+let balanceHidden = VIEW_ONLY ? !DEMO : localStorage.getItem('balanceHidden') === '1';
 
 // "Just imported" review summary — a quick post-import sanity check, not a
 // to-do list. Captures the rows from the single most recent Import click
@@ -1421,6 +1526,225 @@ if (shareViewLinkBtn) {
   };
 }
 
+// ===== Owed to you =====
+function renderClaimsOwed_() {
+  const el = document.getElementById('claimsOwed');
+  if (!el) return;
+  const open = outstandingClaims_();
+  if (!open.length || VIEW_ONLY) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const total = open.reduce((a, g) => a + (g.totalOut - g.totalIn), 0);
+  el.style.display = '';
+  el.innerHTML = `<div class="owed-card"><div class="owed-title">⏳ Owed to you · RM${total.toFixed(2)}</div>` +
+    open.map(g => `<div class="owed-row"><span>${escapeHtml(g.remark)}</span><b>RM${(g.totalOut - g.totalIn).toFixed(2)}</b></div>`).join('') +
+    `<div class="owed-hint">Shows until the money comes back and is linked as a Claim.</div></div>`;
+}
+
+// ===== Commitments =====
+const COMMIT_PRESETS = [
+  { name: 'Rent', amount: 0, dueDay: 1, kind: 'fixed', match: 'RENT' },
+  { name: 'Car loan', amount: 0, dueDay: 1, kind: 'fixed', match: 'LOAN' },
+  { name: 'Dad (Ng Chan Kee)', amount: 500, dueDay: 1, kind: 'fixed', match: 'NG CHAN KEE' },
+  { name: 'Phone (XOX / Celcom)', amount: 0, dueDay: 1, kind: 'fixed', match: 'XOX, CELCOM' },
+  { name: 'Streaming', amount: 0, dueDay: 1, kind: 'flexible', match: 'NETFLIX, SPOTIFY, YOUTUBE' }
+];
+function commitMonthly_(c) { return (c.cycle === 'yearly') ? (Number(c.amount) || 0) / 12 : (Number(c.amount) || 0); }
+function ordSuffix_(n) { n = Number(n); return (n % 10 === 1 && n !== 11) ? 'st' : (n % 10 === 2 && n !== 12) ? 'nd' : (n % 10 === 3 && n !== 13) ? 'rd' : 'th'; }
+function commitStatus_(c) {
+  const now = new Date();
+  const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const dueThisMonth = c.cycle !== 'yearly' || Number(c.dueMonth) === now.getMonth() + 1;
+  const kws = String(c.match || c.name || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+  let paid = 0, hits = 0;
+  if (kws.length) allTxns.forEach(t => {
+    if (!t.date || t.date.slice(0, 7) !== ym || txnFlow(t) !== 'out') return;
+    const text = ((t.merchant || '') + ' ' + (t.remark || '') + ' ' + (t.notes || '')).toUpperCase();
+    if (kws.some(k => text.includes(k))) { paid += Number(t.amount) || 0; hits++; }
+  });
+  if (!dueThisMonth) return { key: 'later', text: 'Not due this month', color: '#8e8e93', paid, due: 0 };
+  if (hits) return { key: 'paid', text: 'Paid', color: '#30d158', paid, due: Number(c.amount) || 0 };
+  const diff = (Number(c.dueDay) || 1) - now.getDate();
+  if (diff < 0) return { key: 'missing', text: 'Missing', color: '#ff453a', paid, due: Number(c.amount) || 0 };
+  if (diff <= 5) return { key: 'soon', text: diff === 0 ? 'Due today' : `Due in ${diff}d`, color: '#ff9f0a', paid, due: Number(c.amount) || 0 };
+  return { key: 'upcoming', text: `Due on the ${c.dueDay}${ordSuffix_(c.dueDay)}`, color: '#0a84ff', paid, due: Number(c.amount) || 0 };
+}
+function renderCommitments_() {
+  const list = document.getElementById('commitList'), sum = document.getElementById('commitSummary');
+  if (!list) return;
+  document.getElementById('commitAddBtn').style.display = VIEW_ONLY ? 'none' : '';
+  const act = commitments.filter(c => c.active !== 'no' && c.active !== false);
+  const sumM = a => a.reduce((x, c) => x + commitMonthly_(c), 0);
+  const sts = act.map(c => ({ c, st: commitStatus_(c) }));
+  const fixedS = sts.filter(x => x.c.kind !== 'flexible'), flexS = sts.filter(x => x.c.kind === 'flexible');
+  const dueTotal = sts.reduce((a, x) => a + x.st.due, 0);
+  const paidTotal = sts.reduce((a, x) => a + (x.st.key === 'paid' ? Math.min(x.st.paid, x.st.due || x.st.paid) : 0), 0);
+  sum.innerHTML = act.length ? `
+    <div class="commit-cards">
+      <div class="commit-card" style="--cc:#30d158"><div class="cc-l">Fixed per month</div><div class="cc-v">RM${sumM(fixedS.map(x => x.c)).toFixed(0)}</div></div>
+      <div class="commit-card" style="--cc:#ff9f0a"><div class="cc-l">Flexible per month</div><div class="cc-v">RM${sumM(flexS.map(x => x.c)).toFixed(0)}</div></div>
+    </div>
+    <div class="commit-paidbar"><div class="cpb-t">Paid this month <b>RM${paidTotal.toFixed(0)}</b> of <b>RM${dueTotal.toFixed(0)}</b></div>
+      <div class="link-bar"><div class="link-bar-fill" style="width:${dueTotal ? Math.min(100, paidTotal / dueTotal * 100) : 0}%"></div></div></div>` : '';
+  if (!act.length) {
+    list.innerHTML = `<div class="empty" style="text-align:left">No commitments yet. Add what you pay every month or year (rent, loan, phone, Dad, subscriptions). We match them to your records automatically.</div>` +
+      (VIEW_ONLY ? '' : `<div class="commit-presets">${COMMIT_PRESETS.map((pr, i) => `<button class="commit-preset" data-pi="${i}">+ ${escapeHtml(pr.name)}</button>`).join('')}</div>`);
+    list.querySelectorAll('.commit-preset').forEach(b => { b.onclick = () => openCommitDialog_(Object.assign({ cycle: 'monthly' }, COMMIT_PRESETS[Number(b.dataset.pi)])); });
+    return;
+  }
+  const section = (title, color, arr) => arr.length ? `<div class="link-section-title" style="color:${color}">${title}</div>` + arr.map(({ c, st }) => `
+    <div class="commit-row" data-cid="${escapeHtml(String(c.id))}" style="border-left:4px solid ${color}">
+      <div class="commit-main"><div class="commit-name">${escapeHtml(c.name)}</div>
+        <div class="commit-sub">RM${Number(c.amount).toFixed(2)} ${c.cycle === 'yearly' ? 'yearly (RM' + commitMonthly_(c).toFixed(2) + '/mo)' : 'monthly'}${st.paid ? ' · paid RM' + st.paid.toFixed(2) : ''}</div></div>
+      <span class="link-chip" style="background:${st.color}33;color:${st.color}">${st.text}</span>
+    </div>`).join('') : '';
+  list.innerHTML = section('Fixed · must pay', '#30d158', fixedS) + section('Flexible · can cancel', '#ff9f0a', flexS);
+  if (!VIEW_ONLY) list.querySelectorAll('.commit-row').forEach(r => { r.onclick = () => openCommitDialog_(commitments.find(c => String(c.id) === r.dataset.cid)); });
+}
+document.getElementById('commitAddBtn').onclick = () => openCommitDialog_({ kind: 'fixed', cycle: 'monthly', dueDay: 1 });
+function openCommitDialog_(c) {
+  c = c || {};
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  const inp = 'width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #888;font-size:15px;margin-top:3px';
+  const lab = 'display:block;font-size:12px;color:#555;margin-top:10px';
+  let kind = c.kind === 'flexible' ? 'flexible' : 'fixed';
+  ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:14px;padding:16px;max-width:380px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4)">
+    <div style="font-weight:600">${c.id ? 'Edit' : 'New'} commitment <button class="help-dot" data-help="commitdlg">?</button></div>
+    <label style="${lab}">Name<input id="cmName" style="${inp}" value="${escapeHtml(c.name || '')}"></label>
+    <label style="${lab}">Amount (RM)<input id="cmAmt" type="number" step="0.01" style="${inp}" value="${c.amount || ''}"></label>
+    <div style="display:flex;gap:8px">
+      <label style="${lab};flex:1">Pay on day<input id="cmDay" type="number" min="1" max="31" style="${inp}" value="${c.dueDay || 1}"></label>
+      <label style="${lab};flex:1">How often<select id="cmCycle" style="${inp}"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label>
+    </div>
+    <label style="${lab}" id="cmMonthWrap">Which month (yearly)<select id="cmMonth" style="${inp}">${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select></label>
+    <div style="${lab}">Type</div>
+    <div style="display:flex;gap:6px;margin-top:3px"><button id="cmFixed" style="flex:1;padding:8px;border-radius:999px;border:1.5px solid #30d158">Fixed</button><button id="cmFlex" style="flex:1;padding:8px;border-radius:999px;border:1.5px solid #ff9f0a">Flexible</button></div>
+    <div id="cmKindHelp" style="font-size:12px;color:#666;margin-top:4px"></div>
+    <label style="${lab}">Match words in your records (comma separated)<input id="cmMatch" style="${inp}" value="${escapeHtml(c.match || '')}" placeholder="e.g. NETFLIX, XOX"></label>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
+      ${c.id ? '<button id="cmDel" style="padding:8px 12px;border-radius:8px;border:1px solid #c00;background:transparent;color:#c00">Delete</button>' : ''}
+      <button id="cmCancel" style="padding:8px 12px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit">Cancel</button>
+      <button id="cmSave" style="padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff">Save</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  const q = id => ov.querySelector('#' + id);
+  q('cmCycle').value = c.cycle === 'yearly' ? 'yearly' : 'monthly';
+  q('cmMonth').value = c.dueMonth || 1;
+  const paint = () => {
+    q('cmMonthWrap').style.display = q('cmCycle').value === 'yearly' ? '' : 'none';
+    q('cmFixed').style.background = kind === 'fixed' ? '#30d158' : 'transparent'; q('cmFixed').style.color = kind === 'fixed' ? '#fff' : '#111';
+    q('cmFlex').style.background = kind === 'flexible' ? '#ff9f0a' : 'transparent'; q('cmFlex').style.color = kind === 'flexible' ? '#fff' : '#111';
+    q('cmKindHelp').textContent = kind === 'fixed' ? 'Must pay (rent, loan, family). You cannot easily stop it.' : 'Can cancel (streaming, apps, gym). Good place to save money.';
+  };
+  q('cmCycle').onchange = paint; q('cmFixed').onclick = () => { kind = 'fixed'; paint(); }; q('cmFlex').onclick = () => { kind = 'flexible'; paint(); };
+  paint();
+  q('cmCancel').onclick = () => ov.remove();
+  const del = q('cmDel'); if (del) del.onclick = async () => { ov.remove(); await callApi('deleteCommitment', { id: c.id }); await loadData(); };
+  q('cmSave').onclick = async () => {
+    const name = q('cmName').value.trim();
+    if (!name) { alert('Please give it a name.'); return; }
+    const rec = { id: c.id || undefined, name, amount: Number(q('cmAmt').value) || 0, dueDay: Number(q('cmDay').value) || 1, cycle: q('cmCycle').value,
+      dueMonth: q('cmCycle').value === 'yearly' ? Number(q('cmMonth').value) : 0, kind, match: q('cmMatch').value.trim(), active: true, notes: c.notes || '' };
+    ov.remove();
+    await callApi('saveCommitment', { commitment: rec });
+    await loadData();
+  };
+}
+
+// ===== Help (?) =====
+const HELP = {
+  main: ['Main (calendar)', [
+    ['Calendar', 'Each day shows what you spent. Tap a day to see its records.'],
+    ['Category chips', 'Tap a category to filter the list. Tap again for its sub-types (e.g. Transport → Toll).'],
+    ['Pencil ✎', 'Link a record: Split, Claim or Note. See the Links tab help.'],
+    ['⇆ Break it down', 'One payment, several categories (e.g. a pharmacy bill: Pharmacy + Supplements). The total stays the same.'],
+    ['Date', 'Tap the date of any record to change it to the day you really paid.'],
+    ['⏱ clock', 'Orange = the bank date is not the real day, please confirm. Grey = the bank posted it a few days after you paid.'],
+    ['🔗 and 👁️', '🔗 shares a Friends link or a Demo link. 👁️ hides income and balances on your screen.']]],
+  compare: ['Insights · Compare', [
+    ['Compare', 'Pick a category and two periods (this month vs last, week, month by month, or custom).'],
+    ['Leave out one-offs', 'Big once-only items like a car deposit are left out so they do not spoil the averages. They stay in the month total.']]],
+  splits: ['Insights · Links', [
+    ['Split', 'Friends share a cost. Money comes back from several people and you keep your share.'],
+    ['Claim', 'Someone else owes the full amount (company, ex-employer). Shows "Not claimed yet" until the money arrives.'],
+    ['Note', 'A label only (e.g. Hair cut). Never changes totals.'],
+    ['Needs attention', 'Links still waiting for money are listed first.']]],
+  commit: ['Insights · Commitments', [
+    ['Fixed vs Flexible', 'Fixed = must pay (rent, loan, family). Flexible = you can cancel (streaming, apps).'],
+    ['Paid / Due soon / Missing', 'We look for matching records this month using your match words. Green = found, orange = due within 5 days, red = past due and not found.'],
+    ['Yearly', 'Yearly items also show their monthly equivalent (amount ÷ 12).'],
+    ['Match words', 'Words from the bank record, e.g. NETFLIX or NG CHAN KEE. Commas separate several.']]],
+  commitdlg: ['Commitment', [['Match words', 'Words that appear in the bank record of this payment. Capital letters do not matter.']]],
+  oneoff: ['One-offs', [['What counts', 'Vehicle · Deposit and Down payment. They are left out of Compare only.']]],
+  history: ['History', [['Recent activity', 'A log of what was added, changed or imported, newest first.']]],
+  review: ['Review', [
+    ['Dates to confirm', 'Grab records on HL Bank 2 post a few days late. Set the real day, or tap Keep posted date.'],
+    ['Unsure', 'Pick a category once and tick Remember so it is automatic next time.'],
+    ['Owed to you', 'Work costs you paid that nobody has paid back yet.']]],
+  linkdlg: ['Link a record', [
+    ['Split', 'Shared with friends.'], ['Claim', 'Someone else owes you all of it.'], ['Note', 'Label only, no effect on totals.'],
+    ['Also count as', 'Optionally change the category of this record. Tick Remember to repeat it for this merchant.']]]
+};
+function currentHelpKey_() {
+  if (activePage === 'insights') return insightsSubPage === 'splits' ? 'splits' : (insightsSubPage === 'commit' ? 'commit' : 'compare');
+  return activePage;
+}
+function openHelp_(key) {
+  const h = HELP[key || currentHelpKey_()] || HELP.main;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:14px;padding:16px;max-width:400px;width:100%;max-height:85vh;overflow:auto">
+    <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:#0a84ff">? ${escapeHtml(h[0])}</div>
+    ${h[1].map(r => `<div style="margin-bottom:9px"><b>${escapeHtml(r[0])}</b><div style="font-size:14px;color:#444">${escapeHtml(r[1])}</div></div>`).join('')}
+    <button style="margin-top:6px;padding:8px 16px;border-radius:8px;border:0;background:#0a84ff;color:#fff;width:100%">Got it</button></div>`;
+  ov.onclick = e => { if (e.target === ov || e.target.tagName === 'BUTTON') ov.remove(); };
+  document.body.appendChild(ov);
+}
+document.getElementById('helpBtn').onclick = () => openHelp_();
+document.addEventListener('click', e => { const d = e.target.closest && e.target.closest('.help-dot'); if (d) { e.preventDefault(); e.stopPropagation(); openHelp_(d.dataset.help); } }, true);
+
+// ===== 👁️ and 🔗 menus =====
+function showMenu_(title, items) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:12px';
+  ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:16px;padding:14px;max-width:420px;width:100%">
+    <div style="font-weight:700;margin-bottom:8px">${escapeHtml(title)}</div>
+    ${items.map((it, i) => `<button data-i="${i}" style="display:block;width:100%;text-align:left;padding:11px 12px;margin-bottom:8px;border-radius:10px;border:1.5px solid ${it.color};background:${it.active ? it.color + '22' : 'transparent'};color:#111"><b style="color:${it.color}">${escapeHtml(it.label)}</b><div style="font-size:12px;color:#555">${escapeHtml(it.desc)}</div></button>`).join('')}
+    <button data-i="x" style="width:100%;padding:9px;border-radius:10px;border:0;background:#eee;color:#111">Close</button></div>`;
+  ov.onclick = e => {
+    if (e.target === ov) { ov.remove(); return; }
+    const b = e.target.closest('button'); if (!b) return;
+    ov.remove();
+    if (b.dataset.i !== 'x') items[Number(b.dataset.i)].run();
+  };
+  document.body.appendChild(ov);
+}
+document.getElementById('hideNumbersBtn').onclick = () => {
+  if (VIEW_ONLY) return;
+  showMenu_('Privacy on this screen', [
+    { label: 'Show everything', desc: 'Normal view.', color: '#30d158', active: !balanceHidden, run: () => { balanceHidden = false; localStorage.setItem('balanceHidden', '0'); applyBalanceHidden(); } },
+    { label: 'Hide income & balances', desc: 'Use when someone is looking at your screen.', color: '#ff9f0a', active: balanceHidden, run: () => { balanceHidden = true; localStorage.setItem('balanceHidden', '1'); applyBalanceHidden(); } },
+    { label: 'Demo (fake data)', desc: 'Opens the sample version with made-up numbers.', color: '#bf5af2', run: () => { location.href = location.pathname.replace(/[^/]*$/, '') + 'demo.html'; } }
+  ]);
+};
+(function () {
+  const btn = document.getElementById('shareViewLinkBtn');
+  if (!btn) return;
+  const copy = async (url, what) => {
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
+      try { const ta = document.createElement('textarea'); ta.value = url; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); ok = true; } catch (e2) {}
+    }
+    alert(ok ? what + ' link copied.' : url);
+  };
+  btn.onclick = () => {
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+    showMenu_('Share a link', [
+      { label: 'Friends link', desc: 'Your real spending and commitments. Income and balances are hidden. Cannot change anything.', color: '#0a84ff', run: () => copy(base + 'index.html?view=friends', 'Friends') },
+      { label: 'Demo link', desc: 'Sample version with fake numbers. Not connected to your sheet.', color: '#bf5af2', run: () => copy(base + 'demo.html', 'Demo') }
+    ]);
+  };
+})();
+
 document.querySelectorAll('.chart-mode-btn').forEach(btn => {
   btn.onclick = () => {
     overallChartMode = btn.dataset.mode;
@@ -1485,11 +1809,43 @@ let chartInstances = {};
 // an empty subTag (Food) are simply absent here, so no sub-filter row shows
 // for them.
 const SUBTAGS_BY_CATEGORY = {};
-CATEGORY_OPTIONS.forEach(o => {
-  if (o.subTag) {
-    (SUBTAGS_BY_CATEGORY[o.category] = SUBTAGS_BY_CATEGORY[o.category] || []).push(o.subTag);
-  }
-});
+function rebuildSubtagIndex_() {
+  Object.keys(SUBTAGS_BY_CATEGORY).forEach(k => delete SUBTAGS_BY_CATEGORY[k]);
+  CATEGORY_OPTIONS.forEach(o => {
+    if (o.subTag && o.subTag !== '__new__') {
+      (SUBTAGS_BY_CATEGORY[o.category] = SUBTAGS_BY_CATEGORY[o.category] || []).push(o.subTag);
+    }
+  });
+}
+rebuildSubtagIndex_();
+// Sub-tags you added yourself with "+ New type…" (stored in the CustomTags
+// sheet) join the dropdowns right above that category's "+ New" entry.
+let customTags = [];
+function applyCustomTags_() {
+  customTags.forEach(ct => {
+    if (CATEGORY_OPTIONS.some(o => o.category === ct.category && o.subTag.toLowerCase() === ct.subTag.toLowerCase())) return;
+    const opt = { category: ct.category, subTag: ct.subTag, label: ct.category + ' · ' + ct.subTag };
+    let idx = CATEGORY_OPTIONS.findIndex(o => o.category === ct.category && o.subTag === '__new__');
+    if (idx === -1) idx = CATEGORY_OPTIONS.findIndex(o => o.category === ct.category) + 1;
+    if (idx <= 0) idx = CATEGORY_OPTIONS.length - 1;
+    CATEGORY_OPTIONS.splice(idx, 0, opt);
+  });
+  rebuildSubtagIndex_();
+}
+// Dropdown value -> [category, subTag]; handles the "+ New type…" entry by
+// asking for a name (in-page dialog), saving it, and returning the new pair.
+// Returns null if cancelled.
+async function resolveCatValue_(value) {
+  const [category, subTag] = String(value || '').split('|');
+  if (subTag !== '__new__') return [category, subTag];
+  const name = await askTextInline_('Name the new ' + category + ' type (e.g. Cleaning, Laundry)');
+  const clean = (name || '').trim();
+  if (!clean) return null;
+  try { await callApi('addCustomTag', { category, subTag: clean }); } catch (e) {}
+  customTags.push({ category, subTag: clean });
+  applyCustomTags_();
+  return [category, clean];
+}
 
 // Minimal HTML-escaping for free-text remarks before they're dropped into
 // innerHTML, so a remark containing <, >, & etc. can't break the row markup.
@@ -1510,7 +1866,7 @@ function cmpScopeMatch_(t, scope) {
   return !sub || (t.subTag || '') === sub;
 }
 function cmpPeriodTxns_(from, to, scope) {
-  return allTxns.filter(t => t.date >= from && t.date <= to && !NON_SPEND_CATEGORIES.includes(t.category) && cmpScopeMatch_(t, scope));
+  return allTxns.filter(t => t.date >= from && t.date <= to && !NON_SPEND_CATEGORIES.includes(t.category) && cmpScopeMatch_(t, scope) && !(cmpLeaveOutOneOff && isOneOff_(t)));
 }
 function cmpFmtDate_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function cmpPresetRanges_(preset) {
@@ -1548,6 +1904,8 @@ function cmpScopeOptionsHtml_(selected) {
   return html;
 }
 let cmpScope = 'ALL', cmpPreset = 'month';
+let cmpLeaveOutOneOff = true;
+function isOneOff_(t) { return t.category === 'Vehicle' && /^(Deposit|Down payment)$/i.test(t.subTag || ''); }
 function cmpBarsHtml_(days, scope, max, color) {
   return '<div class="cmp-bars">' + days.map(d => {
     const v = cmpPeriodTxns_(d, d, scope).reduce((s, t) => s + spendAmount(t), 0);
@@ -1640,6 +1998,7 @@ function renderCompare() {
     <div class="cmp-bars-label">B · day by day</div>${cmpBarsHtml_(dB, cmpScope, max, '#8e8e93')}`;
 }
 document.getElementById('cmpScope').onchange = e => { cmpScope = e.target.value; renderCompare(); };
+document.getElementById('cmpOneOff').onchange = e => { cmpLeaveOutOneOff = e.target.checked; renderCompare(); };
 document.getElementById('cmpPreset').onchange = e => { cmpPreset = e.target.value; renderCompare(); };
 ['cmpAFrom', 'cmpATo', 'cmpBFrom', 'cmpBTo'].forEach(id => { document.getElementById(id).onchange = renderCompare; });
 
@@ -1651,7 +2010,44 @@ document.getElementById('cmpPreset').onchange = e => { cmpPreset = e.target.valu
 // any category. Nothing is written to the sheet. Groups made only of
 // transfers (e.g. "Dad") are never touched.
 function splitGroupKey_(remark) { return String(remark || '').trim().toLowerCase(); }
+function origCat_(t) { return t._ovr ? t._origCat : t.category; }
+function origSub_(t) { return t._ovr ? t._origSub : t.subTag; }
+// Split / Claim / Note, told apart by the word in the remark ("... split",
+// "... claim"); anything else is a plain note. A legacy remark with no keyword
+// still counts as a split if it has a spend plus an incoming "From Others".
+function linkKindFromRemark_(remark, txns) {
+  const r = String(remark || '');
+  if (/\bclaim\b/i.test(r)) return 'claim';
+  if (/\bsplit\b/i.test(r)) return 'split';
+  if (txns) {
+    const hasSpend = txns.some(t => !NON_SPEND_CATEGORIES.includes(origCat_(t)) && txnFlow(t) === 'out');
+    const hasIncomingTransfer = txns.some(t => origCat_(t) === 'Transfer' && origSub_(t) === 'From Others' && txnFlow(t) === 'in');
+    if (hasSpend && hasIncomingTransfer) return 'split';
+  }
+  return 'note';
+}
+function isReimbursementRow_(t) {
+  return txnFlow(t) === 'in' && ((t.category === 'Transfer' && t.subTag === 'From Others') || (t.category === 'Income' && t.subTag === 'Claim Paid Back'));
+}
+// "Break it down": one bank payment covering several categories is stored on
+// the sheet as ONE row with a JSON list of parts. For every total and chart it
+// is expanded into one virtual row per part (same payment, same account, same
+// balance effect); allTxnsRaw keeps the untouched rows for duplicate matching.
+function expandParts_(raw) {
+  const out = [];
+  raw.forEach(t => {
+    let parts = null;
+    if (t.parts) { try { parts = JSON.parse(t.parts); } catch (e) { parts = null; } }
+    if (!Array.isArray(parts) || parts.length < 2) { out.push(t); return; }
+    parts.forEach((pt, i) => {
+      out.push(Object.assign({}, t, { amount: Number(pt.amount) || 0, category: pt.category, subTag: pt.subTag || '',
+        _partOf: t.row, _partIdx: i, _partCount: parts.length, _partTotal: Number(t.amount) || 0 }));
+    });
+  });
+  return out;
+}
 function applySplitOverlay_() {
+  allTxns = expandParts_(allTxnsRaw);
   allTxns.forEach(t => {
     if (t._ovr) { t.category = t._origCat; t.subTag = t._origSub; if (t._origFlowMissing) delete t.flow; delete t._ovr; delete t._origFlowMissing; }
   });
@@ -1662,11 +2058,12 @@ function applySplitOverlay_() {
   });
   Object.keys(groups).forEach(k => {
     const g = groups[k];
+    if (linkKindFromRemark_(g[0].remark, g) === 'note') return;
     const spends = g.filter(t => !NON_SPEND_CATEGORIES.includes(t.category) && txnFlow(t) === 'out');
     if (!spends.length) return;
     const payer = spends.reduce((a, b) => Number(b.amount || 0) > Number(a.amount || 0) ? b : a);
     g.forEach(t => {
-      if (t.category !== 'Transfer' || t.subTag !== 'From Others' || txnFlow(t) !== 'in') return;
+      if (!isReimbursementRow_(t)) return;
       t._ovr = true; t._origCat = t.category; t._origSub = t.subTag;
       if (t.flow !== 'in' && t.flow !== 'out') { t._origFlowMissing = true; t.flow = 'in'; }
       t.category = payer.category; t.subTag = payer.subTag || '';
@@ -1677,13 +2074,17 @@ function applySplitOverlay_() {
 async function loadData() {
   document.getElementById('list').innerHTML = '<div class="empty">Loading…</div>';
   try {
-    const res = await fetch(APPS_SCRIPT_URL + '?api=1');
-    const data = await res.json();
-    allTxns = data.transactions || [];
+    const data = DEMO ? DEMO : await (await fetch(APPS_SCRIPT_URL + '?api=1' + (FRIENDS ? '&view=friends' : ''))).json();
+    allTxnsRaw = data.transactions || [];
+    allTxns = allTxnsRaw;
     merchantRules = data.merchantRules || [];
     accountBalances = data.accountBalances || [];
     activityLog = data.activityLog || [];
     balanceAlerts = data.balanceAlerts || [];
+    commitments = data.commitments || [];
+    customTags = data.customTags || [];
+    friendsView = !!data.friendsView;
+    applyCustomTags_();
   } catch (err) {
     document.getElementById('list').innerHTML = '<div class="empty">Error loading data. Check your connection.</div>';
     return;
@@ -1821,10 +2222,11 @@ function renderApp() {
   // page check.
   if (activePage === 'main') {
     renderCalendar();
-    if (document.getElementById('insightsPage').style.display !== 'none') {
-      if (insightsSubPage === 'compare') renderCompare();
-      else if (insightsSubPage === 'splits') renderSplitsInsights(splitsFilterRemark);
-    }
+  }
+  if (activePage === 'insights') {
+    if (insightsSubPage === 'compare') renderCompare();
+    else if (insightsSubPage === 'splits') renderSplitsInsights(splitsFilterRemark);
+    else if (insightsSubPage === 'commit') renderCommitments_();
   }
   if (activePage === 'history') renderHistory();
 }
@@ -1842,17 +2244,12 @@ function switchInsightsSub(sub) {
   document.getElementById('comparePage').style.display = sub === 'compare' ? '' : 'none';
   document.getElementById('trendsPage').style.display = sub === 'charts' ? '' : 'none';
   document.getElementById('splitsInsightsPage').style.display = sub === 'splits' ? '' : 'none';
+  document.getElementById('commitPage').style.display = sub === 'commit' ? '' : 'none';
+  if (sub === 'commit') renderCommitments_();
   if (sub === 'compare') renderCompare();
   else if (sub === 'charts') renderTrends();
   else if (sub === 'splits') renderSplitsInsights(splitsFilterRemark);
 }
-document.getElementById('insightsToggleBtn').onclick = () => {
-  const pg = document.getElementById('insightsPage');
-  const open = pg.style.display === 'none';
-  pg.style.display = open ? '' : 'none';
-  document.getElementById('insightsToggleBtn').textContent = open ? 'More insights (Compare, Splits) ▾' : 'More insights (Compare, Splits) ▸';
-  if (open) switchInsightsSub(insightsSubPage);
-};
 document.querySelectorAll('.insights-subtab').forEach(el => {
   el.onclick = () => switchInsightsSub(el.dataset.sub);
 });
@@ -1861,9 +2258,10 @@ function switchPage(page) {
   activePage = page;
   document.querySelectorAll('.page-tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   document.getElementById('mainPage').style.display = page === 'main' ? '' : 'none';
+  document.getElementById('insightsTab').style.display = page === 'insights' ? '' : 'none';
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
   document.getElementById('reviewPage').style.display = page === 'review' ? '' : 'none';
-  if (page === 'main') switchInsightsSub(insightsSubPage);
+  if (page === 'insights') switchInsightsSub(insightsSubPage);
   if (page === 'history') renderHistory();
   if (page === 'review') renderReviewList();
 }
@@ -2219,8 +2617,9 @@ function trendBucketsFor(txns) {
 // the hue wheel to tell apart when several categories are plotted side by
 // side as bars. Each category gets its own distinct hue here instead.
 const TREND_CATEGORY_COLORS = {
-  Car: '#0a84ff', Shopping: '#ff9f0a', Food: '#30d158',
-  Entertainment: '#ffd60a', Sports: '#64d2ff', Housing: '#ff375f', Loss: '#ff453a', Social: '#ff9ff3', Unsure: '#bf5af2'
+  Food: '#ff6b35', Transport: '#0a84ff', Vehicle: '#5e5ce6', Shopping: '#ff9f0a', Health: '#30d158', 'Personal Care': '#ff6482',
+  Entertainment: '#ffd60a', Subscriptions: '#bf5af2', Sports: '#64d2ff', Social: '#ff9ff3', Housing: '#ff375f', Bills: '#32ade6',
+  'Work Expenses': '#a2845e', Services: '#00c7be', Loss: '#ff453a', 'Savings & Investment': '#34c759', Unsure: '#bf5af2'
 };
 
 // Compresses bar HEIGHT only (sign-preserving square root) so a month with
@@ -2651,8 +3050,49 @@ function renderJustImportedSummary() {
   }
 }
 
+function renderReviewDates_() {
+  const section = document.getElementById('reviewDatesSection');
+  const el = document.getElementById('reviewDatesList');
+  const rows = allTxns.filter(t => t.dateStatus === 'unconfirmed').sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (!rows.length) { section.style.display = 'none'; return rows.length; }
+  section.style.display = '';
+  document.getElementById('reviewDatesLabel').textContent = `Dates to confirm (${rows.length})`;
+  el.innerHTML = `<div class="review-meta" style="margin:0 0 8px;color:var(--muted);font-size:12px;">These came from the bank days after you paid. Set the day you really paid, or keep the posted date for now.</div>` + rows.map(t => `
+    <div class="review-entry" style="border-left:3px solid #ff9f0a;border-radius:12px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;">
+        <div><b>${escapeHtml(txnTitle(t))}</b><div class="meta">Posted ${fmtShortDate_(t.postedDate || t.date)} · ${escapeHtml(t.account || '')}</div></div>
+        <div style="font-weight:600;">RM${Number(t.amount || 0).toFixed(2)}</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <input type="date" class="rd-input" data-row="${t.row}" value="${String(t.date).slice(0, 10)}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--card);color:inherit;">
+        <button class="review-btn confirm rd-save" data-row="${t.row}">Set date</button>
+        <button class="review-btn rd-skip" data-row="${t.row}">Keep</button>
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('.rd-save').forEach(btn => {
+    btn.onclick = async () => {
+      const row = Number(btn.dataset.row);
+      const v = el.querySelector(`.rd-input[data-row="${row}"]`).value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+      const t = allTxns.find(x => x.row === row);
+      btn.disabled = true; btn.textContent = 'Saving…';
+      await callApi('updateDate', { row, date: v === String(t.date).slice(0, 10) ? '' : v, status: 'confirmed' });
+      await loadData();
+    };
+  });
+  el.querySelectorAll('.rd-skip').forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = '…';
+      await callApi('updateDate', { row: Number(btn.dataset.row), date: '', status: 'skipped' });
+      await loadData();
+    };
+  });
+  return rows.length;
+}
 function renderReviewList() {
   renderJustImportedSummary();
+  const datesToConfirm = renderReviewDates_();
+  renderClaimsOwed_();
   const label = document.getElementById('reviewSectionLabel');
   const el = document.getElementById('reviewList');
   const unconfirmed = allTxns.filter(t => t.remark && t.remark.indexOf('*TBC') === 0)
@@ -2687,7 +3127,7 @@ function renderReviewList() {
     .sort((a, b) => (a.txn.date || '').localeCompare(b.txn.date || ''));
 
   const badge = document.getElementById('reviewTabBadge');
-  const badgeCount = unconfirmed.length + unsure.length + awaitingSync.length;
+  const badgeCount = unconfirmed.length + unsure.length + awaitingSync.length + datesToConfirm;
   if (badge) {
     badge.textContent = badgeCount ? String(badgeCount) : '';
     badge.style.display = badgeCount ? '' : 'none';
@@ -3038,8 +3478,9 @@ function renderTotals(txns, incomeTxns) {
 // grey since money moves either direction, and Unsure stays purple as a
 // "needs review" flag.
 const CHART_COLORS = {
-  Car: '#ff453a', Shopping: '#ff9f0a', Food: '#ff6b35', Entertainment: '#ffd60a',
-  Housing: '#ff7a9c', Loss: '#ff453a', Social: '#ff9ff3', Unsure: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
+  Food: '#ff6b35', Transport: '#0a84ff', Vehicle: '#5e5ce6', Shopping: '#ff9f0a', Health: '#30d158', 'Personal Care': '#ff6482',
+  Entertainment: '#ffd60a', Subscriptions: '#bf5af2', Sports: '#64d2ff', Social: '#ff9ff3', Housing: '#ff7a9c', Bills: '#32ade6',
+  'Work Expenses': '#a2845e', Services: '#00c7be', Loss: '#ff453a', 'Savings & Investment': '#34c759', Unsure: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
 };
 
 // Not real spending — Transfer covers wallet top-ups (Card Reload), P2P
@@ -3048,7 +3489,7 @@ const CHART_COLORS = {
 // other bank credits) that TNG never had. Tracked and filterable like any
 // other category, but left out of the "All" totals/pie so none of this
 // inflates spend numbers.
-const NON_SPEND_CATEGORIES = ['Transfer', 'Income'];
+const NON_SPEND_CATEGORIES = ['Transfer', 'Income', 'Savings & Investment'];
 function colorFor(key) { return CHART_COLORS[key] || '#8e8e93'; }
 
 // Subtag palette used when a single category is selected (e.g. Car ->
@@ -3057,7 +3498,7 @@ function colorFor(key) { return CHART_COLORS[key] || '#8e8e93'; }
 // the category itself is neutral regardless of which subtag.
 const SUBTAG_COLORS = {
   Toll: '#0a84ff', Parking: '#64d2ff', Fuel: '#5e5ce6', Service: '#30d5ff', Ride: '#ff6961',
-  'Convenience Store': '#34c759', Hypermarket: '#30d158', Pharmacies: '#ff2d55', 'Personal Care': '#ff9500',
+  'Convenience Store': '#34c759', Hypermarket: '#30d158', Pharmacy: '#30d158', Supplements: '#34c759', Supplies: '#63e6be', Medical: '#ff2d55', Haircut: '#ff9500', Skincare: '#ff6482', Spa: '#ff9ff3', Delivery: '#ff9f0a', Streaming: '#ff6482', 'Apps & Software': '#5e5ce6', Gaming: '#bf5af2', Deposit: '#5e5ce6', Loan: '#0a84ff', Insurance: '#30b0c7', 'Road Tax': '#64d2ff', Registration: '#a2845e', Props: '#a2845e', Equipment: '#8e8e93', Legal: '#00c7be', Cleaning: '#34c759', Repairs: '#ff9f0a', Scam: '#ff453a', Fines: '#ff6961', Charges: '#8e8e93', Phone: '#32ade6', Internet: '#5e5ce6', Treat: '#ff9ff3', Gift: '#ff6482', Condolence: '#8e8e93',
   Subscription: '#ff6482',
   Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
   // Yellow (matches .dot.Reload) — any movement of money between your OWN
@@ -3480,7 +3921,7 @@ function renderStatBreakdown(base) {
 // Unsure sits last — it's the "needs a real category" bucket, not something
 // you'd usually filter to on purpose, so it shouldn't compete for attention
 // with the real spending categories at the front of the row.
-const ALL_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Sports', 'Social', 'Housing', 'Loss', 'Transfer', 'Income', 'Unsure'];
+const ALL_CATEGORIES = ['Food', 'Transport', 'Vehicle', 'Shopping', 'Health', 'Personal Care', 'Entertainment', 'Subscriptions', 'Sports', 'Social', 'Housing', 'Bills', 'Work Expenses', 'Services', 'Loss', 'Savings & Investment', 'Transfer', 'Income', 'Unsure'];
 
 // Top-level "which real-world account" filter — All / TNG / HL Bank / PBank
 // — a separate dimension from the category filters below it. Which account
@@ -4052,7 +4493,7 @@ function transferHint(t) {
 // excludes Transfer/Income/Unsure — those aren't "one payment covers two
 // spend categories" situations, they're money-movement/not-yet-categorized
 // buckets that the also-under concept doesn't really apply to.
-const TAGGABLE_CATEGORIES = ['Car', 'Shopping', 'Food', 'Entertainment', 'Sports', 'Housing'];
+const TAGGABLE_CATEGORIES = ['Transport', 'Shopping', 'Food', 'Health', 'Personal Care', 'Entertainment', 'Sports', 'Housing'];
 
 // extraTag started out storing a bare subtag string (e.g. "WiFi"), always
 // implicitly in the SAME category as the row's own primary category (the
@@ -4065,7 +4506,8 @@ function parseExtraTag(primaryCategory, extraTag) {
   if (!extraTag) return null;
   const bar = extraTag.indexOf('|');
   if (bar === -1) return { category: primaryCategory, subTag: extraTag };
-  return { category: extraTag.slice(0, bar), subTag: extraTag.slice(bar + 1) };
+  const cat0 = extraTag.slice(0, bar);
+  return { category: cat0 === 'Car' ? 'Transport' : cat0, subTag: extraTag.slice(bar + 1) };
 }
 function extraTagKey(category, subTag) { return category + '|' + (subTag || ''); }
 // Human-readable label for a stored extraTag value, e.g. "WiFi" (same
@@ -4692,18 +5134,22 @@ function renderTxnRow(t, opts) {
   // placeholders already have their own Delete button in the "Needs
   // review" unconfirmed section, so this is hidden there to avoid a
   // confusing double control for the exact same row.
+  const canBreakDown = t._partOf === undefined && txnFlow(t) === 'out' && !NON_SPEND_CATEGORIES.includes(t.category) && t.category !== 'Unsure';
+  const partsBtnHtml = canBreakDown ? `<button class="parts-btn parts-icon" data-parts-row="${t.row}" title="Break this payment into several categories">⇆</button>` : '';
   const deleteBtnHtml = isTbc ? '' : `<button class="txn-delete-btn" data-row="${t.row}" title="Delete this transaction">✕</button>`;
   return `
     <div class="txn" data-row="${t.row}">
-      <div class="dot ${dotClass}"></div>
+      <div class="dot" style="background:${colorFor(t.category)}"></div>
       <div class="info">
         <div class="merchant"><span class="merchant-text">${txnTitle(t)}</span>${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${syncedFlagHtml}</div>
         ${hintHtml}
         ${typeHintHtml}
-        <div class="meta">${new Date(t.date).toLocaleDateString()} · ${t.time || 'No time record'} · ${t.account || 'TNG'}</div>
+        <div class="meta"><span class="date-edit" data-edit-date="${t.row}" title="Tap to change the paid date">${new Date(t.date).toLocaleDateString()}</span> · ${t.time || 'No time record'} · ${t.account || 'TNG'}${clockChipHtml_(t)}${claimChipHtml_(t)}</div>
         ${remarkHtml}
         <div class="cat-select-row">
-          <select class="txn-cat-select${opts.reviewMode ? ' review-cat-select' : ''}" data-row="${t.row}" data-committed="${t.category}|${t.subTag || ''}">${categoryOptionsHtml(t.category, t.subTag, t.account)}</select>
+          ${t._partOf !== undefined
+            ? `<span class="part-label" style="border-left:3px solid ${colorFor(t.category)};">${escapeHtml(t.category)}${t.subTag ? ' · ' + escapeHtml(t.subTag) : ''} <span style="color:var(--muted)">· part ${t._partIdx + 1} of ${t._partCount} of RM${t._partTotal.toFixed(2)}</span></span><button class="parts-btn" data-parts-row="${t._partOf}">Edit parts</button>`
+            : `<select class="txn-cat-select${opts.reviewMode ? ' review-cat-select' : ''}" data-row="${t.row}" data-committed="${t.category}|${t.subTag || ''}">${categoryOptionsHtml(t.category, t.subTag, t.account)}</select>`}
           ${extraSelectHtml}
           ${extraAmountHtml}
           ${opts.reviewMode ? `<button class="review-btn confirm review-confirm-cat-btn" data-row="${t.row}">Confirm</button>` : ''}
@@ -4714,6 +5160,7 @@ function renderTxnRow(t, opts) {
       <div class="txn-actions">
         <div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
         ${remarkBtnHtml}
+        ${partsBtnHtml}
         ${deleteBtnHtml}
       </div>
     </div>`;
@@ -4732,7 +5179,9 @@ function attachCatSelectHandlers() {
   document.querySelectorAll('.txn-cat-select:not(.review-cat-select)').forEach(el => {
     el.onchange = async () => {
       const row = Number(el.dataset.row);
-      const [category, subTag] = el.value.split('|');
+      const resolved = await resolveCatValue_(el.value);
+      if (!resolved) { renderApp(); return; }
+      const [category, subTag] = resolved;
       const t = allTxns.find(x => x.row === row);
       const hadExtraTag = t && t.extraTag;
       if (t) { t.category = category; t.subTag = subTag; t.extraTag = ''; }
@@ -4764,7 +5213,9 @@ function attachReviewConfirmCatHandlers() {
       const row = Number(btn.dataset.row);
       const select = document.querySelector(`.review-cat-select[data-row="${row}"]`);
       if (!select) return;
-      const [category, subTag] = select.value.split('|');
+      const resolvedSel = await resolveCatValue_(select.value);
+      if (!resolvedSel) { renderApp(); return; }
+      const [category, subTag] = resolvedSel;
       const t = allTxns.find(x => x.row === row);
       const hadExtraTag = t && t.extraTag;
       if (t) { t.category = category; t.subTag = subTag; t.extraTag = ''; }
@@ -4955,6 +5406,8 @@ function groupByRemark(remark) {
   render();
 }
 function attachLinkHandlers() {
+  attachDateHandlers_();
+  document.querySelectorAll('[data-parts-row]').forEach(b => { b.onclick = (e) => { e.stopPropagation(); openPartsDialog_(Number(b.dataset.partsRow)); }; });
   document.querySelectorAll('.remark[data-remark]').forEach(el => {
     el.onclick = () => openSplitsInsights(el.dataset.remark);
   });
@@ -5006,16 +5459,31 @@ function remarkGroups() {
       const amt = Number(t.amount || 0);
       if (txnFlow(t) === 'in') totalIn += amt; else totalOut += amt;
     });
-    return { remark, txns, count: txns.length, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date, firstDate: txns[txns.length - 1].date };
+    return { remark, txns, count: txns.length, totalOut, totalIn, net: totalOut - totalIn, lastDate: txns[0].date, firstDate: txns[txns.length - 1].date, kind: linkKindFromRemark_(remark, txns) };
   });
   list.sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
   return list;
 }
-function splitGroups() {
-  return remarkGroups().filter(g => g.count >= 2);
-}
+function linkGroups_() { return remarkGroups(); }
+function splitGroups() { return remarkGroups().filter(g => g.kind !== 'note' && g.count >= 2); }
+function outstandingClaims_() { return linkGroups_().filter(g => g.kind === 'claim' && g.totalOut - g.totalIn > 0.005); }
 
+const LINK_COLORS = { split: '#0a84ff', claim: '#ff9f0a', note: '#00c7be' };
+const LINK_LABELS = { split: 'Split', claim: 'Claim', note: 'Note' };
+function linkStatus_(g) {
+  const owed = g.totalOut - g.totalIn;
+  if (g.kind === 'claim') {
+    if (owed <= 0.005) return { text: 'Claimed', cls: 'ok' };
+    if (g.totalIn > 0) return { text: 'Partly claimed', cls: 'warn' };
+    return { text: 'Not claimed yet', cls: 'warn' };
+  }
+  if (g.kind === 'split') return g.totalIn > 0 ? { text: 'Settled', cls: 'ok' } : { text: 'Waiting for friends', cls: 'warn' };
+  return { text: 'Note group', cls: 'info' };
+}
 function splitGroupCardHtml(g) {
+  const color = LINK_COLORS[g.kind];
+  const st = linkStatus_(g);
+  const owed = Math.max(0, g.totalOut - g.totalIn);
   const rowsHtml = g.txns.map(t => {
     const flow = txnFlow(t);
     const sign = flow === 'in' ? '+' : '-';
@@ -5028,60 +5496,63 @@ function splitGroupCardHtml(g) {
   const dateRangeText = g.firstDate === g.lastDate
     ? new Date(g.firstDate).toLocaleDateString()
     : `${new Date(g.firstDate).toLocaleDateString()} – ${new Date(g.lastDate).toLocaleDateString()}`;
+  let statsHtml;
+  if (g.kind === 'claim') {
+    const pct = g.totalOut > 0 ? Math.min(100, Math.round(g.totalIn / g.totalOut * 100)) : 0;
+    statsHtml = `<div class="link-bar"><div class="link-bar-fill" style="width:${pct}%"></div></div>
+      <div class="split-group-summary"><span>Paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Claimed <b>RM${g.totalIn.toFixed(2)}</b></span><span style="color:${owed > 0 ? '#ff9f0a' : '#30d158'}">Owed <b>RM${owed.toFixed(2)}</b></span></div>`;
+  } else if (g.kind === 'split') {
+    statsHtml = `<div class="split-group-summary"><span>You paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Back <b>RM${g.totalIn.toFixed(2)}</b></span><span>Your share <b>${formatSignedRM(g.net)}</b></span></div>`;
+  } else {
+    statsHtml = `<div class="split-group-summary"><span>Costs <b>RM${g.totalOut.toFixed(2)}</b></span><span>Recovered <b>RM${g.totalIn.toFixed(2)}</b></span><span>Net <b>${formatSignedRM(g.net)}</b></span></div>`;
+  }
   return `
-    <div class="split-group" data-remark="${escapeHtml(g.remark)}">
+    <div class="split-group link-card" data-remark="${escapeHtml(g.remark)}" style="border-left:4px solid ${color};">
       <div class="split-group-header">
         <div>
           <div class="split-group-name">${escapeHtml(g.remark)}</div>
-          <div class="split-group-daterange">${dateRangeText}</div>
+          <div class="split-group-daterange"><span class="link-kind" style="color:${color}">${LINK_LABELS[g.kind]}</span> · ${g.count} record${g.count === 1 ? '' : 's'} · ${dateRangeText}</div>
         </div>
-        <div class="split-group-net">${formatSignedRM(g.net)}</div>
+        <span class="link-chip link-chip-${st.cls}">${st.text}</span>
       </div>
       <div class="split-group-rows">${rowsHtml}</div>
-      <div class="split-group-summary">
-        <span>You paid: <b>RM${g.totalOut.toFixed(2)}</b></span>
-        <span>Received back: <b>RM${g.totalIn.toFixed(2)}</b></span>
-        <span>Net cost to you: <b>${formatSignedRM(g.net)}</b></span>
-      </div>
+      ${statsHtml}
       <button class="toolbar-btn split-group-viewlist" data-remark="${escapeHtml(g.remark)}">Show in transaction list →</button>
     </div>`;
 }
 
-// Powers the Splits sub-tab under Insights — every group permanently
-// browsable there (full browse, filterRemark null) instead of the old
-// popup. Tapping a shared note on any transaction row (see
-// attachLinkHandlers) still jumps straight to one group's detail via
-// openSplitsInsights(remark), same as the modal used to.
 let splitsFilterRemark = null;
-// Persists across re-renders so switching sort order doesn't reset when
-// paging away and back to the Splits tab.
-let splitsSortBy = 'date';
+let linksFilter = 'all';
 function renderSplitsInsights(filterRemark) {
   const el = document.getElementById('splitsInsightsList');
   const label = document.getElementById('splitsInsightsLabel');
   const backBtn = document.getElementById('splitsInsightsBackBtn');
-  const sortSel = document.getElementById('splitsSortBy');
+  const chipsEl = document.getElementById('linksChips');
+  const all = linkGroups_().filter(g => g.kind !== 'note' || g.count >= 2);
   backBtn.style.display = filterRemark ? '' : 'none';
-  const groups = filterRemark ? remarkGroups().filter(g => splitGroupKey_(g.remark) === splitGroupKey_(filterRemark)) : splitGroups();
-  // Sort control only makes sense on the full-browse view — a single
-  // filtered group has nothing to sort against.
-  sortSel.style.display = (!filterRemark && groups.length > 1) ? '' : 'none';
-  if (!groups.length) {
-    label.textContent = filterRemark || 'Split groups';
-    el.innerHTML = filterRemark
-      ? '<div class="empty">No other transactions linked to this note yet — add the same note to another transaction to form a split.</div>'
-      : '<div class="empty">No splits yet — tap the ✎ note icon on a transaction and link two or more together.</div>';
-    return;
-  }
-  if (!filterRemark) {
-    if (splitsSortBy === 'amount') {
-      groups.sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  if (filterRemark) {
+    chipsEl.style.display = 'none';
+    const one = linkGroups_().filter(g => splitGroupKey_(g.remark) === splitGroupKey_(filterRemark));
+    label.textContent = filterRemark;
+    el.innerHTML = one.length ? one.map(splitGroupCardHtml).join('') : '<div class="empty">Nothing else is linked to this yet. Use the same link on another record to add it.</div>';
+  } else {
+    chipsEl.style.display = '';
+    const counts = { all: all.length, split: 0, claim: 0, note: 0 };
+    all.forEach(g => counts[g.kind]++);
+    const chip = (key, text, color) => `<button class="links-chip${linksFilter === key ? ' active' : ''}" data-filter="${key}" style="${linksFilter === key ? `background:${color};color:#fff;border-color:${color};` : `border-color:${color};color:${color};`}">${text} ${counts[key]}</button>`;
+    chipsEl.innerHTML = chip('all', 'All', '#8e8e93') + chip('split', 'Splits', LINK_COLORS.split) + chip('claim', 'Claims', LINK_COLORS.claim) + chip('note', 'Notes', LINK_COLORS.note);
+    chipsEl.querySelectorAll('.links-chip').forEach(b => { b.onclick = () => { linksFilter = b.dataset.filter; renderSplitsInsights(null); }; });
+    const shown = all.filter(g => linksFilter === 'all' || g.kind === linksFilter);
+    const attention = shown.filter(g => (g.kind === 'claim' && g.totalOut - g.totalIn > 0.005) || (g.kind === 'split' && g.totalIn === 0));
+    const rest = shown.filter(g => !attention.includes(g)).sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
+    label.textContent = 'Links';
+    if (!shown.length) {
+      el.innerHTML = '<div class="empty">Nothing here yet. Tap the ✎ on a record to link it as a Split, Claim or Note.</div>';
     } else {
-      groups.sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
+      el.innerHTML = (attention.length ? `<div class="link-section-title" style="color:#ff9f0a;">Needs attention (${attention.length})</div>` + attention.map(splitGroupCardHtml).join('') : '') +
+        (rest.length ? `<div class="link-section-title" style="color:#30d158;">${attention.length ? 'Done' : 'All'} (${rest.length})</div>` + rest.map(splitGroupCardHtml).join('') : '');
     }
   }
-  label.textContent = filterRemark || `Split groups (${groups.length})`;
-  el.innerHTML = groups.map(splitGroupCardHtml).join('');
   el.querySelectorAll('.split-group-viewlist').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
@@ -5089,6 +5560,11 @@ function renderSplitsInsights(filterRemark) {
       groupByRemark(btn.dataset.remark);
     };
   });
+  updateLinksBadge_();
+}
+function updateLinksBadge_() {
+  const n = outstandingClaims_().length;
+  document.querySelectorAll('.insights-subtab[data-sub="splits"]').forEach(b => { b.textContent = n ? `Links (${n})` : 'Links'; });
 }
 // Jumps to the Insights > Splits sub-view, filtered to one group's detail —
 // called when tapping a shared note on any transaction row. Insights lives
@@ -5097,9 +5573,7 @@ function renderSplitsInsights(filterRemark) {
 // separate page the way it used to.
 function openSplitsInsights(filterRemark) {
   splitsFilterRemark = filterRemark || null;
-  switchPage('main');
-  document.getElementById('insightsPage').style.display = '';
-  document.getElementById('insightsToggleBtn').textContent = 'More insights (Compare, Splits) ▾';
+  switchPage('insights');
   switchInsightsSub('splits');
   const subnav = document.getElementById('insightsSubnav');
   if (subnav) subnav.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -5107,10 +5581,6 @@ function openSplitsInsights(filterRemark) {
 document.getElementById('splitsInsightsBackBtn').onclick = () => {
   splitsFilterRemark = null;
   renderSplitsInsights(null);
-};
-document.getElementById('splitsSortBy').onchange = (e) => {
-  splitsSortBy = e.target.value;
-  renderSplitsInsights(splitsFilterRemark);
 };
 
 // Split/remark picker sheet — opened from the ✎ button on any transaction
@@ -5125,54 +5595,153 @@ document.getElementById('splitsSortBy').onchange = (e) => {
 // split ends up named consistently, unless the typed text exactly matches
 // an existing split (then it's saved as-is, to actually join that group).
 let splitPickerRow = null;
+let linkMode = 'split';
 const splitPickerBackdrop = document.getElementById('splitPickerBackdrop');
+const LINK_HELP = {
+  split: 'Friends share a cost. Money comes back from several people and you keep your own share.',
+  claim: 'Someone else owes you the full amount (company, ex-employer). Your cost becomes RM0 once they pay, and it shows "not claimed yet" until then.',
+  note: 'Just a label for what this was for, like "Hair cut". It never changes any totals.'
+};
+function renderLinkPicker_() {
+  const t = allTxns.find(x => x.row === splitPickerRow);
+  const currentRemark = (t && isSplitLinkableRemark(t.remark)) ? t.remark : '';
+  document.querySelectorAll('#linkSeg button').forEach(b => {
+    const on = b.dataset.mode === linkMode;
+    b.style.background = on ? b.style.getPropertyValue('--c') : 'transparent';
+    b.style.color = on ? '#fff' : b.style.getPropertyValue('--c');
+    b.style.borderColor = b.style.getPropertyValue('--c');
+  });
+  document.getElementById('linkHelp').textContent = LINK_HELP[linkMode];
+  const groups = remarkGroups().filter(g => g.kind === linkMode);
+  const listEl = document.getElementById('splitPickerList');
+  const label = document.getElementById('splitPickerInputLabel');
+  const input = document.getElementById('splitPickerInput');
+  if (linkMode === 'note') {
+    label.textContent = 'What was this for?';
+    input.placeholder = 'e.g. Hair cut, Salary recovery, Company props';
+  } else {
+    label.textContent = linkMode === 'split' ? 'Or start a new split — we add "split" for you' : 'Or start a new claim — we add "claim" for you';
+    input.placeholder = linkMode === 'split' ? 'e.g. Sushi 31/7' : 'e.g. Shooting props';
+  }
+  if (!groups.length) {
+    listEl.innerHTML = `<div class="split-picker-empty">No ${linkMode}s yet — type a name below.</div>`;
+  } else {
+    listEl.innerHTML = groups.map(g => `
+      <div class="split-picker-option${g.remark === currentRemark ? ' selected' : ''}" data-remark="${escapeHtml(g.remark)}" style="border-left:3px solid ${LINK_COLORS[linkMode]};">
+        <span>${escapeHtml(g.remark)}</span>
+        <span class="spo-count">${g.count >= 2 ? `${g.count} records · net ${formatSignedRM(g.net)}` : '1 record so far'}</span>
+      </div>`).join('');
+    listEl.querySelectorAll('.split-picker-option').forEach(opt => {
+      opt.onclick = () => { if (linkMode === 'note') { input.value = opt.dataset.remark; } else { saveLinkChoice_(opt.dataset.remark); } };
+    });
+  }
+}
 function openSplitPicker(row) {
   splitPickerRow = row;
   const t = allTxns.find(x => x.row === row);
   const currentRemark = (t && isSplitLinkableRemark(t.remark)) ? t.remark : '';
+  linkMode = currentRemark ? (linkKindFromRemark_(currentRemark, null) === 'note' ? 'note' : linkKindFromRemark_(currentRemark, null)) : (t && txnFlow(t) === 'in' ? 'split' : 'split');
   document.getElementById('splitPickerInput').value = currentRemark;
-
-  const groups = remarkGroups();
-  const listEl = document.getElementById('splitPickerList');
-  if (!groups.length) {
-    listEl.innerHTML = '<div class="split-picker-empty">No existing splits yet — type a new name below.</div>';
-  } else {
-    listEl.innerHTML = groups.map(g => `
-      <div class="split-picker-option${g.remark === currentRemark ? ' selected' : ''}" data-remark="${escapeHtml(g.remark)}">
-        <span>${escapeHtml(g.remark)}</span>
-        <span class="spo-count">${g.count >= 2 ? `${g.count} txns · net ${formatSignedRM(g.net)}` : '1 txn so far'}</span>
-      </div>
-    `).join('');
-    listEl.querySelectorAll('.split-picker-option').forEach(opt => {
-      opt.onclick = () => saveSplitPickerRemark(opt.dataset.remark);
-    });
-  }
+  const sel = document.getElementById('linkCountAs');
+  sel.innerHTML = '<option value="">Keep as it is</option>' + categoryOptionsHtml('', '', t ? t.account : '');
+  sel.value = '';
+  document.getElementById('linkRemember').checked = false;
+  renderLinkPicker_();
   splitPickerBackdrop.classList.add('open');
 }
 function closeSplitPicker() {
   splitPickerBackdrop.classList.remove('open');
   splitPickerRow = null;
 }
-async function saveSplitPickerRemark(remark) {
+// Saves the remark, and (optionally) a category for the record. Linking a
+// record that is money COMING IN as a Claim files it as Income > Claim paid
+// back automatically so it nets against what you paid.
+async function saveLinkChoice_(remark) {
   const row = splitPickerRow;
   if (row === null) return;
   const t = allTxns.find(x => x.row === row);
-  if (t) t.remark = remark;
+  const sel = document.getElementById('linkCountAs');
+  const remember = document.getElementById('linkRemember').checked;
+  let chosen = null;
+  if (sel.value) { chosen = await resolveCatValue_(sel.value); if (!chosen) return; }
   closeSplitPicker();
+  if (t) t.remark = remark;
   await callApi('updateRemark', { row, remark });
-  renderApp();
+  if (!chosen && remark && t && txnFlow(t) === 'in' && !isReimbursementRow_(t)) {
+    if (linkMode === 'claim') chosen = ['Income', 'Claim Paid Back'];
+    else if (linkMode === 'split' && (t.category === 'Unsure' || !t.category)) chosen = ['Transfer', 'From Others'];
+  }
+  if (chosen) {
+    await callApi('updateCategory', { row, category: chosen[0], subTag: chosen[1] });
+    if (remember && t && t.merchant) await callApi('saveMerchantRule', { rule: { merchant: t.merchant, category: chosen[0], subTag: chosen[1] } });
+  }
+  await loadData();
 }
 document.getElementById('splitPickerClose').onclick = closeSplitPicker;
+document.querySelectorAll('#linkSeg button').forEach(b => { b.onclick = () => { linkMode = b.dataset.mode; renderLinkPicker_(); }; });
 document.getElementById('splitPickerSave').onclick = () => {
   let val = document.getElementById('splitPickerInput').value.trim();
   if (val) {
     const existingNames = remarkGroups().map(g => g.remark);
-    const isExisting = existingNames.includes(val);
-    if (!isExisting && !/\bsplit$/i.test(val)) val = val + ' split';
+    if (!existingNames.includes(val)) {
+      if (linkMode === 'split' && !/\bsplit\b/i.test(val)) val += ' split';
+      if (linkMode === 'claim' && !/\bclaim\b/i.test(val)) val += ' claim';
+    }
   }
-  saveSplitPickerRemark(val);
+  saveLinkChoice_(val);
 };
-document.getElementById('splitPickerClear').onclick = () => saveSplitPickerRemark('');
+document.getElementById('splitPickerClear').onclick = () => saveLinkChoice_('');
+
+// ---- Break it down: one payment, several categories ----------------------------
+function openPartsDialog_(row) {
+  const raw = allTxnsRaw.find(x => x.row === row);
+  if (!raw) return;
+  const total = Number(raw.amount) || 0;
+  let parts = [];
+  try { parts = JSON.parse(raw.parts || '[]'); } catch (e) { parts = []; }
+  if (!Array.isArray(parts) || parts.length < 2) parts = [{ category: raw.category, subTag: raw.subTag || '', amount: total }, { category: '', subTag: '', amount: 0 }];
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  const render = () => {
+    const sumOthers = parts.slice(0, -1).reduce((a, x) => a + (Number(x.amount) || 0), 0);
+    parts[parts.length - 1].amount = Math.round((total - sumOthers) * 100) / 100;
+    ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:14px;padding:16px;max-width:380px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4)">
+      <div style="font-weight:600;margin-bottom:2px">Break it down</div>
+      <div style="font-size:13px;color:#444;margin-bottom:10px">${escapeHtml(txnTitle(raw))} · one payment of <b>RM${total.toFixed(2)}</b>. Split it by what you bought.</div>
+      ${parts.map((pt, i) => `<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+          <select data-i="${i}" class="pd-cat" style="flex:1;min-width:0;padding:8px;border-radius:8px;border:1px solid #888;font-size:14px">${categoryOptionsHtml(pt.category, pt.subTag, raw.account)}</select>
+          <input data-i="${i}" class="pd-amt" type="number" step="0.01" min="0" value="${Number(pt.amount).toFixed(2)}" ${i === parts.length - 1 ? 'readonly' : ''} style="width:84px;padding:8px;border-radius:8px;border:1px solid #888;font-size:14px;${i === parts.length - 1 ? 'background:#eee' : ''}">
+          ${parts.length > 2 ? `<button data-i="${i}" class="pd-del" style="border:0;background:transparent;font-size:16px;color:#c00">✕</button>` : ''}
+        </div>`).join('')}
+      <div style="font-size:12px;color:#666;margin-bottom:10px">The last line fills in the rest automatically.${parts.length < 3 ? ' <a href="#" id="pdAdd" style="color:#2563eb">+ Add a line</a>' : ''}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+        ${raw.parts ? '<button id="pdClear" style="padding:8px 12px;border-radius:8px;border:1px solid #c00;background:transparent;color:#c00">Remove breakdown</button>' : ''}
+        <button id="pdCancel" style="padding:8px 12px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit">Cancel</button>
+        <button id="pdSave" style="padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff">Save</button>
+      </div></div>`;
+    ov.querySelectorAll('.pd-cat').forEach(sel => { sel.onchange = async () => {
+      const r = await resolveCatValue_(sel.value);
+      if (r) { parts[Number(sel.dataset.i)].category = r[0]; parts[Number(sel.dataset.i)].subTag = r[1]; }
+      render();
+    }; });
+    ov.querySelectorAll('.pd-amt').forEach(inp => { inp.onchange = () => { parts[Number(inp.dataset.i)].amount = Number(inp.value) || 0; render(); }; });
+    ov.querySelectorAll('.pd-del').forEach(b => { b.onclick = () => { parts.splice(Number(b.dataset.i), 1); render(); }; });
+    const add = ov.querySelector('#pdAdd');
+    if (add) add.onclick = (e) => { e.preventDefault(); parts.splice(parts.length - 1, 0, { category: 'Shopping', subTag: '', amount: 0 }); render(); };
+    ov.querySelector('#pdCancel').onclick = () => ov.remove();
+    const clr = ov.querySelector('#pdClear');
+    if (clr) clr.onclick = async () => { ov.remove(); await callApi('updateParts', { row, parts: '' }); await loadData(); };
+    ov.querySelector('#pdSave').onclick = async () => {
+      const last = parts[parts.length - 1].amount;
+      if (last < 0 || parts.some(x => !x.category || x.category === 'Unsure')) { alert('Pick a category for every line, and make sure the amounts add up.'); return; }
+      ov.remove();
+      await callApi('updateParts', { row, parts: JSON.stringify(parts.map(x => ({ category: x.category, subTag: x.subTag || '', amount: Number(x.amount) || 0 }))) });
+      await loadData();
+    };
+  };
+  document.body.appendChild(ov);
+  render();
+}
 
 document.getElementById('groupBy').onchange = (e) => { groupMode = e.target.value; render(); };
 document.getElementById('sortBy').onchange = (e) => { sortMode = e.target.value; render(); };
@@ -5187,9 +5756,9 @@ function refreshFCategoryOptions() {
   const sel = document.getElementById('fCategory');
   let [prevCategory, prevSubTag] = (sel.value || '').split('|');
   const account = document.getElementById('fAccount').value;
-  sel.innerHTML = categoryOptionsHtml(prevCategory || 'Car', prevSubTag || 'Toll', account);
+  sel.innerHTML = categoryOptionsHtml(prevCategory || 'Transport', prevSubTag || 'Toll', account);
 }
-document.getElementById('fCategory').innerHTML = categoryOptionsHtml('Car', 'Toll', 'TNG');
+document.getElementById('fCategory').innerHTML = categoryOptionsHtml('Transport', 'Toll', 'TNG');
 document.getElementById('fAccount').onchange = refreshFCategoryOptions;
 document.getElementById('addBtn').onclick = () => {
   const now = new Date();
@@ -5204,7 +5773,9 @@ document.getElementById('fSubmit').onclick = async () => {
   const amount = parseFloat(document.getElementById('fAmount').value);
   const date = document.getElementById('fDate').value;
   const time = document.getElementById('fTime').value;
-  const [category, subTag] = document.getElementById('fCategory').value.split('|');
+  const resolvedF = await resolveCatValue_(document.getElementById('fCategory').value);
+  if (!resolvedF) return;
+  const [category, subTag] = resolvedF;
   const merchant = document.getElementById('fMerchant').value;
   const account = document.getElementById('fAccount').value;
   const rememberMerchant = document.getElementById('fRemember').checked;
@@ -5280,6 +5851,7 @@ let importBeforeOpeningCollapsed = true;
 
 function resetImportSheet() {
   importStage = 'pick';
+  importSubmitBtn.disabled = false;
   pendingImportRows = [];
   pendingImportSections = [];
   pendingImportReviewLabels = [];
@@ -6471,7 +7043,16 @@ function parseCardPdfPageItems(items) {
     const isReload = /Reload/i.test(typeStr);
     const { location, operator } = sector === 'PARKING' ? extractCardParkingNames_(rowItems) : { location: '', operator: '' };
 
-    records.push({ date, time: normalizeTime(timeStr), amount, sector, isReload, typeStr, location, operator });
+    // "Posted Date" prints as "08/10" over "/2026" at x~181; the bank posts a
+    // parking/toll charge a day or two after you actually exit.
+    const postedItem = rowItems.find(it => it.x >= 160 && it.x < 194 && /^\d{2}\/\d{2}$/.test(it.str));
+    let postedDate = '';
+    if (postedItem) {
+      const pm = postedItem.str.split('/');
+      postedDate = `${dm[3]}-${pm[1]}-${pm[0]}`;
+      if (postedDate < date) postedDate = `${Number(dm[3]) + 1}-${pm[1]}-${pm[0]}`;
+    }
+    records.push({ date, time: normalizeTime(timeStr), amount, sector, isReload, typeStr, location, operator, postedDate });
   }
   return records;
 }
@@ -6606,9 +7187,10 @@ async function parseCardPdfFile(file) {
       const notes = r.operator ? `${r.typeStr} · ${r.operator}` : r.typeStr;
       rows.push({
         date: r.date, time: r.time || '', amount: r.amount,
-        category: 'Car', subTag: 'Parking',
+        category: 'Transport', subTag: 'Parking',
         merchant, source: 'TNG Card PDF Import', notes, type: 'Parking',
-        account: 'TNG Card'
+        account: 'TNG Card',
+        ...(r.postedDate && r.postedDate !== r.date ? { postedDate: r.postedDate, dateStatus: 'auto' } : {})
       });
       return;
     }
@@ -6644,7 +7226,7 @@ function parseCardCsvFile(file) {
           const isReload = /RELOAD/.test(typeUpper) || /RELOAD/.test(descUpper);
           rows.push({
             date, time: '', amount: parseFloat(amountRaw) || 0,
-            category: isReload ? 'Transfer' : 'Car',
+            category: isReload ? 'Transfer' : 'Transport',
             subTag: isReload ? 'TNG Card Top-up' : 'Parking',
             merchant: isReload ? 'TNG Card Reload' : 'TNG Card Parking',
             source: 'TNG Card CSV Import', notes: type, type,
@@ -6928,8 +7510,8 @@ async function parseCardScreenshotFile(file) {
     // before falling back to Unsure.
     let guess = categorize(r.merchant, r.type);
     if (!guess) {
-      if (/toll/i.test(r.merchant)) guess = { category: 'Car', subTag: 'Toll' };
-      else if (/park/i.test(r.merchant)) guess = { category: 'Car', subTag: 'Parking' };
+      if (/toll/i.test(r.merchant)) guess = { category: 'Transport', subTag: 'Toll' };
+      else if (/park/i.test(r.merchant)) guess = { category: 'Transport', subTag: 'Parking' };
       else guess = { category: 'Unsure', subTag: '' };
     }
     rows.push({
@@ -7022,7 +7604,7 @@ function renderImportPreview() {
     return `
     <div class="txn preview-row">
       <div class="preview-top">
-        <div class="dot ${ALL_CATEGORIES.includes(r.category) ? r.category : 'Custom'}"></div>
+        <div class="dot" style="background:${colorFor(r.category)}"></div>
         <div class="info">
           <div class="merchant">${txnTitle(r)}${reviewBadgeHtml}</div>
           <div class="meta">${r.date} · ${r.time || 'No time record'}</div>
@@ -7041,7 +7623,7 @@ function renderImportPreview() {
   const dupRowHtml = (r, i) => `
     <div class="txn preview-row preview-row-dup">
       <div class="preview-top">
-        <div class="dot ${ALL_CATEGORIES.includes(r.category) ? r.category : 'Custom'}"></div>
+        <div class="dot" style="background:${colorFor(r.category)}"></div>
         <div class="info">
           <div class="merchant">${txnTitle(r)}</div>
           <div class="meta">${r.date} · ${r.time || 'No time record'} · matches an existing record</div>
@@ -7058,7 +7640,7 @@ function renderImportPreview() {
     return `
     <div class="txn preview-row preview-row-dup">
       <div class="preview-top">
-        <div class="dot ${ALL_CATEGORIES.includes(r.category) ? r.category : 'Custom'}"></div>
+        <div class="dot" style="background:${colorFor(r.category)}"></div>
         <div class="info">
           <div class="merchant">${txnTitle(r)}</div>
           <div class="meta">${r.date} · ${r.time || 'No time record'} · predates ${r.account}'s starting balance (${asOf})</div>
@@ -7155,9 +7737,11 @@ function renderImportPreview() {
     };
   });
   importPreviewList.querySelectorAll('[data-cat-idx]').forEach(el => {
-    el.onchange = () => {
+    el.onchange = async () => {
       const idx = Number(el.dataset.catIdx);
-      const [category, subTag] = el.value.split('|');
+      const resolvedI = await resolveCatValue_(el.value);
+      if (!resolvedI) { renderImportPreview(); return; }
+      const [category, subTag] = resolvedI;
       pendingImportRows[idx].category = category;
       pendingImportRows[idx].subTag = subTag;
       // If "Always categorize this merchant" is already ticked for this row,
@@ -7259,7 +7843,7 @@ function isGenericTransferImportRow(r) {
 // already matched above is enough to call it a duplicate once one side is
 // this generic label.
 function isGenericParkingImportRow(r) {
-  return r.category === 'Car' && r.subTag === 'Parking' &&
+  return r.category === 'Transport' && r.subTag === 'Parking' &&
     /^tng card parking$/i.test(String(r.merchant || '').trim());
 }
 // 2026-09: HL Bank 1 and HL Bank 2 are two real, separate accounts, but a
@@ -7280,7 +7864,12 @@ function isCrossHLDuplicate(a, b) {
 }
 function importRowsMatch(a, b) {
   const sameAccount = (a.account || 'TNG') === (b.account || 'TNG');
-  const sameDate = a.date === b.date;
+  // A row whose date you moved to the real paid day keeps the bank's posted
+  // date in postedDate, so a later statement import still recognises it.
+  const sameDate = a.date === b.date ||
+    (a.postedDate && a.postedDate === b.date) ||
+    (b.postedDate && b.postedDate === a.date) ||
+    (a.postedDate && b.postedDate && a.postedDate === b.postedDate);
   const sameAmount = Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
   if (!sameAccount || !sameDate || !sameAmount) return false;
   if (isReloadishImportRow(a) && isReloadishImportRow(b)) return true;
@@ -7313,7 +7902,7 @@ function importRowsMatch(a, b) {
     return true;
   }
   if ((isGenericParkingImportRow(a) || isGenericParkingImportRow(b)) &&
-      a.category === 'Car' && b.category === 'Car' &&
+      a.category === 'Transport' && b.category === 'Transport' &&
       a.subTag === 'Parking' && b.subTag === 'Parking') {
     return true;
   }
@@ -7364,16 +7953,109 @@ function accountDateKey(account, date) { return (account || 'TNG') + '|' + date;
 
 function beforeAccountOpening_(r) {
   const anchor = accountBalances.find(b => b.account === r.account);
-  return !!(anchor && anchor.asOfDate && r.date < anchor.asOfDate);
+  return !!(anchor && anchor.asOfDate && (r.postedDate || r.date) < anchor.asOfDate);
+}
+
+
+// ---- Delayed transactions: real paid date vs bank posted date ----------------
+// `date` is always the real paid day (what calendar/Compare/lists use).
+// `postedDate` is when the bank/e-wallet posted it (kept for tracing back and
+// for balances / duplicate matching). `dateStatus`: 'unconfirmed' (Grab* A-…
+// and GRAB-EC on HL Bank 2: only the posted day is known, you set the real
+// one or skip), 'auto' (the real date was read from the statement), 'confirmed'
+// (you set it), 'skipped' (you chose to keep the posted date).
+function parseDdmmyyFromMerchant_(m) {
+  const x = /\b(\d{2})(\d{2})(\d{2})\b\s*$/.exec(String(m || '').trim());
+  if (!x) return null;
+  const dd = Number(x[1]), mm = Number(x[2]), yy = Number(x[3]);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  return '20' + x[3] + '-' + x[2] + '-' + x[1];
+}
+function daysBetweenIso_(a, b) {
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+}
+function applyDelayInfo_(r) {
+  if (!r || r.postedDate || r.dateStatus) return;
+  const m = String(r.merchant || '');
+  if (/^HL Bank/.test(r.account || '') && (/^GRAB\*\s*A-/i.test(m) || /^GRAB-EC\b/i.test(m))) {
+    r.postedDate = r.date; r.dateStatus = 'unconfirmed';
+    return;
+  }
+  if (r.account === 'PBank' && /^GRAB/i.test(m)) {
+    const d = parseDdmmyyFromMerchant_(m);
+    if (d) {
+      const gap = daysBetweenIso_(d, r.date);
+      if (gap >= 0 && gap <= 10) { r.postedDate = r.date; r.date = d; r.dateStatus = 'auto'; }
+    }
+  }
+}
+function fmtShortDate_(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+// Little clock chip shown beside a record's date.
+function clockChipHtml_(t) {
+  if (t.dateStatus === 'unconfirmed') {
+    return `<span class="clock-chip clock-warn" data-edit-date="${t.row}" title="Only the bank posted date is known — tap to set the real paid date">⏱ confirm date · posted ${fmtShortDate_(t.postedDate || t.date)}</span>`;
+  }
+  if (t.postedDate && t.postedDate !== t.date) {
+    const tag = t.dateStatus === 'skipped' ? 'date estimated' : 'posted';
+    return `<span class="clock-chip clock-note" data-edit-date="${t.row}" title="Tap to edit the paid date">⏱ ${tag} ${fmtShortDate_(t.postedDate)}</span>`;
+  }
+  return '';
+}
+function claimChipHtml_(t) {
+  const cat = origCat_(t);
+  if (cat !== 'Work Expenses' || txnFlow(t) !== 'out') return '';
+  const g = t.remark ? remarkGroups().find(x => splitGroupKey_(x.remark) === splitGroupKey_(t.remark) && x.kind === 'claim') : null;
+  if (g && g.totalOut - g.totalIn <= 0.005) return '<span class="clock-chip" style="background:rgba(48,209,88,.2);color:#30d158;">✔ claimed</span>';
+  return '<span class="clock-chip clock-warn" title="Paid for work — not paid back yet">⏳ not claimed yet</span>';
+}
+function openDateDialog_(row) {
+  const t = allTxns.find(x => x.row === row);
+  if (!t) return;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  const posted = t.postedDate && t.postedDate !== t.date ? `<div style="font-size:12px;color:#666;margin-bottom:8px">Bank posted: <b>${fmtShortDate_(t.postedDate)}</b></div>` : '';
+  ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:14px;padding:18px;max-width:340px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4)">
+    <div style="font-weight:600;margin-bottom:4px">When did you actually pay?</div>
+    <div style="font-size:13px;color:#444;margin-bottom:8px">${escapeHtml(txnTitle(t))} · RM${Number(t.amount || 0).toFixed(2)}</div>
+    ${posted}
+    <input type="date" id="dateDlgInput" style="width:100%;box-sizing:border-box;padding:10px;font-size:16px;border-radius:8px;border:1px solid #888;margin-bottom:12px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button id="dateDlgCancel" style="padding:8px 12px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit">Cancel</button>
+      ${t.dateStatus === 'unconfirmed' ? '<button id="dateDlgSkip" style="padding:8px 12px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit">Keep posted date</button>' : ''}
+      <button id="dateDlgSave" style="padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff">Save date</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  const inp = ov.querySelector('#dateDlgInput');
+  inp.value = String(t.date).slice(0, 10);
+  const close = () => ov.remove();
+  ov.querySelector('#dateDlgCancel').onclick = close;
+  const skip = ov.querySelector('#dateDlgSkip');
+  if (skip) skip.onclick = async () => { close(); await callApi('updateDate', { row, date: '', status: 'skipped' }); await loadData(); };
+  ov.querySelector('#dateDlgSave').onclick = async () => {
+    const v = inp.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+    close();
+    await callApi('updateDate', { row, date: v === String(t.date).slice(0, 10) ? '' : v, status: 'confirmed' });
+    await loadData();
+  };
+}
+function attachDateHandlers_() {
+  document.querySelectorAll('[data-edit-date]').forEach(el => {
+    el.onclick = (e) => { e.stopPropagation(); openDateDialog_(Number(el.dataset.editDate)); };
+  });
 }
 
 function classifyImportRows(rows) {
-  const existingDateKeys = new Set(allTxns.map(t => accountDateKey(t.account, t.date)));
+  rows.forEach(applyDelayInfo_);
+  const pool = allTxnsRaw.length ? allTxnsRaw : allTxns;
+  const existingDateKeys = new Set(pool.map(t => accountDateKey(t.account, t.date)));
   const beforeOpening = [], duplicate = [], reviewSynced = [], reviewSyncedLabels = [], reviewSyncedMatches = [], newDate = [], oldDate = [];
   const keptSoFar = [];
   rows.forEach(r => {
     if (beforeAccountOpening_(r)) { beforeOpening.push(r); return; }
-    const dupExisting = allTxns.some(t => importRowsMatch(t, r) || isCrossHLDuplicate(t, r));
+    const dupExisting = pool.some(t => importRowsMatch(t, r) || isCrossHLDuplicate(t, r));
     const dupInBatch = keptSoFar.some(k => importRowsMatch(k, r) || isCrossHLDuplicate(k, r));
     if (dupExisting || dupInBatch) { duplicate.push(r); return; }
     keptSoFar.push(r);
