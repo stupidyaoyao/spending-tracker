@@ -706,6 +706,16 @@
   .sum-line { font-size: 13px; color: var(--text); padding: 3px 0; border-top: 1px solid var(--line); }
   .sug-btn { border: 0; background: var(--accent); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 12px; }
   .sug-x { border: 0; background: transparent; color: var(--muted); font-size: 14px; }
+  #undoToast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 100006; background: var(--text); color: var(--bg); border-radius: 12px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.35); max-width: 92vw; }
+  #undoToast button { border: 0; background: transparent; color: var(--accent); font-weight: 700; font-size: 14px; }
+  .bud-row { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+  .bud-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .bud-name { font-weight: 600; } .bud-nums { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .bud-in { width: 84px; background: var(--card2); color: var(--text); border: 0; border-radius: 8px; padding: 6px 8px; font-size: 14px; }
+  .bud-sub { font-size: 11px; margin-top: 4px; }
+  .coming { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--card); border: 1px solid var(--line); border-left: 4px solid #4a8be8; border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; font-size: 13px; }
+  .coming-l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .coming-i { background: var(--card2); border-radius: 999px; padding: 2px 10px; }
   .link-seg { display:flex; gap:6px; margin:6px 0 8px; }
   .link-seg button { flex:1; padding:8px 0; border-radius:999px; border:1.5px solid; background:transparent; font-weight:600; font-size:14px; }
   .link-help { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.4; }
@@ -798,6 +808,7 @@
   </header>
 
   <div id="mainPage">
+    <div id="comingUp"></div>
     <div id="calendarPage" style="margin-bottom:14px;">
       <div class="cal-toprow"><div class="cal-view-seg" id="calViewSeg"><button data-v="month" class="on">Month</button><button data-v="week">Week</button><button data-v="year">Year</button></div>
       <div class="cal-legend" id="calLegend"><span>Less</span><i style="background:#f7e3a1"></i><i style="background:#f3c274"></i><i style="background:#ee9f5f"></i><i style="background:#e57a52"></i><i style="background:#c9533f"></i><span>More</span></div></div>
@@ -912,6 +923,7 @@
       <button class="insights-subtab active" data-sub="compare" style="--tc:#8d6fe0">Compare</button>
       <button class="insights-subtab" data-sub="splits" style="--tc:#2fa7a1">Links</button>
       <button class="insights-subtab" data-sub="commit" style="--tc:#3fae78">Commitments</button>
+      <button class="insights-subtab" data-sub="budget" style="--tc:#d9894a">Budgets</button>
     </div>
 
     <div id="comparePage">
@@ -934,6 +946,8 @@
       </div>
       <div id="cmpResult"></div>
     </div>
+
+    <div id="budgetPage" style="display:none;"><div id="budgetList"></div></div>
 
     <div id="commitPage" style="display:none;">
       <div id="commitSummary"></div>
@@ -1004,6 +1018,7 @@
          the sections below which DO need something from you. Disappears
          once dismissed or after your next import. -->
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="toolbar-btn" id="reviewExpandAllBtn">Expand all</button></div>
+    <div id="monthEnd"></div>
     <div id="claimsOwed" style="display:none;"></div>
     <div id="reviewDatesSection" style="display:none;">
       <div class="history-section-label-row">
@@ -1214,6 +1229,7 @@
   add(dd(8), 200, 'Transfer', 'To Cash', 'ATM WITHDRAWAL', 'PBank', 'out', 'Cash for the week');
   add(dd(7), 45, 'Food', '', 'PASAR MALAM', 'Cash', 'out');
   rows.forEach(function (r) { if (r.subTag === 'Pharmacy' && !r.remark) r.remark = 'Health \u203a Clinic'; });
+  var budgetTags = [{category:'__budget__',subTag:'Food|1000'},{category:'__budget__',subTag:'Transport|300'},{category:'__budget__',subTag:'Entertainment|600'}];
   var commitments = [
     { id: 'd1', name: 'Rent', amount: 800, dueDay: 2, cycle: 'monthly', dueMonth: 0, kind: 'fixed', match: 'RENT', active: 'yes' },
     { id: 'd2', name: 'Dad', amount: 500, dueDay: 3, cycle: 'monthly', dueMonth: 0, kind: 'fixed', match: 'DAD', active: 'yes' },
@@ -1223,7 +1239,7 @@
     { id: 'd6', name: 'Spotify', amount: 14.9, dueDay: 7, cycle: 'monthly', dueMonth: 0, kind: 'flexible', match: 'SPOTIFY', active: 'yes' },
     { id: 'd7', name: 'Car insurance', amount: 1200, dueDay: 15, cycle: 'yearly', dueMonth: 3, kind: 'fixed', match: 'INSURANCE', active: 'yes' }
   ];
-  return { transactions: rows, merchantRules: [], accountBalances: [], activityLog: [], balanceAlerts: [], commitments: commitments, customTags: [], friendsView: false };
+  return { transactions: rows, merchantRules: [], accountBalances: [], activityLog: [], balanceAlerts: [], commitments: commitments, customTags: budgetTags, friendsView: false };
 })();
 </script>
 <script>
@@ -1264,17 +1280,65 @@ const VIEW_ONLY = QS_.get('mode') === 'view' || FRIENDS || !!DEMO;
 // POST helper. Uses Content-Type: text/plain so the request stays a CORS
 // "simple request" (no OPTIONS preflight) — Apps Script web apps can't
 // answer custom preflight requests.
+const OWNER_KEY_LS = 'ownerKey';
+function ownerKey_() { try { return localStorage.getItem(OWNER_KEY_LS) || ''; } catch (e) { return ''; } }
+const UNDO_ACTIONS = { updateCategory: ['category', 'subTag'], updateRemark: ['remark'], updateExtraTag: ['extraTag', 'extraTagAmount'], updateParts: ['parts'] };
+let undoTimer_ = null, lastCallAt_ = 0;
+async function rawPost_(action, extra) {
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action, key: ownerKey_() }, extra))
+  });
+  const j = await res.json();
+  if (j && j.error === 'locked') { askOwnerKey_(); }
+  return j;
+}
 async function callApi(action, extra) {
   if (VIEW_ONLY) {
     console.warn('Shared view is read-only — blocked action:', action);
     return { ok: false, viewOnly: true };
   }
-  const res = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ action }, extra))
-  });
-  return res.json();
+  let undo = null;
+  if (UNDO_ACTIONS[action] && extra && extra.row) {
+    const t = (typeof allTxnsRaw !== 'undefined' ? allTxnsRaw : []).find(x => x.row === extra.row);
+    if (t) { const prev = { row: extra.row }; UNDO_ACTIONS[action].forEach(k => { prev[k] = t[k] === undefined || t[k] === null ? '' : t[k]; }); undo = { action, prev, label: action === 'updateCategory' ? `${t.category}${t.subTag ? ' · ' + t.subTag : ''} → ${extra.category}${extra.subTag ? ' · ' + extra.subTag : ''}` : action === 'updateRemark' ? 'Note changed' : action === 'updateParts' ? 'Breakdown changed' : 'Tag changed' }; }
+  }
+  const now = Date.now(); const bulk = now - lastCallAt_ < 700; lastCallAt_ = now;
+  const r = await rawPost_(action, extra);
+  if (bulk) hideUndo_();
+  else if (undo && r && r.ok !== false) showUndo_(undo);
+  return r;
+}
+function hideUndo_() { const t = document.getElementById('undoToast'); if (t) t.remove(); clearTimeout(undoTimer_); }
+function showUndo_(u) {
+  hideUndo_();
+  const el = document.createElement('div');
+  el.id = 'undoToast';
+  el.innerHTML = `<span>${escapeHtml(u.label)}</span><button>Undo</button>`;
+  document.body.appendChild(el);
+  el.querySelector('button').onclick = async () => { hideUndo_(); await rawPost_(u.action, u.prev); await loadData(); };
+  undoTimer_ = setTimeout(hideUndo_, 9000);
+}
+function askOwnerKey_() {
+  if (document.getElementById('keyOverlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'keyOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:var(--bg);color:var(--text);z-index:100010;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="max-width:340px;width:100%"><div style="font-size:20px;font-weight:700;margin-bottom:6px">Enter your key</div><div style="color:var(--muted);font-size:13px;margin-bottom:12px">This device needs your owner key once. It is the same key you wrote in Code.gs.</div>
+    <input id="keyIn" type="password" autocomplete="off" style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;border-radius:12px;border:0;background:var(--card2);color:var(--text);margin-bottom:10px">
+    <div id="keyErr" style="color:#e0685c;font-size:12px;min-height:16px"></div>
+    <button id="keyOk" style="width:100%;padding:12px;border-radius:12px;border:0;background:var(--accent);color:#fff;font-size:15px">Unlock</button></div>`;
+  document.body.appendChild(ov);
+  const go = async () => {
+    const k = ov.querySelector('#keyIn').value;
+    const j = await (await fetch(APPS_SCRIPT_URL + '?api=1&key=' + encodeURIComponent(k))).json();
+    if (j && j.error === 'locked') { ov.querySelector('#keyErr').textContent = 'That key is not right.'; return; }
+    localStorage.setItem(OWNER_KEY_LS, k); ov.remove(); loadData();
+  };
+  ov.querySelector('#keyOk').onclick = go;
+  ov.querySelector('#keyIn').onkeydown = e => { if (e.key === 'Enter') go(); };
+  ov.querySelector('#keyIn').focus();
 }
 
 // Category rules — mirrors Code.gs CATEGORY_RULES exactly. Used by manual
@@ -1874,6 +1938,10 @@ const HELP = {
     ['Paid / Due soon / Missing', 'We look for matching records this month using your match words. Green = found, orange = due within 5 days, red = past due and not found.'],
     ['Yearly', 'Yearly items also show their monthly equivalent (amount ÷ 12).'],
     ['Match words', 'Words from the bank record, e.g. NETFLIX or NG CHAN KEE. Commas separate several.']]],
+  budget: ['Insights · Budgets', [
+    ['Budget', 'The most you plan to spend in a category each month. The bar fills as you spend: green is fine, orange from 80%, red when over.'],
+    ['Use my suggested budgets', 'Sets sensible amounts from your last 3 months. You can change each one.'],
+    ['Zero removes it', 'Type 0 in a budget to remove it.']]],
   commitdlg: ['Commitment', [['Match words', 'Words that appear in the bank record of this payment. Capital letters do not matter.']]],
   oneoff: ['One-offs', [['What counts', 'Vehicle · Deposit and Down payment. They are left out of Compare only.']]],
   history: ['History', [['Recent activity', 'A log of what was added, changed or imported, newest first.']]],
@@ -1886,7 +1954,7 @@ const HELP = {
     ['Also count as', 'Optionally change the category of this record. Tick Remember to repeat it for this merchant.']]]
 };
 function currentHelpKey_() {
-  if (activePage === 'insights') return insightsSubPage === 'splits' ? 'splits' : (insightsSubPage === 'commit' ? 'commit' : 'compare');
+  if (activePage === 'insights') return insightsSubPage === 'splits' ? 'splits' : (insightsSubPage === 'commit' ? 'commit' : (insightsSubPage === 'budget' ? 'budget' : 'compare'));
   return activePage;
 }
 function openHelp_(key) {
@@ -1940,7 +2008,7 @@ document.getElementById('hideNumbersBtn').onclick = () => {
   btn.onclick = () => {
     const base = location.origin + location.pathname.replace(/[^/]*$/, '');
     showMenu_('Share a link', [
-      { label: 'Friends link', desc: 'Your real spending and commitments. Income and balances are hidden. Cannot change anything.', color: '#4a8be8', run: () => copy(base + 'index.html?view=friends', 'Friends') },
+      { label: 'Friends link', desc: 'Your real spending and commitments. Income and balances are hidden. Cannot change anything.', color: '#4a8be8', run: async () => { let k = ''; try { const r = await callApi('getFriendsKey', {}); k = (r && r.key) || ''; } catch (e) {} copy(base + 'index.html?view=friends' + (k ? '&k=' + encodeURIComponent(k) : ''), 'Friends'); } },
       { label: 'Demo link', desc: 'Sample version with fake numbers. Not connected to your sheet.', color: '#8d6fe0', run: () => copy(base + 'demo.html', 'Demo') }
     ]);
   };
@@ -2045,7 +2113,7 @@ function openCatSheet_(sel, keepLabel, totals) {
       <div style="font-weight:700;margin-bottom:8px">Pick a category${totals ? ' <span style="font-weight:400;color:var(--muted);font-size:12px">· ' + escapeHtml(periodLabel_()) + '</span>' : ''}</div>
       ${keep ? '<button data-keep="1" style="width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:0;background:var(--card2);color:inherit">' + (keepLabel || 'Keep as it is') + '</button>' : ''}
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:11px 12px;border-radius:10px;border:0;border-left:4px solid ${colorFor(c)};background:color-mix(in srgb, ${colorFor(c)} ${c === curCat ? 30 : 12}%, var(--card2));color:var(--text);font-weight:600;font-size:14px">${escapeHtml(c)}${groups[c].length > 1 ? ' <span style="color:var(--muted)">›</span>' : ''}${totals ? `<div style="font-size:11px;font-weight:400;color:var(--muted)">${totals[c] ? 'RM' + totals[c].toFixed(0) : '—'}</div>` : ''}</button>`).join('')}</div>
+      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:11px 12px;border-radius:10px;border:0;border-left:4px solid ${colorFor(c)};background:color-mix(in srgb, ${colorFor(c)} ${c === curCat ? 30 : 12}%, var(--card2));color:var(--text);font-weight:600;font-size:14px">${escapeHtml(c)}${groups[c].length > 1 ? ' <span style="color:var(--muted)">›</span>' : ''}${totals ? `<div style="font-size:11px;font-weight:400;color:var(--muted)">${totals[c] ? 'RM' + totals[c].toFixed(0) : '—'}${(calView === 'month' && budgets_()[c]) ? ' / ' + budgets_()[c] : ''}</div>${(calView === 'month' && budgets_()[c]) ? `<div style="height:4px;background:var(--line);border-radius:2px;margin-top:4px"><div style="height:4px;border-radius:2px;width:${Math.min(100, (totals[c] || 0) / budgets_()[c] * 100)}%;background:${budgetBarColor_((totals[c] || 0) / budgets_()[c] * 100)}"></div></div>` : ''}` : ''}</button>`).join('')}</div>
       <button data-x="1" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div>`;
     ov.querySelectorAll('[data-c]').forEach(b => { b.onclick = () => { const g = groups[b.dataset.c]; if (g.length === 1) choose(g[0].v); else step2(b.dataset.c); }; });
     const k = ov.querySelector('[data-keep]'); if (k) k.onclick = () => choose('');
@@ -2165,6 +2233,7 @@ const TOURS = {
   compare: [['#cmpScope', 'Pick what to compare: all spending or one category.'], ['#cmpPreset', 'Pick the periods: this month vs last, week, or month by month.'], ['#cmpOneOff', 'Leave out big once-only items like a car deposit.']],
   splits: [['#linksChips', 'Filter by Split, Claim or Note.'], ['#splitsInsightsList', 'Cards that still need money or settling are listed first.']],
   commit: [['#commitSummary', 'Fixed and Flexible monthly totals, and how much is paid this month.'], ['#commitList', 'Green means paid, orange is due soon, red is missing. Tap one to edit it.'], ['#commitAddBtn', 'Add a new commitment here.']],
+  budget: [['#budgetList', 'Set a monthly budget per category. The bar shows how much is used.']],
   history: [['#historyList', 'A log of what was added, changed or imported.']],
   review: [['#claimsOwed', 'Work costs not paid back yet.'], ['#reviewExpandAllBtn', 'Open or close every row at once.'], ['#reviewList', 'Tap a row to open it, pick a category, then Confirm.']]
 };
@@ -2528,6 +2597,10 @@ function renderInsightsSummary_() {
   if (topCats.length) lines.push(`Most spent on <b>${topCats.map(([c, v]) => escapeHtml(c) + ' RM' + v.toFixed(0)).join(', ')}</b>.`);
   if (topDay) lines.push(`Biggest day: <b>${dayName(topDay[0])}</b> (RM${topDay[1].toFixed(0)}).`);
   if (topTx) lines.push(`Biggest single payment: <b>${escapeHtml(txnTitle(topTx))}</b> RM${spendAmount(topTx).toFixed(0)}.`);
+  const bd = budgets_(), spentCat = monthSpendByCat_();
+  const over = Object.keys(bd).filter(c => (spentCat[c] || 0) >= bd[c]), near = Object.keys(bd).filter(c => (spentCat[c] || 0) >= bd[c] * 0.8 && (spentCat[c] || 0) < bd[c]);
+  if (over.length) lines.push(`<span style="color:#e0685c">Over budget: ${over.map(c => escapeHtml(c) + ' RM' + (spentCat[c] || 0).toFixed(0) + '/' + bd[c]).join(', ')}.</span>`);
+  if (near.length) lines.push(`<span style="color:#d9894a">Close to budget: ${near.map(c => escapeHtml(c) + ' RM' + (spentCat[c] || 0).toFixed(0) + '/' + bd[c]).join(', ')}.</span>`);
   const active = commitments.filter(c => c.active !== 'no' && c.active !== false);
   if (active.length) { const sts = active.map(commitStatus_); const missing = sts.filter(s => s.key === 'missing').length; lines.push(missing ? `<span style="color:#e0685c">${missing} commitment${missing === 1 ? '' : 's'} not seen yet this month.</span>` : 'All due commitments are paid or not due yet.'); }
   el.innerHTML = `<div class="sum-card"><div class="sum-top"><div><div class="sum-l">${mName} so far</div><div class="sum-v">RM${curT.toFixed(0)}</div></div>${diff === null ? '' : `<div class="sum-d" style="color:${diff > 0 ? '#e0685c' : '#3fae78'}">${diff > 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(0)}% <span>vs same days last month</span></div>`}</div>${lines.map(l => `<div class="sum-line">${l}</div>`).join('')}</div>`;
@@ -2568,6 +2641,88 @@ function renderSuggestions_() {
   box.innerHTML = `<div class="link-section-title">Suggested (${list.length}) · check each one</div>` + list.map((s, i) => `<div class="commit-row sug-row" style="border-left:4px solid #4a8be8"><div class="commit-main"><div class="commit-name">${escapeHtml(s.name)}</div><div class="commit-sub">About RM${s.amount.toFixed(2)} · around the ${s.dueDay}${ordSuffix_(s.dueDay)} · seen in ${s.months} months · ${escapeHtml(s.category)}</div></div><span><button class="sug-btn" data-add="${i}">Review</button> <button class="sug-x" data-no="${i}" title="Not a commitment">✕</button></span></div>`).join('');
   box.querySelectorAll('[data-add]').forEach(b => { b.onclick = () => { const s = list[Number(b.dataset.add)]; openCommitDialog_({ name: s.name.charAt(0) + s.name.slice(1).toLowerCase(), amount: s.amount, dueDay: s.dueDay, kind: 'fixed', cycle: 'monthly', match: s.name }); }; });
   box.querySelectorAll('[data-no]').forEach(b => { b.onclick = () => { const s = list[Number(b.dataset.no)]; let d = []; try { d = JSON.parse(localStorage.getItem('dismissedSuggest') || '[]'); } catch (e) {} d.push(s.name); localStorage.setItem('dismissedSuggest', JSON.stringify(d)); renderSuggestions_(); }; });
+}
+
+
+// ===== Budgets =====
+const SUGGESTED_BUDGETS = { 'Food': 1000, 'Transport': 800, 'Entertainment': 600, 'Shopping': 300, 'Subscriptions': 150, 'Health': 100, 'Bills': 130, 'Personal Care': 200 };
+function budgets_() {
+  const m = {};
+  customTags.filter(c => c.category === '__budget__').forEach(c => { const i = c.subTag.lastIndexOf('|'); if (i > 0) { const v = Number(c.subTag.slice(i + 1)); const k = c.subTag.slice(0, i); if (v > 0) m[k] = v; else delete m[k]; } });
+  return m;
+}
+async function saveBudget_(cat, amt) {
+  const sub = cat + '|' + (Number(amt) || 0);
+  customTags.push({ category: '__budget__', subTag: sub });
+  try { await callApi('addCustomTag', { category: '__budget__', subTag: sub }); } catch (e) {}
+}
+function monthSpendByCat_() {
+  const now = new Date(), ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'), m = {};
+  allTxns.forEach(t => { if (!t.date || t.date.slice(0, 7) !== ym || NON_SPEND_CATEGORIES.includes(t.category)) return; m[t.category] = (m[t.category] || 0) + spendAmount(t); });
+  return m;
+}
+function budgetBarColor_(p) { return p >= 100 ? '#e0685c' : p >= 80 ? '#d9894a' : '#3fae78'; }
+function renderBudgets_() {
+  const el = document.getElementById('budgetList');
+  if (!el) return;
+  const b = budgets_(), spent = monthSpendByCat_();
+  const cats = ALL_CATEGORIES.filter(c => !NON_SPEND_CATEGORIES.includes(c) && c !== 'Unsure');
+  const rows = cats.map(c => {
+    const bud = b[c] || 0, sp = spent[c] || 0, p = bud ? sp / bud * 100 : 0;
+    return `<div class="bud-row" style="--c:${colorFor(c)}"><div class="bud-top"><span class="bud-name">${escapeHtml(c)}</span><span class="bud-nums">RM${sp.toFixed(0)}${bud ? ' of ' : ''}${bud ? '<input class="bud-in" data-cat="' + escapeHtml(c) + '" type="number" inputmode="decimal" value="' + bud + '">' : ''}${bud || VIEW_ONLY ? '' : '<input class="bud-in" data-cat="' + escapeHtml(c) + '" type="number" inputmode="decimal" placeholder="set budget">'}</span></div>${bud ? `<div class="link-bar"><div class="link-bar-fill" style="width:${Math.min(100, p)}%;background:${budgetBarColor_(p)}"></div></div><div class="bud-sub" style="color:${budgetBarColor_(p)}">${p >= 100 ? 'Over by RM' + (sp - bud).toFixed(0) : 'RM' + (bud - sp).toFixed(0) + ' left'}</div>` : ''}</div>`;
+  }).join('');
+  el.innerHTML = (VIEW_ONLY ? '' : `<button class="commit-add" id="budSuggest" style="margin:0 0 10px">Use my suggested budgets</button>`) + `<div class="link-section-title">This month</div>` + rows;
+  el.querySelectorAll('.bud-in').forEach(i => { i.onchange = async () => { await saveBudget_(i.dataset.cat, i.value); renderBudgets_(); renderInsightsSummary_(); }; if (VIEW_ONLY) i.disabled = true; });
+  const sg = el.querySelector('#budSuggest');
+  if (sg) sg.onclick = () => showMenu_('Use suggested budgets?', [
+    { label: 'Yes, set them', desc: Object.entries(SUGGESTED_BUDGETS).map(([k, v]) => k + ' ' + v).join(' · ') + '. You can change each one afterwards.', color: '#3fae78', run: async () => { for (const [k, v] of Object.entries(SUGGESTED_BUDGETS)) await saveBudget_(k, v); renderBudgets_(); renderInsightsSummary_(); } },
+    { label: 'Not now', desc: '', color: '#8a97b2', run: () => {} }]);
+}
+
+// ===== Coming up (next 7 days) =====
+function renderComingUp_() {
+  const el = document.getElementById('comingUp');
+  if (!el) return;
+  const now = new Date(), today = now.getDate();
+  const items = [];
+  commitments.filter(c => c.active !== 'no' && c.active !== false).forEach(c => {
+    const st = commitStatus_(c);
+    if (st.key === 'paid' || st.key === 'later' || st.key === 'missing') return;
+    const diff = (Number(c.dueDay) || 1) - today;
+    if (diff >= 0 && diff <= 7) items.push({ c, diff });
+  });
+  items.sort((a, b) => a.diff - b.diff);
+  el.innerHTML = items.length ? `<div class="coming"><span class="coming-l">Coming up</span>${items.map(x => `<span class="coming-i">${escapeHtml(x.c.name)} <b>RM${Number(x.c.amount).toFixed(0)}</b> · ${x.diff === 0 ? 'today' : x.diff === 1 ? 'tomorrow' : 'in ' + x.diff + ' days'}</span>`).join('')}</div>` : '';
+}
+
+// ===== Month-end checklist =====
+function renderMonthEnd_() {
+  const el = document.getElementById('monthEnd');
+  if (!el) return;
+  const now = new Date(), d = now.getDate();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  if (VIEW_ONLY || !(d >= lastDay - 4 || d <= 3)) { el.innerHTML = ''; return; }
+  const unsure = allTxns.filter(t => t.category === 'Unsure').length;
+  const dates = allTxns.filter(t => t.dateStatus === 'unconfirmed').length;
+  const others = allTxns.filter(t => t.category === 'Transfer' && (t.subTag === 'To Others' || t.subTag === 'From Others') && !t.remark).length;
+  const claims = outstandingClaims_().length;
+  const missing = commitments.filter(c => c.active !== 'no' && c.active !== false).map(commitStatus_).filter(s => s.key === 'missing').length;
+  const bal = balanceAlerts.length;
+  const rows = [['Nothing left as Unsure', unsure], ['Grab dates confirmed', dates], ['Transfers have a name', others], ['Claims paid back', claims], ['Commitments seen this month', missing], ['Balances match', bal]];
+  el.innerHTML = `<div class="owed-card" style="border-left-color:#4a8be8;background:color-mix(in srgb,#4a8be8 12%,var(--card))"><div class="owed-title" style="color:#4a8be8">${d <= 3 ? 'New month — last month checklist' : 'Month-end checklist'}</div>${rows.map(([t, n]) => `<div class="owed-row"><span>${n ? '⚠️' : '✅'} ${t}</span><b>${n ? n + ' to fix' : ''}</b></div>`).join('')}</div>`;
+}
+
+// ===== Weekly backup card (History) =====
+async function renderBackupCard_() {
+  let el = document.getElementById('backupCard');
+  if (!el) { el = document.createElement('div'); el.id = 'backupCard'; const hs = document.getElementById('historySummary'); hs.parentNode.insertBefore(el, hs); }
+  if (VIEW_ONLY) { el.innerHTML = ''; return; }
+  const last = activityLog.find(h => h.action === 'Backup' && /^Saved/.test(h.details || ''));
+  const lastTxt = last ? new Date(last.timestamp).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'none yet';
+  el.innerHTML = `<div class="cash-card" style="border-left-color:#3fae78;background:color-mix(in srgb,#3fae78 12%,var(--card))"><div class="cash-t" style="color:#3fae78">🛟 Backup</div><div class="cash-row"><span>Last backup <b>${lastTxt}</b></span></div><div style="display:flex;gap:8px;margin-top:8px"><button class="sug-btn" id="bkNow">Back up now</button><button class="sug-btn" id="bkWeekly" style="background:var(--card2);color:var(--text)">Turn on weekly</button></div><div class="cash-hint" id="bkMsg">Copies saved in Google Drive › Spending backups. Weekly runs on Google's servers, even when your computer is off.</div></div>`;
+  const msg = t => { const m = document.getElementById('bkMsg'); if (m) m.textContent = t; };
+  document.getElementById('bkNow').onclick = async () => { msg('Backing up…'); const r = await rawPost_('backupNow', {}); msg(r && r.ok ? 'Saved: ' + r.result : 'Needs the newest Code.gs first.'); };
+  document.getElementById('bkWeekly').onclick = async () => { const r = await rawPost_('setupBackup', {}); msg(r && r.ok ? 'Weekly backup is on (Sundays, about 3am).' : 'Needs the newest Code.gs first.'); };
 }
 
 document.querySelectorAll('.chart-mode-btn').forEach(btn => {
@@ -2911,7 +3066,8 @@ function applySplitOverlay_() {
 async function loadData() {
   document.getElementById('list').innerHTML = '<div class="empty">Loading…</div>';
   try {
-    const data = DEMO ? DEMO : await (await fetch(APPS_SCRIPT_URL + '?api=1' + (FRIENDS ? '&view=friends' : ''))).json();
+    const data = DEMO ? DEMO : await (await fetch(APPS_SCRIPT_URL + '?api=1' + (FRIENDS ? '&view=friends&fkey=' + encodeURIComponent(QS_.get('k') || '') : '&key=' + encodeURIComponent(ownerKey_())))).json();
+    if (data && data.error === 'locked') { if (FRIENDS) { document.getElementById('list').innerHTML = '<div class="empty">This link is no longer valid. Ask for a new one.</div>'; return; } askOwnerKey_(); return; }
     allTxnsRaw = data.transactions || [];
     allTxns = allTxnsRaw;
     merchantRules = data.merchantRules || [];
@@ -3049,6 +3205,7 @@ function renderStatementReminder() {
 function renderApp() {
   refreshPendingReloadSync();
   if (typeof searchRefresh_ === 'function') searchRefresh_();
+  try { renderComingUp_(); renderMonthEnd_(); } catch (e) {}
   renderBalanceBanner();
   renderStatementReminder();
   render();
@@ -3067,9 +3224,10 @@ function renderApp() {
     if (insightsSubPage === 'compare') renderCompare();
     else if (insightsSubPage === 'splits') renderSplitsInsights(splitsFilterRemark);
     else if (insightsSubPage === 'commit') { renderCommitments_(); renderSuggestions_(); }
+    else if (insightsSubPage === 'budget') renderBudgets_();
     renderInsightsSummary_();
   }
-  if (activePage === 'history') { renderHistory(); renderCashCard_(); }
+  if (activePage === 'history') { renderHistory(); renderCashCard_(); renderBackupCard_(); }
 }
 
 // Insights (Calendar/Charts/Splits) used to be its own top-level tab; now
@@ -3086,6 +3244,8 @@ function switchInsightsSub(sub) {
   document.getElementById('trendsPage').style.display = sub === 'charts' ? '' : 'none';
   document.getElementById('splitsInsightsPage').style.display = sub === 'splits' ? '' : 'none';
   document.getElementById('commitPage').style.display = sub === 'commit' ? '' : 'none';
+  document.getElementById('budgetPage').style.display = sub === 'budget' ? '' : 'none';
+  if (sub === 'budget') renderBudgets_();
   renderInsightsSummary_();
   if (sub === 'commit') { renderCommitments_(); renderSuggestions_(); }
   if (sub === 'compare') renderCompare();
@@ -3104,7 +3264,7 @@ function switchPage(page) {
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
   document.getElementById('reviewPage').style.display = page === 'review' ? '' : 'none';
   if (page === 'insights') switchInsightsSub(insightsSubPage);
-  if (page === 'history') { renderHistory(); renderCashCard_(); }
+  if (page === 'history') { renderHistory(); renderCashCard_(); renderBackupCard_(); }
   if (page === 'review') renderReviewList();
 }
 document.querySelectorAll('.page-tab').forEach(el => {
