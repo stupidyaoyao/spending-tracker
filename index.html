@@ -656,6 +656,22 @@
   .sheet-inner { border-top: 4px solid #4a8be8; border-radius: 16px 16px 0 0; }
   .txn2:hover { background: color-mix(in srgb, var(--cc) 8%, var(--card)); }
   .list .txn2 { background: color-mix(in srgb, var(--cc) 6%, var(--card)); }
+  .remark-btn, .link-btn, .txn-delete-btn, .parts-icon { color: var(--text); opacity: .8; }
+  .remark-btn.has-remark, .link-btn.has-link { color: var(--accent); opacity: 1; }
+  .txn-delete-btn:hover { opacity: 1; }
+  .tab-badge { position: static; display: inline-block; margin-left: 6px; vertical-align: middle; }
+  .cal-view-seg { display: flex; gap: 4px; background: var(--card2); border-radius: 999px; padding: 3px; width: fit-content; margin: 0 auto 8px; }
+  .cal-view-seg button { border: 0; background: transparent; color: var(--muted); padding: 5px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .cal-view-seg button.on { background: var(--accent); color: #fff; }
+  .cal-grid.year { grid-template-columns: repeat(3, 1fr); }
+  .cal-month-tile { border: 0; border-radius: 12px; padding: 16px 10px; background: var(--card2); display: flex; flex-direction: column; gap: 4px; text-align: left; }
+  .cmt-name { font-size: 13px; font-weight: 600; } .cmt-amt { font-size: 16px; font-weight: 700; }
+  .cal-legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 11px; color: var(--muted); margin: 6px 2px 0; }
+  .cal-legend i { width: 16px; height: 8px; border-radius: 2px; display: inline-block; }
+  .cal-filter-chip { border: 0; background: var(--accent); color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 11px; margin-left: 6px; }
+  .who-chip { border: 1px dashed var(--accent); color: var(--accent); background: transparent; border-radius: 999px; padding: 0 8px; font-size: 11px; margin-left: 6px; }
+  .card-records { margin-top: 8px; }
+  .card-toggle { width: 100%; margin-top: 6px; }
   .link-seg { display:flex; gap:6px; margin:6px 0 8px; }
   .link-seg button { flex:1; padding:8px 0; border-radius:999px; border:1.5px solid; background:transparent; font-weight:600; font-size:14px; }
   .link-help { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.4; }
@@ -699,7 +715,7 @@
   .cmp-month-delta { font-size:11px; }
   .cmp-bar { width:100%; border-radius:3px 3px 0 0; min-height:1px; }
 
-  body.light { --bg:#f4f6fb; --card:#ffffff; --card2:#eef2fa; --line:#dde3f0; --line2:#c9d2e6; --text:#1b2540; --muted:#6b7794; }
+  html.light, body.light { --bg:#f4f6fb; --card:#ffffff; --card2:#eef2fa; --line:#dde3f0; --line2:#c9d2e6; --text:#1b2540; --muted:#6b7794; }
   html, body { background: var(--bg); color: var(--text); }
   .icon-btn { background: var(--card2); width: 38px; height: 38px; font-size: 16px; }
   .page-tab { background: var(--card2); color: var(--muted); border: 0; }
@@ -749,6 +765,7 @@
 
   <div id="mainPage">
     <div id="calendarPage" style="margin-bottom:14px;">
+      <div class="cal-view-seg" id="calViewSeg"><button data-v="month" class="on">Month</button><button data-v="week">Week</button><button data-v="year">Year</button></div>
       <div class="cal-nav">
         <button class="cal-nav-btn" id="calPrev">&lsaquo;</button>
         <span id="calMonthLabel"></span>
@@ -760,6 +777,7 @@
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
       </div>
       <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-legend" id="calLegend"><span>Less</span><i style="background:#f7e3a1"></i><i style="background:#f3c274"></i><i style="background:#ee9f5f"></i><i style="background:#e57a52"></i><i style="background:#c9533f"></i><span>More</span></div>
       <div id="calDayPanel"></div>
     </div>
     <div class="cat-strip" id="catTiles"></div>
@@ -1840,7 +1858,7 @@ function renderCatTiles_(accountTxns) {
   const tile = (c, label, sub, color) => `<button class="cat-pill${c === activeFilter ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="--tc:${color}"><span class="cp-dot"></span><span class="cp-name">${escapeHtml(label)}</span><span class="cp-sub">${sub}</span></button>`;
   el.innerHTML = tile('All', 'All', '', '#3a9bc4') +
     cats.map(c => tile(c, c, NON_SPEND_CATEGORIES.includes(c) ? '' : 'RM' + by[c].mTotal.toFixed(0), colorFor(c))).join('');
-  el.querySelectorAll('.cat-pill').forEach(b => { b.onclick = () => { activeFilter = b.dataset.cat; activeSubFilter = 'All'; render(); }; });
+  el.querySelectorAll('.cat-pill').forEach(b => { b.onclick = () => { activeFilter = (b.dataset.cat === activeFilter && activeFilter !== 'All') ? 'All' : b.dataset.cat; activeSubFilter = 'All'; render(); }; });
 }
 document.addEventListener('click', e => {
   const tg = e.target.closest && e.target.closest('[data-rv-toggle]');
@@ -1921,8 +1939,8 @@ function openCatSheet_(sel) {
     ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
       <div style="font-weight:700;margin-bottom:8px">Pick a category</div>
       ${keep ? '<button data-keep="1" style="width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:1px solid #555;background:transparent;color:inherit">Keep as it is</button>' : ''}
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">
-      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:10px;border-radius:12px;border:1.5px solid ${colorFor(c)};background:${c === curCat ? colorFor(c) : colorFor(c) + '22'};color:${c === curCat ? '#111' : 'var(--text)'};font-weight:600">${escapeHtml(c)}${groups[c].length > 1 ? ' ›' : ''}</button>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:11px 12px;border-radius:10px;border:0;border-left:4px solid ${colorFor(c)};background:color-mix(in srgb, ${colorFor(c)} ${c === curCat ? 30 : 12}%, var(--card2));color:var(--text);font-weight:600;font-size:14px">${escapeHtml(c)}${groups[c].length > 1 ? ' <span style="color:var(--muted)">›</span>' : ''}</button>`).join('')}</div>
       <button data-x="1" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div>`;
     ov.querySelectorAll('[data-c]').forEach(b => { b.onclick = () => { const g = groups[b.dataset.c]; if (g.length === 1) choose(g[0].v); else step2(b.dataset.c); }; });
     const k = ov.querySelector('[data-keep]'); if (k) k.onclick = () => choose('');
@@ -1932,7 +1950,7 @@ function openCatSheet_(sel) {
     const col = colorFor(c);
     ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
       <div style="font-weight:700;margin-bottom:8px;color:${col}">${escapeHtml(c)} · pick a type</div>
-      ${groups[c].map((o, i) => { const sub = o.l.indexOf(' · ') >= 0 ? o.l.split(' · ').slice(1).join(' · ') : o.l + ' (general)'; return `<button data-i="${i}" style="display:block;width:100%;text-align:left;padding:11px 12px;margin-bottom:6px;border-radius:10px;border:1px solid ${o.cur ? col : 'var(--line2)'};background:${o.cur ? col + '33' : 'transparent'};color:inherit">${escapeHtml(sub)}</button>`; }).join('')}
+      ${groups[c].map((o, i) => { const sub = o.l.indexOf(' · ') >= 0 ? o.l.split(' · ').slice(1).join(' · ') : o.l + ' (general)'; return `<button data-i="${i}" style="display:block;width:100%;text-align:left;padding:11px 12px;margin-bottom:6px;border-radius:10px;border:0;border-left:4px solid ${col};background:color-mix(in srgb, ${col} ${o.cur ? 28 : 10}%, var(--card2));color:var(--text)">${escapeHtml(sub)}</button>`; }).join('')}
       <div style="display:flex;gap:8px;margin-top:6px"><button data-back="1" style="flex:1;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">‹ Back</button><button data-x="1" style="flex:1;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div></div>`;
     ov.querySelectorAll('[data-i]').forEach(b => { b.onclick = () => choose(groups[c][Number(b.dataset.i)].v); });
     ov.querySelector('[data-back]').onclick = step1;
@@ -2123,14 +2141,14 @@ function notesViewHtml_() {
   if (notesTopicView) {
     const list = notesTopicView === '__done__' ? done : open.filter(g => (parseNote_(g.remark).topic || 'Unsorted') === notesTopicView);
     const col = notesTopicView === '__done__' ? '#8e8e93' : topicColor_(notesTopicView);
-    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px"><button class="toolbar-btn" id="notesBack">← Topics</button><b style="color:${col}">${notesTopicView === '__done__' ? 'Done' : escapeHtml(notesTopicView)}</b>${(notesTopicView === '__done__' || notesTopicView === 'Unsorted' || VIEW_ONLY) ? '<span></span>' : '<button class="toolbar-btn" id="notesRename">Rename</button>'}</div>`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px"><button class="toolbar-btn" id="notesBack">← Topics</button><b style="color:${col}">${notesTopicView === '__done__' ? 'Settled' : escapeHtml(notesTopicView)}</b>${(notesTopicView === '__done__' || notesTopicView === 'Unsorted' || VIEW_ONLY) ? '<span></span>' : '<button class="toolbar-btn" id="notesRename">Rename</button>'}</div>`;
     html += list.length ? list.map(g => splitGroupCardHtml(g) + (VIEW_ONLY ? '' : `<button class="note-edit" data-edit="${escapeHtml(stripMark_(g.remark))}">Rename or move this note</button>`)).join('') : '<div class="empty">Nothing here.</div>';
     return html;
   }
   const by = {};
   open.forEach(g => { const tp = parseNote_(g.remark).topic || 'Unsorted'; (by[tp] = by[tp] || []).push(g); });
   const tiles = Object.keys(by).map(tp => { const net = by[tp].reduce((a, g) => a + g.net, 0); const col = tp === 'Unsorted' ? '#8e8e93' : topicColor_(tp); return `<button class="cat-tile" data-topic="${escapeHtml(tp)}" style="--tc:${col}"><span class="ct-name">${escapeHtml(tp)}</span><span class="ct-sub">${by[tp].length} note${by[tp].length === 1 ? '' : 's'} · RM${net.toFixed(0)}</span></button>`; });
-  if (done.length) tiles.push(`<button class="cat-tile" data-topic="__done__" style="--tc:#8e8e93"><span class="ct-name">🔒 Done</span><span class="ct-sub">${done.length} note${done.length === 1 ? '' : 's'}</span></button>`);
+  if (done.length) tiles.push(`<button class="cat-tile" data-topic="__done__" style="--tc:#8e8e93"><span class="ct-name">🔒 Settled</span><span class="ct-sub">${done.length} note${done.length === 1 ? '' : 's'}</span></button>`);
   html += tiles.length ? `<div class="cat-tiles">${tiles.join('')}</div>` : '<div class="empty">No notes yet. Tap the ✎ on a record and choose Note.</div>';
   return html;
 }
@@ -2202,7 +2220,7 @@ function renderCashCard_() {
 // ===== Light / dark =====
 function applyTheme_() {
   const light = localStorage.getItem('theme') === 'light';
-  document.body.classList.toggle('light', light);
+  document.body.classList.toggle('light', light); document.documentElement.classList.toggle('light', light);
   const b = document.getElementById('themeBtn'); if (b) { b.textContent = light ? '🌙' : '☀️'; b.title = light ? 'Switch to dark' : 'Switch to light'; }
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = light ? '#f4f6fb' : '#0d1424';
 }
@@ -2267,6 +2285,42 @@ async function autoApplyPeople_() {
   }
   if (changed) { applySplitOverlay_(); renderApp(); }
 }
+
+
+// ===== Records inside a link card =====
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.card-toggle');
+  if (!b) return;
+  const box = b.nextElementSibling;
+  const open = box.style.display === 'none';
+  if (open) {
+    const g = remarkGroups().find(x => splitGroupKey_(x.remark) === b.dataset.key);
+    box.innerHTML = g ? g.txns.map(t => renderTxnRow(t)).join('') : '';
+    box.style.display = '';
+    attachCatSelectHandlers(); attachExtraTagHandlers(); attachExtraTagAmountHandlers(); attachRemarkHandlers(); attachLinkHandlers();
+  } else { box.style.display = 'none'; box.innerHTML = ''; }
+  b.textContent = open ? 'Hide records ▴' : 'Show records ▾';
+});
+
+// ===== Clean names (display) =====
+function cleanMerchantDisplay_(t) {
+  let m = String(t.merchant || '');
+  const m1 = m.match(/^To Others \(NO:\s*\d+\s+(.*)\)$/i);
+  if (m1) return 'To Others (' + stripTrailingRef(m1[1]) + ')';
+  m = m.replace(/^NO:\s*\d+\s+/i, '');
+  if (t.account === 'PBank' && /DUITNOW/i.test(t.type || '') && txnFlow(t) === 'out' && m && !/^(To Others|Internal|To HL|Salary|Bank Credit|From )/i.test(m)) return 'To Others (' + stripTrailingRef(m) + ')';
+  return m;
+}
+// ===== Who? chip for generic TNG transfers =====
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('.who-chip');
+  if (!b) return;
+  const row = Number(b.dataset.whoRow);
+  const nm = await askTextInline_('Who was this for? (the statement only says "Fund Transfer")');
+  if (!nm || !nm.trim()) return;
+  await callApi('updateRemark', { row, remark: 'People' + TOPIC_SEP + nm.trim() });
+  await loadData();
+});
 
 document.querySelectorAll('.chart-mode-btn').forEach(btn => {
   btn.onclick = () => {
@@ -2864,6 +2918,14 @@ const HEAT_LIGHT_YELLOW = [255, 235, 130];
 const HEAT_RED = [255, 69, 58];
 const HEAT_BROWN = [139, 69, 19];
 function lerpChannel(a, b, t) { return Math.round(a + (b - a) * t); }
+const HEAT_STEPS = [[247,227,161],[243,194,116],[238,159,95],[229,122,82],[201,83,63]];
+function heatRank_(amount, sorted) {
+  const n = sorted.length;
+  if (n <= 1) return HEAT_STEPS[2];
+  let below = 0; for (const v of sorted) if (v < amount) below++;
+  const p = below / (n - 1);
+  return HEAT_STEPS[Math.min(4, Math.floor(p * 5))];
+}
 function heatColorForAmount(amount) {
   if (amount <= 300) {
     const t = Math.max(0, amount) / 300;
@@ -2887,11 +2949,44 @@ function heatTextColor(rgb) {
   return luminance > 150 ? '#1a1a1a' : '#f5f5f7';
 }
 
+let calView = 'month';
+let calWeekStart = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d; })();
+function calIso_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function calViewDates_() {
+  if (calView === 'week') return Array.from({ length: 7 }, (_, i) => { const d = new Date(calWeekStart); d.setDate(d.getDate() + i); return calIso_(d); });
+  const y = calendarMonth.getFullYear(), m = calendarMonth.getMonth(), n = new Date(y, m + 1, 0).getDate();
+  return Array.from({ length: n }, (_, i) => calIso_(new Date(y, m, i + 1)));
+}
+function renderCalYear_() {
+  const y = calendarMonth.getFullYear();
+  document.getElementById('calMonthLabel').textContent = String(y);
+  document.getElementById('calUpdated').textContent = lastUpdatedLabel();
+  document.getElementById('calDayPanel').innerHTML = '';
+  const tot = [];
+  for (let m = 0; m < 12; m++) { let t = 0; const n = new Date(y, m + 1, 0).getDate(); for (let d = 1; d <= n; d++) t += calendarDayTotal(calIso_(new Date(y, m, d))); tot.push(t); }
+  const sorted = tot.filter(v => v > 0).sort((a, b) => a - b);
+  document.getElementById('calMonthTotals').innerHTML = `<span class="cal-month-spend">Spent RM${tot.reduce((a, b) => a + b, 0).toFixed(0)} in ${y}</span>`;
+  const grid = document.getElementById('calGrid'); grid.classList.add('year');
+  grid.innerHTML = tot.map((t, m) => { const rgb = t > 0 ? heatRank_(t, sorted) : null; const txt = rgb ? heatTextColor(rgb) : 'var(--muted)';
+    return `<button class="cal-month-tile" data-m="${m}" style="${rgb ? `background:rgb(${rgb.join(',')});` : ''}color:${txt}"><span class="cmt-name">${new Date(y, m, 1).toLocaleDateString('en-GB', { month: 'short' })}</span><span class="cmt-amt">${t > 0 ? 'RM' + (t >= 1000 ? (t / 1000).toFixed(1) + 'K' : t.toFixed(0)) : '—'}</span></button>`; }).join('');
+  grid.querySelectorAll('.cal-month-tile').forEach(b => { b.onclick = () => { calendarMonth = new Date(y, Number(b.dataset.m), 1); setCalView_('month'); }; });
+}
+function setCalView_(v) {
+  calView = v; selectedCalendarDay = null;
+  document.querySelectorAll('#calViewSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  document.querySelector('.cal-weekdays').style.display = v === 'year' ? 'none' : '';
+  document.getElementById('calGrid').classList.toggle('year', v === 'year');
+  const lg = document.getElementById('calLegend'); if (lg) lg.style.display = v === 'year' ? 'none' : '';
+  renderCalendar();
+}
 function renderCalendar() {
+  if (calView === 'year') { renderCalYear_(); return; }
+  const viewDates = calViewDates_();
   const year = calendarMonth.getFullYear();
   const month = calendarMonth.getMonth();
-  document.getElementById('calMonthLabel').textContent =
-    calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  document.getElementById('calMonthLabel').textContent = calView === 'week'
+    ? new Date(viewDates[0] + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' – ' + new Date(viewDates[6] + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   document.getElementById('calUpdated').textContent = lastUpdatedLabel();
 
   const startWeekday = new Date(year, month, 1).getDay(); // 0 = Sun
@@ -2902,8 +2997,7 @@ function renderCalendar() {
   const nonSpendByDay = {};
   let monthIn = 0, monthOut = 0;
   let monthSpend = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  for (const dateStr of viewDates) {
     totalsByDay[dateStr] = calendarDayTotal(dateStr);
     monthSpend += totalsByDay[dateStr];
     if (nonSpendMode) {
@@ -2916,9 +3010,9 @@ function renderCalendar() {
   // (which only ever looks at spend categories — see NON_SPEND_CATEGORIES)
   // so it's summed here independently rather than folded into the day
   // totals above.
-  const monthPrefix = year + '-' + String(month + 1).padStart(2, '0');
+  const posTotals = Object.values(totalsByDay).filter(v => v > 0).sort((a, b) => a - b);
   const monthIncome = allTxns
-    .filter(t => t.category === 'Income' && (t.date || '').startsWith(monthPrefix))
+    .filter(t => t.category === 'Income' && viewDates.includes(t.date))
     .reduce((s, t) => s + Number(t.amount || 0), 0);
   document.getElementById('calMonthTotals').innerHTML = nonSpendMode
     ? `<span class="cal-month-spend">${activeFilter === 'Income' ? 'Out' : 'Moved out'} RM${monthOut.toFixed(2)}</span> <span class="cal-month-dot">·</span> <span class="cal-month-income">${activeFilter === 'Income' ? 'In' : 'Moved in'} RM${monthIn.toFixed(2)}</span>`
@@ -2926,9 +3020,9 @@ function renderCalendar() {
       (monthIncome > 0 ? ` <span class="cal-month-dot">·</span> <span class="cal-month-income">Earned RM${monthIncome.toFixed(2)}</span>` : '');
 
   let html = '';
-  for (let i = 0; i < startWeekday; i++) html += '<div class="cal-day empty-cell"></div>';
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  for (let i = 0; i < (calView === 'month' ? startWeekday : 0); i++) html += '<div class="cal-day empty-cell"></div>';
+  for (const dateStr of viewDates) {
+    const d = Number(dateStr.slice(8));
     const total = totalsByDay[dateStr];
     let styleAttr = '';
     let numStyle = '';
@@ -2943,7 +3037,7 @@ function renderCalendar() {
         cellAmtText = ns.net === 0 ? ('×' + ns.count) : ((ns.net > 0 ? '+RM' : '-RM') + (Math.abs(ns.net) >= 1000 ? (Math.abs(ns.net) / 1000).toFixed(1) + 'K' : Math.abs(ns.net).toFixed(0)));
       }
     } else if (total > 0) {
-      const rgb = heatColorForAmount(total);
+      const rgb = heatRank_(total, posTotals);
       const txt = heatTextColor(rgb);
       styleAttr = ` style="background:rgb(${rgb[0]},${rgb[1]},${rgb[2]});"`;
       numStyle = ` style="color:${txt};opacity:0.8;"`;
@@ -2976,16 +3070,20 @@ function renderCalDayPanel() {
   const hideBrowse = !!selectedCalendarDay;
   const mb = document.getElementById('mainBrowse'), ct = document.getElementById('catTiles');
   if (mb) mb.style.display = hideBrowse ? 'none' : '';
-  if (ct) ct.style.display = hideBrowse ? 'none' : '';
+  if (ct) ct.style.display = '';
   if (!selectedCalendarDay) { panelEl.innerHTML = ''; return; }
-  const dayTxns = sortTxns(allTxns.filter(t => t.date === selectedCalendarDay));
+  const dayTxns = sortTxns(allTxns.filter(t => t.date === selectedCalendarDay
+    && (activeFilter === 'All' || t.category === activeFilter)
+    && (activeAccountFilter === 'All' || t.account === activeAccountFilter)
+    && (activeFilter === 'All' || activeSubFilter === 'All' || normalizedSubTag(t.category, t.subTag || '') === activeSubFilter)));
   const total = dayTxns
     .filter(t => !NON_SPEND_CATEGORIES.includes(t.category))
     .reduce((s, t) => s + spendAmount(t), 0);
+  const filterChip = activeFilter !== 'All' ? `<button class="cal-filter-chip" id="calClearFilter">${escapeHtml(activeFilter)} ✕</button>` : '';
   const dateObj = new Date(selectedCalendarDay + 'T00:00:00');
   const label = dateObj.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-  let html = `<div class="cal-day-panel"><div class="cal-day-panel-head"><span>${label}</span><span>${formatSignedRM(total)}</span></div>`;
+  let html = `<div class="cal-day-panel"><div class="cal-day-panel-head"><span>${label} ${filterChip}</span><span>${formatSignedRM(total)}</span></div>`;
   if (!dayTxns.length) {
     html += '<div class="empty">No transactions.</div>';
   } else {
@@ -3009,6 +3107,7 @@ function renderCalDayPanel() {
   }
   html += '</div>';
   panelEl.innerHTML = html;
+  const cf = document.getElementById('calClearFilter'); if (cf) cf.onclick = () => { activeFilter = 'All'; activeSubFilter = 'All'; render(); };
   attachCatSelectHandlers();
   attachExtraTagHandlers();
   attachExtraTagAmountHandlers();
@@ -3016,16 +3115,19 @@ function renderCalDayPanel() {
   attachLinkHandlers();
 }
 
-document.getElementById('calPrev').onclick = () => {
-  calendarMonth.setMonth(calendarMonth.getMonth() - 1);
+function calNav_(dir) {
   selectedCalendarDay = null;
+  if (calView === 'week') calWeekStart.setDate(calWeekStart.getDate() + 7 * dir);
+  else if (calView === 'year') calendarMonth.setFullYear(calendarMonth.getFullYear() + dir);
+  else calendarMonth.setMonth(calendarMonth.getMonth() + dir);
   renderCalendar();
-};
-document.getElementById('calNext').onclick = () => {
-  calendarMonth.setMonth(calendarMonth.getMonth() + 1);
-  selectedCalendarDay = null;
-  renderCalendar();
-};
+}
+document.getElementById('calPrev').onclick = () => calNav_(-1);
+document.getElementById('calNext').onclick = () => calNav_(1);
+document.querySelectorAll('#calViewSeg button').forEach(b => { b.onclick = () => {
+  if (b.dataset.v === 'week' && calView !== 'week') { const base = selectedCalendarDay ? new Date(selectedCalendarDay + 'T00:00:00') : (calendarMonth.getMonth() === new Date().getMonth() && calendarMonth.getFullYear() === new Date().getFullYear() ? new Date() : new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)); base.setHours(0, 0, 0, 0); base.setDate(base.getDate() - base.getDay()); calWeekStart = base; }
+  setCalView_(b.dataset.v);
+}; });
 
 // Trends page — bar-chart comparison of spend across recent periods for a
 // chosen category/subtag, e.g. "Car · Toll, last 6 months". Bars (not a
@@ -4879,7 +4981,7 @@ function txnTitle(t) {
     const label = t.subTag || t.category;
     return `${label} (${merchant})`;
   }
-  return t.merchant || t.notes || 'Unknown';
+  return cleanMerchantDisplay_(t) || t.notes || 'Unknown';
 }
 
 // Real direction of money for this row: 'in' or 'out'. Prefers an explicit
@@ -5685,7 +5787,7 @@ function renderTxnRow(t, opts) {
       </div>
       ${hintHtml}
       ${typeHintHtml}
-      <div class="meta"><span class="date-edit" data-edit-date="${t.row}" title="Tap to change the paid date">${new Date(t.date).toLocaleDateString()}</span> · ${t.time || 'No time record'} · ${t.account || 'TNG'}${clockChipHtml_(t)}${claimChipHtml_(t)}</div>
+      <div class="meta"><span class="date-edit" data-edit-date="${t.row}" title="Tap to change the paid date">${new Date(t.date).toLocaleDateString()}</span> · ${t.time || 'No time record'} · ${t.account || 'TNG'}${clockChipHtml_(t)}${claimChipHtml_(t)}${(!VIEW_ONLY && !t.remark && /^(Fund Transfer|Transfer to Wallet)$/i.test(t.merchant || '')) ? `<button class="who-chip" data-who-row="${t.row}">Who?</button>` : ''}</div>
       ${remarkHtml}
       <div class="txn-bottom">
         <div class="cat-select-row">
@@ -6029,10 +6131,10 @@ function linkStatus_(g) {
 function lockRowHtml_(g) {
   if (VIEW_ONLY) return '';
   const key = escapeHtml(splitGroupKey_(g.remark));
-  if (g.done) return `<div class="lock-row"><span>🔒 ${g.kind === 'note' ? 'Done' : 'Settled'}</span><button class="lock-btn" data-unlock="${key}">${g.kind === 'note' ? 'Reopen' : 'Unlock'}</button></div>`;
+  if (g.done) return `<div class="lock-row"><span>🔒 Settled</span><button class="lock-btn" data-unlock="${key}">${g.kind === 'note' ? 'Reopen' : 'Unlock'}</button></div>`;
   const owed = g.totalOut - g.totalIn;
   const ready = g.kind === 'note' ? true : (g.kind === 'claim' ? owed <= 0.005 : g.totalIn > 0);
-  return true ? `<div class="lock-row"><span></span><button class="lock-btn lock-go" data-lock="${key}">${g.kind === 'note' ? 'Mark done ✓' : 'Mark settled 🔒'}</button></div>` : '';
+  return true ? `<div class="lock-row"><span></span><button class="lock-btn lock-go" data-lock="${key}">Mark settled 🔒</button></div>` : '';
 }
 async function setGroupDone_(key, on) {
   const g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
@@ -6052,8 +6154,8 @@ document.addEventListener('click', async e => {
   if (!b) return;
   if (b.dataset.lock) {
     const key = b.dataset.lock, g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
-    showMenu_(`${g && g.kind === 'note' ? 'Mark done' : 'Mark settled'}: ${stripMark_(g ? g.remark : key)}`, [
-      { label: 'Yes, lock it', desc: g && g.kind === 'note' ? 'Moves to Done. You can reopen it any time.' : ((g && g.kind === 'claim' && g.totalOut - g.totalIn > 0.005) ? `RM${(g.totalOut - g.totalIn).toFixed(2)} is still unpaid. Settle anyway? ` : '') + 'It cannot be changed unless you enter your password and a reason.', color: '#3fae78', run: () => setGroupDone_(key, true) },
+    showMenu_(`Mark settled: ${stripMark_(g ? g.remark : key)}`, [
+      { label: 'Yes, lock it', desc: g && g.kind === 'note' ? 'Moves to Settled. You can reopen it any time.' : ((g && g.kind === 'claim' && g.totalOut - g.totalIn > 0.005) ? `RM${(g.totalOut - g.totalIn).toFixed(2)} is still unpaid. Settle anyway? ` : '') + 'It cannot be changed unless you enter your password and a reason.', color: '#3fae78', run: () => setGroupDone_(key, true) },
       { label: 'Not yet', desc: 'Leave it open.', color: '#8e8e93', run: () => {} }]);
   } else if (b.dataset.unlock) {
     const key = b.dataset.unlock, g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
@@ -6102,7 +6204,8 @@ function splitGroupCardHtml(g) {
       <div class="split-group-rows">${rowsHtml}</div>
       ${statsHtml}
       ${lockRowHtml_(g)}
-      <button class="toolbar-btn split-group-viewlist" data-remark="${escapeHtml(g.remark)}">Show in transaction list →</button>
+      <button class="toolbar-btn card-toggle" data-key="${escapeHtml(splitGroupKey_(g.remark))}">Show records ▾</button>
+      <div class="card-records" style="display:none"></div>
     </div>`;
 }
 
@@ -6143,13 +6246,6 @@ function renderSplitsInsights(filterRemark) {
         (rest.length ? `<div class="link-section-title" style="color:#3fae78;">${attention.length ? 'Done' : 'All'} (${rest.length})</div>` + rest.map(splitGroupCardHtml).join('') : '');
     }
   }
-  el.querySelectorAll('.split-group-viewlist').forEach(btn => {
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      switchPage('main');
-      groupByRemark(btn.dataset.remark);
-    };
-  });
   updateLinksBadge_();
 }
 function updateLinksBadge_() {
@@ -6574,7 +6670,7 @@ function parseCsvFile(file) {
 // (e.g. "ENCIK MUHAMAD FAHMI BIN H283855" where "283855" is the reference),
 // so this trims that back to something closer to just the name.
 function stripTrailingRef(name) {
-  return (name || '').replace(/\d+$/, '').trim();
+  return (name || '').replace(/^NO:\s*\d+\s+/i, '').replace(/\s+QR REF.*$/i, '').replace(/\d+$/, '').trim();
 }
 
 // DUITNOW QR DR/CR rows (both CSV and PDF sources) carry the counterparty
