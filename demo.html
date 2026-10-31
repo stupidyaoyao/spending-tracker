@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trancker">
-<meta name="theme-color" content="#0b0b0d">
+<meta name="theme-color" content="#0d1424">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
@@ -17,27 +17,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
 <style>
   :root {
-    --bg: #0b0b0d;
-    --card: #17171b;
-    --accent: #f5a623;
-    --text: #f5f5f7;
-    --muted: #8e8e93;
+    --bg: #0d1424;
+    --card: #141d33;
+    --card2: #18223a;
+    --line: #232f4d;
+    --line2: #2d3b5e;
+    --accent: #3a9bc4;
+    --text: #e8edf7;
+    --muted: #8a97b2;
     /* Semantic palette: categories that are always spending (Car/Food/
        Shopping/Entertainment/Housing) get warm red/orange tones; Transfer
        stays neutral grey since money can move either direction; Unsure stays
        purple as a "needs review" flag. */
-    --car: #ff453a;
-    --shopping: #ff9f0a;
-    --food: #ff6b35;
-    --entertainment: #ffd60a;
-    --housing: #ff7a9c;
-    --unsure: #bf5af2;
+    --car: #e0685c;
+    --shopping: #d9894a;
+    --food: #e0794a;
+    --entertainment: #d9b23f;
+    --housing: #e07a94;
+    --unsure: #8d6fe0;
     --transfer: #8e8e93;
     /* E-wallet Reload / TNG Card Top-up are still Transfer under the hood,
        but get their own yellow so they read as "internal transfer" at a
        glance, distinct from To Others/From Others/Internal's neutral grey. */
-    --reload: #ffcc00;
-    --income: #30d158;
+    --reload: #d9b23f;
+    --income: #3fae78;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -77,13 +80,13 @@
     padding: 8px 16px; border-radius: 999px; background: var(--card); color: var(--text);
     font-size: 13px; font-weight: 500; border: 1px solid transparent;
   }
-  .page-tab.active { background: #0a84ff; color: #fff; }
+  .page-tab.active { background: #4a8be8; color: #fff; }
   .insights-subnav { display: flex; gap: 8px; margin: 4px 0 14px; }
   .insights-subtab {
     flex: 1; text-align: center; padding: 8px 0; border-radius: 10px;
     background: var(--card); color: var(--muted); font-size: 13px; border: none; font-weight: 500;
   }
-  .insights-subtab.active { background: #1e1e22; color: var(--text); }
+  .insights-subtab.active { background: var(--card2); color: var(--text); }
   .history-section-label-row { display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; gap: 8px; }
   .history-section-label-row .history-section-label { margin: 0; }
   .tab-badge {
@@ -96,8 +99,8 @@
   .cal-nav-btn { background: var(--card); color: var(--text); font-size: 18px; width: 36px; height: 36px; border-radius: 10px; border: none; }
   #calMonthLabel { font-size: 15px; font-weight: 500; }
   .cal-month-totals { font-size: 13px; font-weight: 600; margin: 2px 0 12px; }
-  .cal-month-spend { color: #ff6961; }
-  .cal-month-income { color: #30d158; }
+  .cal-month-spend { color: #e0685c; }
+  .cal-month-income { color: #3fae78; }
   .cal-month-dot { color: var(--muted); }
   .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
   .cal-weekdays span { text-align: center; font-size: 11px; color: var(--muted); }
@@ -112,7 +115,7 @@
   .cal-day.selected { border-color: var(--accent); }
   .cal-day-income-dot {
     position: absolute; top: 5px; right: 5px; width: 6px; height: 6px;
-    border-radius: 50%; background: #30d158;
+    border-radius: 50%; background: #3fae78;
   }
   .cal-day-panel { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
   .cal-day-panel .cal-day-panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
@@ -128,7 +131,7 @@
     flex: 1; text-align: center; padding: 8px 0; border-radius: 10px;
     background: var(--card); color: var(--muted); font-size: 13px; border: none;
   }
-  .trend-group-btn.active { background: #1e1e22; color: var(--text); }
+  .trend-group-btn.active { background: var(--card2); color: var(--text); }
   .trend-card { background: var(--card); border-radius: 14px; padding: 14px; }
   .trend-card-label { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
   .trend-card-value { font-size: 20px; font-weight: 600; margin-bottom: 14px; }
@@ -160,11 +163,11 @@
   .review-entry .review-title { font-size: 14px; font-weight: 600; }
   .review-entry .review-amount { font-size: 14px; font-weight: 700; flex-shrink: 0; }
   .review-entry .review-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .review-entry .review-note { font-size: 12px; color: #ffd60a; font-style: italic; margin-top: 4px; }
+  .review-entry .review-note { font-size: 12px; color: #d9b23f; font-style: italic; margin-top: 4px; }
   .review-actions { display: flex; gap: 8px; margin-top: 10px; }
   .review-btn { flex: 1; border: none; border-radius: 8px; padding: 7px 0; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .review-btn.confirm { background: #1f3d2b; color: #30d158; }
-  .review-btn.delete { background: #3d1f22; color: #ff453a; }
+  .review-btn.confirm { background: #1f3d2b; color: #3fae78; }
+  .review-btn.delete { background: #3d1f22; color: #e0685c; }
 
   .just-imported-card { border-color: #1f3d2b; }
   .just-imported-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; border-top: 1px solid rgba(255,255,255,0.06); }
@@ -178,22 +181,22 @@
   .split-group-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .month-header { cursor: default; }
   .month-summary-row { display: flex; gap: 16px; padding: 10px 12px; font-size: 13px; }
-  .month-summary-expense { color: #ff453a; }
+  .month-summary-expense { color: #e0685c; }
   .month-summary-income { color: #32d74b; }
   .split-group-name { font-size: 14px; font-weight: 600; }
   .split-group-daterange { font-size: 11px; color: var(--muted, #888); margin-top: 2px; }
   .split-group-net { font-size: 14px; font-weight: 700; flex-shrink: 0; }
   .split-group-rows { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
   .split-group-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
-  .split-group-row .sgr-amt.in { color: #30d158; }
-  .split-group-row .sgr-amt.out { color: #ff453a; }
-  .split-group-summary { font-size: 12px; color: var(--muted); margin-top: 8px; border-top: 1px solid #3a3a3c; padding-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .split-group-row .sgr-amt.in { color: #3fae78; }
+  .split-group-row .sgr-amt.out { color: #e0685c; }
+  .split-group-summary { font-size: 12px; color: var(--muted); margin-top: 8px; border-top: 1px solid var(--line2); padding-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
   .split-group-summary b { color: var(--text); }
   .split-group-viewlist { margin-top: 10px; width: 100%; }
 
   .split-picker-list { display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow-y: auto; margin: 10px 0; }
   .split-picker-option {
-    padding: 14px 14px; border-radius: 10px; background: #2c2c2e; cursor: pointer;
+    padding: 14px 14px; border-radius: 10px; background: var(--line); cursor: pointer;
     display: flex; justify-content: space-between; align-items: center; font-size: 14px;
     border: 2px solid transparent;
   }
@@ -202,7 +205,7 @@
   .split-picker-empty { font-size: 12px; color: var(--muted); padding: 2px 0 10px; }
   .split-picker-actions { display: flex; gap: 8px; margin-top: 4px; }
   .split-picker-actions .btn { flex: 1; }
-  .split-picker-clear { background: #3d1f22; color: #ff453a; border: none; border-radius: 10px; padding: 12px 0; font-size: 15px; font-weight: 600; cursor: pointer; flex: 1; }
+  .split-picker-clear { background: #3d1f22; color: #e0685c; border: none; border-radius: 10px; padding: 12px 0; font-size: 15px; font-weight: 600; cursor: pointer; flex: 1; }
   .page-updated { text-align: center; font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
   /* Back to the original 3-across row for Today/This week/This month —
      All time now lives in its own full-width rectangle below (see
@@ -241,8 +244,8 @@
   .total-all-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .total-all-label { font-size: 11px; color: var(--muted); }
   .total-all-value { font-size: 20px; font-weight: 700; white-space: nowrap; }
-  .total-all-value.expense { color: #ff453a; }
-  .total-all-value.income { color: #30d158; }
+  .total-all-value.expense { color: #e0685c; }
+  .total-all-value.income { color: #3fae78; }
   @media (max-width: 400px) {
     .total-all-value { font-size: 17px; }
   }
@@ -255,8 +258,8 @@
   .filter-chip.active { background: var(--accent); color: #1a1a1a; font-weight: 600; }
   .subfilters { display: none; gap: 6px; overflow-x: auto; padding: 0 0 12px; margin-top: -6px; }
   .subfilters .filter-chip { padding: 6px 12px; font-size: 12px; }
-  .accountfilters .filter-chip { padding: 6px 12px; font-size: 12px; border: 1px solid #2c2c2e; }
-  .accountfilters .filter-chip.active { background: #0a84ff; color: #fff; }
+  .accountfilters .filter-chip { padding: 6px 12px; font-size: 12px; border: 1px solid var(--line); }
+  .accountfilters .filter-chip.active { background: #4a8be8; color: #fff; }
 
   .chart-card {
     background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 14px;
@@ -267,7 +270,7 @@
   .chart-card .chart-head span { font-size: 13px; color: var(--muted); }
   .chart-mode-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
   .chart-mode-btn {
-    background: #1c1c1e; border: 1px solid transparent; color: var(--muted);
+    background: var(--card2); border: 1px solid transparent; color: var(--muted);
     border-radius: 999px; padding: 6px 14px; font-size: 12px; cursor: pointer;
   }
   .chart-mode-btn.active { background: var(--accent); color: #1a1a1a; font-weight: 600; }
@@ -276,10 +279,10 @@
   .chart-stats .stat { flex: 1; text-align: center; }
   .chart-stats .stat-label { display: block; font-size: 11px; color: var(--muted); }
   .chart-stats .stat-value { display: block; font-size: 15px; font-weight: 700; margin-top: 2px; }
-  .chart-stats .stat-value.expense { color: #ff453a; }
-  .chart-stats .stat-value.income { color: #30d158; }
-  .chart-stats .stat-value.positive { color: #30d158; }
-  .chart-stats .stat-value.negative { color: #ff453a; }
+  .chart-stats .stat-value.expense { color: #e0685c; }
+  .chart-stats .stat-value.income { color: #3fae78; }
+  .chart-stats .stat-value.positive { color: #3fae78; }
+  .chart-stats .stat-value.negative { color: #e0685c; }
   .chart-stats .stat { cursor: pointer; }
   .stat-breakdown { display: none; margin: 10px 0 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
   .stat-breakdown.show { display: block; }
@@ -292,7 +295,7 @@
   }
   .chart-loading.show { display: flex; }
   .spinner {
-    width: 28px; height: 28px; border-radius: 50%; border: 3px solid #2c2c2e;
+    width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--line);
     border-top-color: var(--accent); animation: spin 0.8s linear infinite;
   }
   .mini-chart-wrap .spinner { width: 18px; height: 18px; border-width: 2px; }
@@ -332,7 +335,7 @@
   .mini-cal-weekdays span { text-align: center; font-size: 10px; color: var(--muted); }
   .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .mini-cal-day {
-    background: #1c1c1e; border-radius: 8px; padding: 7px 0; text-align: center;
+    background: var(--card2); border-radius: 8px; padding: 7px 0; text-align: center;
     font-size: 12px; color: var(--text); border: 1px solid transparent; cursor: pointer;
   }
   .mini-cal-day.empty-cell { background: none; cursor: default; }
@@ -354,7 +357,7 @@
      for findability; never counted in this category's totals/pie. Visually
      distinct (dashed border, no colored dot) so it doesn't read as more of
      the real list. */
-  .also-tagged-section { margin-top: 18px; border-top: 1px dashed #3a3a3c; padding-top: 4px; }
+  .also-tagged-section { margin-top: 18px; border-top: 1px dashed var(--line2); padding-top: 4px; }
   .also-tagged-header { cursor: pointer; }
   .also-tagged-row {
     background: var(--card); border-radius: 14px; padding: 10px 14px;
@@ -393,24 +396,24 @@
   .txn .merchant-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 40px; }
   .tbc-flag {
     display: inline-flex; align-items: center; justify-content: center;
-    padding: 1px 6px; border-radius: 8px; background: #ffd60a;
+    padding: 1px 6px; border-radius: 8px; background: #d9b23f;
     color: #1a1a1a; font-size: 10px; font-weight: 800; margin-left: 5px;
     vertical-align: middle; flex-shrink: 0; cursor: default; white-space: nowrap;
   }
-  .tbc-flag.synced-flag { background: #30d158; color: #08300f; cursor: pointer; }
-  .tbc-flag.stale-flag { background: #ff453a; color: #fff; }
+  .tbc-flag.synced-flag { background: #3fae78; color: #08300f; cursor: pointer; }
+  .tbc-flag.stale-flag { background: #e0685c; color: #fff; }
   .txn .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .txn .amount { font-size: 15px; font-weight: 700; color: #ff453a; }
-  .txn .amount.in { color: #30d158; }
-  .txn .amount.internal { color: #ffd60a; }
-  .transfer-hint { font-size: 11px; color: #0a84ff; margin-top: 2px; }
+  .txn .amount { font-size: 15px; font-weight: 700; color: #e0685c; }
+  .txn .amount.in { color: #3fae78; }
+  .txn .amount.internal { color: #d9b23f; }
+  .transfer-hint { font-size: 11px; color: #4a8be8; margin-top: 2px; }
   .txn-cat-select {
     margin-top: 5px; font-size: 11px; background: var(--bg); color: var(--muted);
-    border: 1px solid #2c2c2e; border-radius: 6px; padding: 3px 4px; max-width: 100%;
+    border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; max-width: 100%;
   }
   .txn-extratag-select {
     margin-top: 5px; margin-left: 6px; font-size: 11px; background: var(--bg); color: var(--muted);
-    border: 1px dashed #3a3a3c; border-radius: 6px; padding: 3px 4px; max-width: 100%;
+    border: 1px dashed var(--line2); border-radius: 6px; padding: 3px 4px; max-width: 100%;
   }
   .txn-extratag-select.has-extra { color: var(--accent); border-color: var(--accent); }
   .txn-extratag-amount {
@@ -428,12 +431,12 @@
     background: none; border: none; color: var(--muted); font-size: 13px; padding: 2px 2px;
     cursor: pointer; line-height: 1; opacity: 0.6;
   }
-  .txn-delete-btn:hover { color: #ff453a; opacity: 1; }
+  .txn-delete-btn:hover { color: #e0685c; opacity: 1; }
   .link-btn {
     background: none; border: none; color: var(--muted); font-size: 15px; padding: 2px 2px;
     cursor: pointer; line-height: 1;
   }
-  .link-btn.has-link { color: #0a84ff; }
+  .link-btn.has-link { color: #4a8be8; }
   .txn .remark {
     font-size: 12px; color: var(--muted); font-style: italic; margin-top: 4px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -456,7 +459,7 @@
   }
   .sheet-backdrop.open { display: flex; }
   .sheet {
-    background: #1c1c1e; width: 100%; max-width: 480px; border-radius: 20px 20px 0 0;
+    background: var(--card2); width: 100%; max-width: 480px; border-radius: 20px 20px 0 0;
     padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
     max-height: 85vh; overflow-y: auto;
   }
@@ -464,7 +467,7 @@
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .field input, .field select {
-    width: 100%; padding: 12px; border-radius: 10px; border: none; background: #2c2c2e;
+    width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--line);
     color: var(--text); font-size: 16px;
   }
   .row2 { display: flex; gap: 10px; }
@@ -473,11 +476,11 @@
     width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--accent);
     color: #1a1a1a; font-size: 16px; font-weight: 700; margin-top: 6px;
   }
-  .btn.secondary { background: #2c2c2e; color: var(--text); }
+  .btn.secondary { background: var(--line); color: var(--text); }
   .close-x { position: absolute; top: 14px; right: 16px; color: var(--muted); font-size: 22px; }
   .sheet-inner { position: relative; }
   .status-msg { text-align: center; font-size: 13px; color: var(--muted); margin: 8px 0; white-space: pre-wrap; }
-  .status-msg.debug { text-align: left; font-family: ui-monospace, monospace; font-size: 11px; background: #2c2c2e; padding: 10px; border-radius: 8px; max-height: 220px; overflow-y: auto; }
+  .status-msg.debug { text-align: left; font-family: ui-monospace, monospace; font-size: 11px; background: var(--line); padding: 10px; border-radius: 8px; max-height: 220px; overflow-y: auto; }
   /* Visible "something is happening" cue while a file is being read/parsed
      or an import is being committed — the existing importStatus text alone
      (small grey caption) was easy to miss, especially on slower PDF/OCR
@@ -547,7 +550,7 @@
   .preview-row .preview-top { display: flex; align-items: center; gap: 10px; }
   .preview-row .info { flex: 1; min-width: 0; }
   .preview-remove { font-size: 16px; color: var(--muted); padding: 0 4px; flex-shrink: 0; }
-  .preview-row select { width: 100%; padding: 8px; border-radius: 8px; border: none; background: #2c2c2e; color: var(--text); font-size: 13px; }
+  .preview-row select { width: 100%; padding: 8px; border-radius: 8px; border: none; background: var(--line); color: var(--text); font-size: 13px; }
   .preview-row .preview-remember { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .preview-row .preview-remember input { width: auto; }
   /* Same "remember this merchant" checkbox style, reused outside the import
@@ -572,28 +575,28 @@
   .mini-chart-wrap { position: relative; height: 110px; }
   .mini-charts.zoomed .mini-chart-wrap { height: 220px; }
   .mini-chart-truebalance { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; font-weight: 500; }
-  .mini-chart-truebalance.positive { color: #30d158; }
-  .mini-chart-truebalance.negative { color: #ff453a; }
+  .mini-chart-truebalance.positive { color: #3fae78; }
+  .mini-chart-truebalance.negative { color: #e0685c; }
   .mini-chart-updated { text-align: center; font-size: 11px; color: var(--muted); opacity: 0.7; margin-top: 2px; }
-  .balance-alert-banner { display: none; flex-direction: column; gap: 6px; background: #ffcc00; color: #111; padding: 10px 14px; font-size: 13px; font-weight: 600; }
+  .balance-alert-banner { display: none; flex-direction: column; gap: 6px; background: #d9b23f; color: #111; padding: 10px 14px; font-size: 13px; font-weight: 600; }
   .balance-alert-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .balance-alert-item span { line-height: 1.3; }
   .balance-alert-dismiss { background: none; border: none; color: #111; font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 6px; flex-shrink: 0; }
-  .statement-reminder-banner { display: none; flex-direction: column; gap: 6px; background: #0a84ff; color: #fff; padding: 10px 14px; font-size: 13px; font-weight: 600; }
+  .statement-reminder-banner { display: none; flex-direction: column; gap: 6px; background: #4a8be8; color: #fff; padding: 10px 14px; font-size: 13px; font-weight: 600; }
   .statement-reminder-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .statement-reminder-item span { line-height: 1.3; }
   .statement-reminder-dismiss { background: none; border: none; color: #fff; font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 6px; flex-shrink: 0; }
   .page-tab { border-color: var(--tc, transparent); color: var(--tc, var(--text)); }
-  .page-tab.active { background: var(--tc, #0a84ff); color: #fff; }
+  .page-tab.active { background: var(--tc, #4a8be8); color: #fff; }
   .insights-subtab { color: var(--tc, var(--muted)); border: 1.5px solid transparent; }
-  .insights-subtab.active { background: var(--tc, #1e1e22); color: #fff; }
-  .history-section-label { color: #bf5af2; font-weight: 600; }
-  .cmp-card:nth-child(1) .cmp-card-val { color: #0a84ff; }
-  .cmp-card:nth-child(2) .cmp-card-val { color: #ff9f0a; }
+  .insights-subtab.active { background: var(--tc, var(--card2)); color: #fff; }
+  .history-section-label { color: #8d6fe0; font-weight: 600; }
+  .cmp-card:nth-child(1) .cmp-card-val { color: #4a8be8; }
+  .cmp-card:nth-child(2) .cmp-card-val { color: #d9894a; }
   .cmp-oneoff { font-size: 12px; color: var(--muted); display:flex; align-items:center; gap:4px; width:100%; }
-  .help-dot { border:1px solid #0a84ff; color:#0a84ff; background:transparent; border-radius:50%; width:18px; height:18px; font-size:11px; line-height:1; padding:0; vertical-align:middle; }
-  .owed-card { background: rgba(255,159,10,.14); border-left:4px solid #ff9f0a; border-radius:12px; padding:12px; margin-bottom:12px; }
-  .owed-title { font-weight:700; color:#ff9f0a; margin-bottom:6px; }
+  .help-dot { border:1px solid #4a8be8; color:#4a8be8; background:transparent; border-radius:50%; width:18px; height:18px; font-size:11px; line-height:1; padding:0; vertical-align:middle; }
+  .owed-card { background: rgba(255,159,10,.14); border-left:4px solid #d9894a; border-radius:12px; padding:12px; margin-bottom:12px; }
+  .owed-title { font-weight:700; color:#d9894a; margin-bottom:6px; }
   .owed-row { display:flex; justify-content:space-between; font-size:14px; padding:2px 0; }
   .owed-hint { font-size:11px; color: var(--muted); margin-top:6px; }
   .commit-cards { display:flex; gap:8px; margin-bottom:10px; }
@@ -602,9 +605,9 @@
   .commit-paidbar { background: var(--card); border-radius:12px; padding:10px; margin-bottom:6px; font-size:13px; }
   .commit-row { display:flex; justify-content:space-between; align-items:center; gap:8px; background: var(--card); border-radius:12px; padding:12px; margin-bottom:8px; }
   .commit-name { font-weight:600; } .commit-sub { font-size:12px; color: var(--muted); }
-  .commit-add { width:100%; padding:11px; border-radius:12px; border:1.5px dashed #30d158; background:transparent; color:#30d158; font-weight:600; margin-top:6px; }
+  .commit-add { width:100%; padding:11px; border-radius:12px; border:1.5px dashed #3fae78; background:transparent; color:#3fae78; font-weight:600; margin-top:6px; }
   .commit-presets { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-  .commit-preset { padding:8px 12px; border-radius:999px; border:1.5px solid #30d158; background:transparent; color:#30d158; font-size:13px; }
+  .commit-preset { padding:8px 12px; border-radius:999px; border:1.5px solid #3fae78; background:transparent; color:#3fae78; font-size:13px; }
   body.view-only #helpBtn { display:inline-flex !important; }
   .page-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
   .page-tab { white-space: nowrap; padding: 8px 13px; }
@@ -633,24 +636,24 @@
   .nt-label { font-size:12px; color:var(--muted); width:100%; }
   .nt-chip { padding:4px 11px; border-radius:999px; border:1.5px solid; background:transparent; font-size:13px; font-weight:600; }
   .note-similar { font-size:12px; color:var(--muted); margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  .nt-sim { border:1px dashed #00c7be; color:#00c7be; background:transparent; border-radius:999px; padding:2px 10px; font-size:12px; }
-  .notes-sort-banner { display:flex; justify-content:space-between; align-items:center; background:rgba(255,159,10,.14); border-left:4px solid #ff9f0a; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:14px; }
-  .notes-sort-banner button { background:#ff9f0a; color:#111; border:0; border-radius:8px; padding:6px 12px; font-weight:600; }
+  .nt-sim { border:1px dashed #2fa7a1; color:#2fa7a1; background:transparent; border-radius:999px; padding:2px 10px; font-size:12px; }
+  .notes-sort-banner { display:flex; justify-content:space-between; align-items:center; background:rgba(255,159,10,.14); border-left:4px solid #d9894a; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:14px; }
+  .notes-sort-banner button { background:#d9894a; color:#111; border:0; border-radius:8px; padding:6px 12px; font-weight:600; }
   .note-edit { background:transparent; border:0; color:var(--muted); font-size:12px; text-decoration:underline; margin:-4px 0 10px 4px; }
-  .lock-row { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:13px; color:#30d158; }
+  .lock-row { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:13px; color:#3fae78; }
   .lock-btn { border:1px solid #8e8e93; background:transparent; color:var(--muted); border-radius:8px; padding:5px 10px; font-size:12px; }
-  .lock-go { border-color:#30d158; color:#30d158; font-weight:600; }
+  .lock-go { border-color:#3fae78; color:#3fae78; font-weight:600; }
   .cash-card { background:rgba(162,132,94,.18); border-left:4px solid #a2845e; border-radius:12px; padding:10px 12px; margin-bottom:10px; }
   .cash-t { font-weight:700; color:#d2b48c; margin-bottom:4px; }
   .cash-row { display:flex; justify-content:space-between; gap:8px; font-size:14px; }
   .cash-hint { font-size:11px; color:var(--muted); margin-top:6px; }
-  .cal-day-panel { border-top: 3px solid #0a84ff; }
-  .cal-day-panel-head { color: #0a84ff; font-weight: 700; }
-  .cal-account-header { color: #bf5af2; border-bottom: 1px solid rgba(191,90,242,.35); padding-bottom: 3px; }
-  .cmp-card:nth-child(1) { border-top: 3px solid #0a84ff; }
-  .cmp-card:nth-child(2) { border-top: 3px solid #ff9f0a; }
+  .cal-day-panel { border-top: 3px solid #4a8be8; }
+  .cal-day-panel-head { color: #4a8be8; font-weight: 700; }
+  .cal-account-header { color: #8d6fe0; border-bottom: 1px solid rgba(191,90,242,.35); padding-bottom: 3px; }
+  .cmp-card:nth-child(1) { border-top: 3px solid #4a8be8; }
+  .cmp-card:nth-child(2) { border-top: 3px solid #d9894a; }
   .link-card, .commit-row, .commit-card, .owed-card, .cash-card { box-shadow: inset 0 0 0 1px rgba(255,255,255,.04); }
-  .sheet-inner { border-top: 4px solid #0a84ff; border-radius: 16px 16px 0 0; }
+  .sheet-inner { border-top: 4px solid #4a8be8; border-radius: 16px 16px 0 0; }
   .txn2:hover { background: color-mix(in srgb, var(--cc) 8%, var(--card)); }
   .list .txn2 { background: color-mix(in srgb, var(--cc) 6%, var(--card)); }
   .link-seg { display:flex; gap:6px; margin:6px 0 8px; }
@@ -662,16 +665,16 @@
   .link-card { background:var(--card); border-radius:12px; padding:12px; margin-bottom:10px; }
   .link-kind { font-weight:700; }
   .link-chip { font-size:11px; padding:2px 10px; border-radius:999px; white-space:nowrap; align-self:flex-start; }
-  .link-chip-ok { background:rgba(48,209,88,.2); color:#30d158; }
-  .link-chip-warn { background:rgba(255,159,10,.22); color:#ff9f0a; }
-  .link-chip-info { background:rgba(0,199,190,.2); color:#00c7be; }
+  .link-chip-ok { background:rgba(48,209,88,.2); color:#3fae78; }
+  .link-chip-warn { background:rgba(255,159,10,.22); color:#d9894a; }
+  .link-chip-info { background:rgba(0,199,190,.2); color:#2fa7a1; }
   .link-bar { height:6px; background:rgba(142,142,147,.25); border-radius:3px; margin:8px 0; }
-  .link-bar-fill { height:6px; background:#30d158; border-radius:3px; }
+  .link-bar-fill { height:6px; background:#3fae78; border-radius:3px; }
   .part-label { padding-left:8px; font-size:14px; flex:1; }
   .parts-btn { background:transparent; border:1px solid var(--border,#444); color:var(--muted); border-radius:8px; padding:2px 8px; font-size:12px; }
   .parts-icon { border:0; font-size:16px; padding:0 4px; }
   .clock-chip { font-size:11px; padding:1px 8px; border-radius:999px; margin-left:6px; cursor:pointer; white-space:nowrap; }
-  .clock-warn { background:rgba(255,159,10,.22); color:#ff9f0a; }
+  .clock-warn { background:rgba(255,159,10,.22); color:#d9894a; }
   .clock-note { background:rgba(142,142,147,.22); color:var(--muted); }
   .date-edit { text-decoration:underline dotted; text-underline-offset:3px; cursor:pointer; }
   .cmp-controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 12px; }
@@ -691,11 +694,33 @@
   .cmp-month-row { display:grid; grid-template-columns:52px 1fr 64px 44px; gap:6px; align-items:center; margin:5px 0; font-size:13px; }
   .cmp-month-label { color:var(--muted); }
   .cmp-month-barwrap { background:var(--card); border-radius:6px; height:14px; overflow:hidden; }
-  .cmp-month-bar { background:#0a84ff; height:100%; border-radius:6px; }
+  .cmp-month-bar { background:#4a8be8; height:100%; border-radius:6px; }
   .cmp-month-val { text-align:right; font-weight:600; }
   .cmp-month-delta { font-size:11px; }
   .cmp-bar { width:100%; border-radius:3px 3px 0 0; min-height:1px; }
 
+  body.light { --bg:#f4f6fb; --card:#ffffff; --card2:#eef2fa; --line:#dde3f0; --line2:#c9d2e6; --text:#1b2540; --muted:#6b7794; }
+  html, body { background: var(--bg); color: var(--text); }
+  .icon-btn { background: var(--card2); width: 38px; height: 38px; font-size: 16px; }
+  .page-tab { background: var(--card2); color: var(--muted); border: 0; }
+  .page-tab.active { background: var(--accent); color: #fff; }
+  .insights-subtab { background: var(--card2); color: var(--muted); border: 0; }
+  .insights-subtab.active { background: var(--accent); color: #fff; }
+  .history-section-label, .link-section-title { color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-size: 11px; font-weight: 600; }
+  .cat-strip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+  .cat-pill { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; background: var(--card2); color: var(--text); border: 0; border-radius: 999px; padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+  .cat-pill .cp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tc); }
+  .cat-pill .cp-sub { color: var(--muted); font-size: 11px; }
+  .cat-pill.active { background: color-mix(in srgb, var(--tc) 22%, var(--card)); box-shadow: inset 0 0 0 1.5px var(--tc); }
+  .cat-tile { border: 0; background: color-mix(in srgb, var(--tc) 14%, var(--card)); color: var(--text); border-left: 3px solid var(--tc); }
+  .cat-tile.active { background: var(--tc); color: #fff; }
+  .txn { border: 1px solid var(--line); }
+  .txn2 { border-left-width: 3px; }
+  .cal-day-panel, .cmp-card, .commit-card, .commit-row, .link-card, .owed-card, .cash-card, .commit-paidbar { border: 1px solid var(--line); }
+  .txn-top-r { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .txn-top-r .review-btn { padding: 4px 10px; font-size: 12px; margin: 0; }
+  .rv-collapsed .review-actions { display: flex; }
+  .tip-bubble { position: fixed; z-index: 100005; background: var(--text); color: var(--bg); padding: 5px 9px; border-radius: 8px; font-size: 12px; font-weight: 600; pointer-events: none; max-width: 240px; }
 </style>
 </head>
 <body>
@@ -708,17 +733,17 @@
     <div class="header-top">
       <h1>Spending</h1>
       <button class="icon-btn" id="resetFiltersBtn" title="Back to All" aria-label="Reset filters">↺</button>
+      <button class="icon-btn" id="themeBtn" title="Light or dark" aria-label="Theme">☀️</button>
       <button class="icon-btn" id="searchBtn" title="Search" aria-label="Search">🔍</button>
       <button class="icon-btn" id="shareViewLinkBtn" title="Share" aria-label="Share">🔗</button>
-      <button class="icon-btn" id="helpBtn" title="Help for this page" aria-label="Help" style="color:#0a84ff;font-weight:700;">?</button>
+      <button class="icon-btn" id="helpBtn" title="Help for this page" aria-label="Help" style="color:#4a8be8;font-weight:700;">?</button>
       <button class="icon-btn" id="hideNumbersBtn" title="Hide balance" aria-label="Hide balance">👁️</button>
     </div>
     <div class="page-tabs" id="pageTabs">
-      <button class="page-tab active" data-page="main" style="--tc:#0a84ff">Main</button>
-      <button class="page-tab" data-page="categories" style="--tc:#ff6b81">Categories</button>
-      <button class="page-tab" data-page="insights" style="--tc:#bf5af2">Insights</button>
-      <button class="page-tab" data-page="history" style="--tc:#00c7be">History</button>
-      <button class="page-tab" data-page="review" style="--tc:#ff9f0a">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
+      <button class="page-tab active" data-page="main" style="--tc:#4a8be8">Main</button>
+      <button class="page-tab" data-page="insights" style="--tc:#8d6fe0">Insights</button>
+      <button class="page-tab" data-page="history" style="--tc:#2fa7a1">History</button>
+      <button class="page-tab" data-page="review" style="--tc:#d9894a">Review<span class="tab-badge" id="reviewTabBadge" style="display:none;"></span></button>
     </div>
   </header>
 
@@ -737,9 +762,8 @@
       <div class="cal-grid" id="calGrid"></div>
       <div id="calDayPanel"></div>
     </div>
-  </div>
-  <div id="categoriesPage" style="display:none;">
-    <div class="cat-tiles" id="catTiles"></div>
+    <div class="cat-strip" id="catTiles"></div>
+    <div id="mainBrowse">
 
     <div class="totals-all" id="totalsAll" style="display:none;"></div>
     <div class="totals" id="totals" style="display:none;"></div>
@@ -820,16 +844,15 @@
       <button class="toolbar-btn" id="miniChartsToggleBtn">Hide account breakdown ▾</button>
     </div>
     <div class="mini-charts" id="miniCharts" style="display:none;"></div>
-
-
+    </div>
   </div>
 
   <div id="insightsTab" style="display:none;">
   <div id="insightsPage">
     <div class="insights-subnav" id="insightsSubnav">
-      <button class="insights-subtab active" data-sub="compare" style="--tc:#bf5af2">Compare</button>
-      <button class="insights-subtab" data-sub="splits" style="--tc:#00c7be">Links</button>
-      <button class="insights-subtab" data-sub="commit" style="--tc:#30d158">Commitments</button>
+      <button class="insights-subtab active" data-sub="compare" style="--tc:#8d6fe0">Compare</button>
+      <button class="insights-subtab" data-sub="splits" style="--tc:#2fa7a1">Links</button>
+      <button class="insights-subtab" data-sub="commit" style="--tc:#3fae78">Commitments</button>
     </div>
 
     <div id="comparePage">
@@ -923,7 +946,7 @@
     <div id="claimsOwed" style="display:none;"></div>
     <div id="reviewDatesSection" style="display:none;">
       <div class="history-section-label-row">
-        <div class="history-section-label" id="reviewDatesLabel" style="color:#ff9f0a;">Dates to confirm</div>
+        <div class="history-section-label" id="reviewDatesLabel" style="color:#d9894a;">Dates to confirm</div>
       </div>
       <div class="list" id="reviewDatesList"></div>
     </div>
@@ -1060,9 +1083,9 @@
       <span class="close-x" id="splitPickerClose">✕</span>
       <h2>Link this record <button class="help-dot" data-help="linkdlg">?</button></h2>
       <div class="link-seg" id="linkSeg">
-        <button data-mode="split" style="--c:#0a84ff">Split</button>
-        <button data-mode="claim" style="--c:#ff9f0a">Claim</button>
-        <button data-mode="note" style="--c:#00c7be">Note</button>
+        <button data-mode="split" style="--c:#4a8be8">Split</button>
+        <button data-mode="claim" style="--c:#d9894a">Claim</button>
+        <button data-mode="note" style="--c:#2fa7a1">Note</button>
       </div>
       <div class="link-help" id="linkHelp"></div>
       <div class="note-topics" id="noteTopics"></div>
@@ -1075,7 +1098,7 @@
       <div class="field">
         <label>Also count this record as (optional)</label>
         <select id="linkCountAs"></select>
-        <label class="preview-remember" style="margin-top:6px;"><input type="checkbox" id="linkRemember"> Remember for this merchant next time</label>
+        <label class="preview-remember" style="margin-top:6px;"><input type="checkbox" id="linkRemember"> <span id="linkRememberText">Remember for this merchant next time</span></label>
       </div>
       <div class="split-picker-actions">
         <button class="btn" id="splitPickerSave">Save</button>
@@ -1672,11 +1695,11 @@ function commitStatus_(c) {
     if (kws.some(k => text.includes(k))) { paid += Number(t.amount) || 0; hits++; }
   });
   if (!dueThisMonth) return { key: 'later', text: 'Not due this month', color: '#8e8e93', paid, due: 0 };
-  if (hits) return { key: 'paid', text: 'Paid', color: '#30d158', paid, due: Number(c.amount) || 0 };
+  if (hits) return { key: 'paid', text: 'Paid', color: '#3fae78', paid, due: Number(c.amount) || 0 };
   const diff = (Number(c.dueDay) || 1) - now.getDate();
-  if (diff < 0) return { key: 'missing', text: 'Missing', color: '#ff453a', paid, due: Number(c.amount) || 0 };
-  if (diff <= 5) return { key: 'soon', text: diff === 0 ? 'Due today' : `Due in ${diff}d`, color: '#ff9f0a', paid, due: Number(c.amount) || 0 };
-  return { key: 'upcoming', text: `Due on the ${c.dueDay}${ordSuffix_(c.dueDay)}`, color: '#0a84ff', paid, due: Number(c.amount) || 0 };
+  if (diff < 0) return { key: 'missing', text: 'Missing', color: '#e0685c', paid, due: Number(c.amount) || 0 };
+  if (diff <= 5) return { key: 'soon', text: diff === 0 ? 'Due today' : `Due in ${diff}d`, color: '#d9894a', paid, due: Number(c.amount) || 0 };
+  return { key: 'upcoming', text: `Due on the ${c.dueDay}${ordSuffix_(c.dueDay)}`, color: '#4a8be8', paid, due: Number(c.amount) || 0 };
 }
 function renderCommitments_() {
   const list = document.getElementById('commitList'), sum = document.getElementById('commitSummary');
@@ -1690,8 +1713,8 @@ function renderCommitments_() {
   const paidTotal = sts.reduce((a, x) => a + (x.st.key === 'paid' ? Math.min(x.st.paid, x.st.due || x.st.paid) : 0), 0);
   sum.innerHTML = act.length ? `
     <div class="commit-cards">
-      <div class="commit-card" style="--cc:#30d158"><div class="cc-l">Fixed per month</div><div class="cc-v">RM${sumM(fixedS.map(x => x.c)).toFixed(0)}</div></div>
-      <div class="commit-card" style="--cc:#ff9f0a"><div class="cc-l">Flexible per month</div><div class="cc-v">RM${sumM(flexS.map(x => x.c)).toFixed(0)}</div></div>
+      <div class="commit-card" style="--cc:#3fae78"><div class="cc-l">Fixed per month</div><div class="cc-v">RM${sumM(fixedS.map(x => x.c)).toFixed(0)}</div></div>
+      <div class="commit-card" style="--cc:#d9894a"><div class="cc-l">Flexible per month</div><div class="cc-v">RM${sumM(flexS.map(x => x.c)).toFixed(0)}</div></div>
     </div>
     <div class="commit-paidbar"><div class="cpb-t">Paid this month <b>RM${paidTotal.toFixed(0)}</b> of <b>RM${dueTotal.toFixed(0)}</b></div>
       <div class="link-bar"><div class="link-bar-fill" style="width:${dueTotal ? Math.min(100, paidTotal / dueTotal * 100) : 0}%"></div></div></div>` : '';
@@ -1707,7 +1730,7 @@ function renderCommitments_() {
         <div class="commit-sub">RM${Number(c.amount).toFixed(2)} ${c.cycle === 'yearly' ? 'yearly (RM' + commitMonthly_(c).toFixed(2) + '/mo)' : 'monthly'}${st.paid ? ' · paid RM' + st.paid.toFixed(2) : ''}</div></div>
       <span class="link-chip" style="background:${st.color}33;color:${st.color}">${st.text}</span>
     </div>`).join('') : '';
-  list.innerHTML = section('Fixed · must pay', '#30d158', fixedS) + section('Flexible · can cancel', '#ff9f0a', flexS);
+  list.innerHTML = section('Fixed · must pay', '#3fae78', fixedS) + section('Flexible · can cancel', '#d9894a', flexS);
   if (!VIEW_ONLY) list.querySelectorAll('.commit-row').forEach(r => { r.onclick = () => openCommitDialog_(commitments.find(c => String(c.id) === r.dataset.cid)); });
 }
 document.getElementById('commitAddBtn').onclick = () => openCommitDialog_({ kind: 'fixed', cycle: 'monthly', dueDay: 1 });
@@ -1728,7 +1751,7 @@ function openCommitDialog_(c) {
     </div>
     <label style="${lab}" id="cmMonthWrap">Which month (yearly)<select id="cmMonth" style="${inp}">${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select></label>
     <div style="${lab}">Type</div>
-    <div style="display:flex;gap:6px;margin-top:3px"><button id="cmFixed" style="flex:1;padding:8px;border-radius:999px;border:1.5px solid #30d158">Fixed</button><button id="cmFlex" style="flex:1;padding:8px;border-radius:999px;border:1.5px solid #ff9f0a">Flexible</button></div>
+    <div style="display:flex;gap:6px;margin-top:3px"><button id="cmFixed" style="flex:1;padding:8px;border-radius:999px;border:1.5px solid #3fae78">Fixed</button><button id="cmFlex" style="flex:1;padding:8px;border-radius:999px;border:1.5px solid #d9894a">Flexible</button></div>
     <div id="cmKindHelp" style="font-size:12px;color:#666;margin-top:4px"></div>
     <label style="${lab}">Match words in your records (comma separated)<input id="cmMatch" style="${inp}" value="${escapeHtml(c.match || '')}" placeholder="e.g. NETFLIX, XOX"></label>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
@@ -1742,8 +1765,8 @@ function openCommitDialog_(c) {
   q('cmMonth').value = c.dueMonth || 1;
   const paint = () => {
     q('cmMonthWrap').style.display = q('cmCycle').value === 'yearly' ? '' : 'none';
-    q('cmFixed').style.background = kind === 'fixed' ? '#30d158' : 'transparent'; q('cmFixed').style.color = kind === 'fixed' ? '#fff' : '#111';
-    q('cmFlex').style.background = kind === 'flexible' ? '#ff9f0a' : 'transparent'; q('cmFlex').style.color = kind === 'flexible' ? '#fff' : '#111';
+    q('cmFixed').style.background = kind === 'fixed' ? '#3fae78' : 'transparent'; q('cmFixed').style.color = kind === 'fixed' ? '#fff' : '#111';
+    q('cmFlex').style.background = kind === 'flexible' ? '#d9894a' : 'transparent'; q('cmFlex').style.color = kind === 'flexible' ? '#fff' : '#111';
     q('cmKindHelp').textContent = kind === 'fixed' ? 'Must pay (rent, loan, family). You cannot easily stop it.' : 'Can cancel (streaming, apps, gym). Good place to save money.';
   };
   q('cmCycle').onchange = paint; q('cmFixed').onclick = () => { kind = 'fixed'; paint(); }; q('cmFlex').onclick = () => { kind = 'flexible'; paint(); };
@@ -1804,9 +1827,9 @@ function openHelp_(key) {
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
   ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:14px;padding:16px;max-width:400px;width:100%;max-height:85vh;overflow:auto">
-    <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:#0a84ff">? ${escapeHtml(h[0])}</div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:#4a8be8">? ${escapeHtml(h[0])}</div>
     ${h[1].map(r => `<div style="margin-bottom:9px"><b>${escapeHtml(r[0])}</b><div style="font-size:14px;color:#444">${escapeHtml(r[1])}</div></div>`).join('')}
-    <button style="margin-top:6px;padding:8px 16px;border-radius:8px;border:0;background:#0a84ff;color:#fff;width:100%">Got it</button></div>`;
+    <button style="margin-top:6px;padding:8px 16px;border-radius:8px;border:0;background:#4a8be8;color:#fff;width:100%">Got it</button></div>`;
   ov.onclick = e => { if (e.target === ov || e.target.tagName === 'BUTTON') ov.remove(); };
   document.body.appendChild(ov);
 }
@@ -1832,9 +1855,9 @@ function showMenu_(title, items) {
 document.getElementById('hideNumbersBtn').onclick = () => {
   if (VIEW_ONLY) return;
   showMenu_('Privacy on this screen', [
-    { label: 'Show everything', desc: 'Normal view.', color: '#30d158', active: !balanceHidden, run: () => { balanceHidden = false; localStorage.setItem('balanceHidden', '0'); applyBalanceHidden(); } },
-    { label: 'Hide income & balances', desc: 'Use when someone is looking at your screen.', color: '#ff9f0a', active: balanceHidden, run: () => { balanceHidden = true; localStorage.setItem('balanceHidden', '1'); applyBalanceHidden(); } },
-    { label: 'Demo (fake data)', desc: 'Opens the sample version with made-up numbers.', color: '#bf5af2', run: () => { location.href = location.pathname.replace(/[^/]*$/, '') + 'demo.html'; } }
+    { label: 'Show everything', desc: 'Normal view.', color: '#3fae78', active: !balanceHidden, run: () => { balanceHidden = false; localStorage.setItem('balanceHidden', '0'); applyBalanceHidden(); } },
+    { label: 'Hide income & balances', desc: 'Use when someone is looking at your screen.', color: '#d9894a', active: balanceHidden, run: () => { balanceHidden = true; localStorage.setItem('balanceHidden', '1'); applyBalanceHidden(); } },
+    { label: 'Demo (fake data)', desc: 'Opens the sample version with made-up numbers.', color: '#8d6fe0', run: () => { location.href = location.pathname.replace(/[^/]*$/, '') + 'demo.html'; } }
   ]);
 };
 (function () {
@@ -1850,8 +1873,8 @@ document.getElementById('hideNumbersBtn').onclick = () => {
   btn.onclick = () => {
     const base = location.origin + location.pathname.replace(/[^/]*$/, '');
     showMenu_('Share a link', [
-      { label: 'Friends link', desc: 'Your real spending and commitments. Income and balances are hidden. Cannot change anything.', color: '#0a84ff', run: () => copy(base + 'index.html?view=friends', 'Friends') },
-      { label: 'Demo link', desc: 'Sample version with fake numbers. Not connected to your sheet.', color: '#bf5af2', run: () => copy(base + 'demo.html', 'Demo') }
+      { label: 'Friends link', desc: 'Your real spending and commitments. Income and balances are hidden. Cannot change anything.', color: '#4a8be8', run: () => copy(base + 'index.html?view=friends', 'Friends') },
+      { label: 'Demo link', desc: 'Sample version with fake numbers. Not connected to your sheet.', color: '#8d6fe0', run: () => copy(base + 'demo.html', 'Demo') }
     ]);
   };
 })();
@@ -1870,11 +1893,10 @@ function renderCatTiles_(accountTxns) {
     if (!NON_SPEND_CATEGORIES.includes(c) && t.date && t.date.slice(0, 7) === ym) o.mTotal += spendAmount(t);
   });
   const cats = ALL_CATEGORIES.filter(c => by[c]);
-  const tile = (c, label, sub, color) => `<button class="cat-tile${c === activeFilter ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="--tc:${color}"><span class="ct-name">${escapeHtml(label)}</span><span class="ct-sub">${sub}</span></button>`;
-  el.innerHTML = tile('All', 'All', accountTxns.length + ' records', '#0a84ff') +
-    cats.map(c => tile(c, c, NON_SPEND_CATEGORIES.includes(c) ? by[c].n + ' records' : 'This month RM' + by[c].mTotal.toFixed(0), colorFor(c))).join('');
-  renderCashCard_();
-  el.querySelectorAll('.cat-tile').forEach(b => { b.onclick = () => { activeFilter = b.dataset.cat; activeSubFilter = 'All'; render(); }; });
+  const tile = (c, label, sub, color) => `<button class="cat-pill${c === activeFilter ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="--tc:${color}"><span class="cp-dot"></span><span class="cp-name">${escapeHtml(label)}</span><span class="cp-sub">${sub}</span></button>`;
+  el.innerHTML = tile('All', 'All', '', '#3a9bc4') +
+    cats.map(c => tile(c, c, NON_SPEND_CATEGORIES.includes(c) ? '' : 'RM' + by[c].mTotal.toFixed(0), colorFor(c))).join('');
+  el.querySelectorAll('.cat-pill').forEach(b => { b.onclick = () => { activeFilter = b.dataset.cat; activeSubFilter = 'All'; render(); }; });
 }
 document.addEventListener('click', e => {
   const tg = e.target.closest && e.target.closest('[data-rv-toggle]');
@@ -1929,9 +1951,9 @@ function askPin_(message, withReason) {
 document.getElementById('hideNumbersBtn').onclick = () => {
   if (VIEW_ONLY) return;
   showMenu_('Privacy on this screen', [
-    { label: 'Show everything', desc: 'Needs your password.', color: '#30d158', active: !balanceHidden, run: async () => { if (!balanceHidden) return; if (!(await askPin_('Enter password to show income and balances'))) return; balanceHidden = false; localStorage.setItem('balanceHidden', '0'); applyBalanceHidden(); } },
-    { label: 'Hide income & balances', desc: 'Use when someone is looking at your screen.', color: '#ff9f0a', active: balanceHidden, run: () => { balanceHidden = true; localStorage.setItem('balanceHidden', '1'); applyBalanceHidden(); } },
-    { label: 'Demo (fake data)', desc: 'Sample version with made-up numbers. Needs your password.', color: '#bf5af2', run: async () => { if (!(await askPin_('Enter password to open the demo'))) return; location.href = location.pathname.replace(/[^/]*$/, '') + 'demo.html'; } }
+    { label: 'Show everything', desc: 'Needs your password.', color: '#3fae78', active: !balanceHidden, run: async () => { if (!balanceHidden) return; if (!(await askPin_('Enter password to show income and balances'))) return; balanceHidden = false; localStorage.setItem('balanceHidden', '0'); applyBalanceHidden(); } },
+    { label: 'Hide income & balances', desc: 'Use when someone is looking at your screen.', color: '#d9894a', active: balanceHidden, run: () => { balanceHidden = true; localStorage.setItem('balanceHidden', '1'); applyBalanceHidden(); } },
+    { label: 'Demo (fake data)', desc: 'Sample version with made-up numbers. Needs your password.', color: '#8d6fe0', run: async () => { if (!(await askPin_('Enter password to open the demo'))) return; location.href = location.pathname.replace(/[^/]*$/, '') + 'demo.html'; } }
   ]);
 };
 
@@ -1952,22 +1974,22 @@ function openCatSheet_(sel) {
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:10px';
   const choose = v => { ov.remove(); sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); };
   const step1 = () => {
-    ov.innerHTML = `<div style="background:#1c1c20;color:#f5f5f7;border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
+    ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
       <div style="font-weight:700;margin-bottom:8px">Pick a category</div>
       ${keep ? '<button data-keep="1" style="width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:1px solid #555;background:transparent;color:inherit">Keep as it is</button>' : ''}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">
-      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:10px;border-radius:12px;border:1.5px solid ${colorFor(c)};background:${c === curCat ? colorFor(c) : colorFor(c) + '22'};color:${c === curCat ? '#111' : '#f5f5f7'};font-weight:600">${escapeHtml(c)}${groups[c].length > 1 ? ' ›' : ''}</button>`).join('')}</div>
-      <button data-x="1" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:0;background:#333;color:#f5f5f7">Cancel</button></div>`;
+      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:10px;border-radius:12px;border:1.5px solid ${colorFor(c)};background:${c === curCat ? colorFor(c) : colorFor(c) + '22'};color:${c === curCat ? '#111' : 'var(--text)'};font-weight:600">${escapeHtml(c)}${groups[c].length > 1 ? ' ›' : ''}</button>`).join('')}</div>
+      <button data-x="1" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div>`;
     ov.querySelectorAll('[data-c]').forEach(b => { b.onclick = () => { const g = groups[b.dataset.c]; if (g.length === 1) choose(g[0].v); else step2(b.dataset.c); }; });
     const k = ov.querySelector('[data-keep]'); if (k) k.onclick = () => choose('');
     ov.querySelector('[data-x]').onclick = () => ov.remove();
   };
   const step2 = c => {
     const col = colorFor(c);
-    ov.innerHTML = `<div style="background:#1c1c20;color:#f5f5f7;border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
+    ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
       <div style="font-weight:700;margin-bottom:8px;color:${col}">${escapeHtml(c)} · pick a type</div>
-      ${groups[c].map((o, i) => { const sub = o.l.indexOf(' · ') >= 0 ? o.l.split(' · ').slice(1).join(' · ') : o.l + ' (general)'; return `<button data-i="${i}" style="display:block;width:100%;text-align:left;padding:11px 12px;margin-bottom:6px;border-radius:10px;border:1px solid ${o.cur ? col : '#444'};background:${o.cur ? col + '33' : 'transparent'};color:inherit">${escapeHtml(sub)}</button>`; }).join('')}
-      <div style="display:flex;gap:8px;margin-top:6px"><button data-back="1" style="flex:1;padding:9px;border-radius:10px;border:0;background:#333;color:#f5f5f7">‹ Back</button><button data-x="1" style="flex:1;padding:9px;border-radius:10px;border:0;background:#333;color:#f5f5f7">Cancel</button></div></div>`;
+      ${groups[c].map((o, i) => { const sub = o.l.indexOf(' · ') >= 0 ? o.l.split(' · ').slice(1).join(' · ') : o.l + ' (general)'; return `<button data-i="${i}" style="display:block;width:100%;text-align:left;padding:11px 12px;margin-bottom:6px;border-radius:10px;border:1px solid ${o.cur ? col : 'var(--line2)'};background:${o.cur ? col + '33' : 'transparent'};color:inherit">${escapeHtml(sub)}</button>`; }).join('')}
+      <div style="display:flex;gap:8px;margin-top:6px"><button data-back="1" style="flex:1;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">‹ Back</button><button data-x="1" style="flex:1;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div></div>`;
     ov.querySelectorAll('[data-i]').forEach(b => { b.onclick = () => choose(groups[c][Number(b.dataset.i)].v); });
     ov.querySelector('[data-back]').onclick = step1;
     ov.querySelector('[data-x]').onclick = () => ov.remove();
@@ -2011,18 +2033,18 @@ function openSearch_() {
   if (ov) { ov.remove(); }
   ov = document.createElement('div');
   ov.id = 'searchOverlay';
-  ov.style.cssText = 'position:fixed;inset:0;background:#0b0b0d;z-index:9000;overflow:auto;padding:14px 14px 60px';
+  ov.style.cssText = 'position:fixed;inset:0;background:var(--bg);color:var(--text);z-index:9000;overflow:auto;padding:14px 14px 60px';
   const accts = [...new Set(allTxns.map(t => t.account).filter(Boolean))];
-  const inp = 'background:#17171b;color:#f5f5f7;border:1.5px solid';
+  const inp = 'background:var(--card);color:var(--text);border:1.5px solid';
   ov.innerHTML = `<div style="max-width:720px;margin:0 auto">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <input id="sQ" type="search" placeholder="Search name, amount, note…" autocomplete="off" style="flex:1;${inp} #0a84ff;border-radius:12px;padding:11px 12px;font-size:16px">
-      <button id="sClose" style="padding:10px 14px;border-radius:12px;border:0;background:#2c2c2e;color:#f5f5f7">Close</button></div>
+      <input id="sQ" type="search" placeholder="Search name, amount, note…" autocomplete="off" style="flex:1;${inp} #4a8be8;border-radius:12px;padding:11px 12px;font-size:16px">
+      <button id="sClose" style="padding:10px 14px;border-radius:12px;border:0;background:var(--card2);color:var(--text)">Close</button></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-      <select id="sCat" style="${inp} #30d158;border-radius:999px;padding:6px 10px"><option value="">Category</option>${ALL_CATEGORIES.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
-      <select id="sAcc" style="${inp} #bf5af2;border-radius:999px;padding:6px 10px"><option value="">Account</option>${accts.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
-      <input id="sFrom" type="date" style="${inp} #ff9f0a;border-radius:999px;padding:5px 8px"><input id="sTo" type="date" style="${inp} #ff9f0a;border-radius:999px;padding:5px 8px">
-      <input id="sMin" type="number" placeholder="RM from" style="${inp} #00c7be;border-radius:999px;padding:6px 10px;width:90px"><input id="sMax" type="number" placeholder="RM to" style="${inp} #00c7be;border-radius:999px;padding:6px 10px;width:90px">
+      <select id="sCat" style="${inp} #3fae78;border-radius:999px;padding:6px 10px"><option value="">Category</option>${ALL_CATEGORIES.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
+      <select id="sAcc" style="${inp} #8d6fe0;border-radius:999px;padding:6px 10px"><option value="">Account</option>${accts.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
+      <input id="sFrom" type="date" style="${inp} #d9894a;border-radius:999px;padding:5px 8px"><input id="sTo" type="date" style="${inp} #d9894a;border-radius:999px;padding:5px 8px">
+      <input id="sMin" type="number" placeholder="RM from" style="${inp} #2fa7a1;border-radius:999px;padding:6px 10px;width:90px"><input id="sMax" type="number" placeholder="RM to" style="${inp} #2fa7a1;border-radius:999px;padding:6px 10px;width:90px">
     </div>
     <div id="sSummary" style="color:#8e8e93;font-size:13px;margin-bottom:8px"></div>
     <div class="list" id="sList"></div></div>`;
@@ -2059,7 +2081,7 @@ function runSearch_() {
   }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const outT = res.filter(t => txnFlow(t) === 'out' && !NON_SPEND_CATEGORIES.includes(t.category)).reduce((s, t) => s + spendAmount(t), 0);
   const inT = res.filter(t => txnFlow(t) === 'in').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  sum.innerHTML = `${res.length} result${res.length === 1 ? '' : 's'} · spent <b style="color:#ff453a">RM${outT.toFixed(2)}</b>${VIEW_ONLY ? '' : ` · received <b style="color:#30d158">RM${inT.toFixed(2)}</b>`}${res.length > 100 ? ' · showing first 100' : ''}`;
+  sum.innerHTML = `${res.length} result${res.length === 1 ? '' : 's'} · spent <b style="color:#e0685c">RM${outT.toFixed(2)}</b>${VIEW_ONLY ? '' : ` · received <b style="color:#3fae78">RM${inT.toFixed(2)}</b>`}${res.length > 100 ? ' · showing first 100' : ''}`;
   out.innerHTML = res.slice(0, 100).map(t => renderTxnRow(t)).join('') || '<div class="empty">No matches.</div>';
   attachCatSelectHandlers(); attachExtraTagHandlers(); attachExtraTagAmountHandlers(); attachRemarkHandlers(); attachLinkHandlers();
 }
@@ -2068,7 +2090,7 @@ document.getElementById('searchBtn').onclick = openSearch_;
 
 // ===== Step-by-step tour for the (?) button =====
 const TOURS = {
-  main: [['#calGrid', 'Each day shows what you spent. Tap a day to see its records.'], ['#calMonthLabel', 'Use the arrows next to the month to move to another month.'], ['#searchBtn', 'Search by name, amount, category, account or dates.'], ['#shareViewLinkBtn', 'Share a Friends link or a Demo link.'], ['#hideNumbersBtn', 'Hide income and balances when someone is watching. Needs your password to show again.'], ['#pageTabs', 'These tabs are the main sections of the app.']],
+  main: [['#calGrid', 'Each day shows what you spent. Tap a day to see only that day.'], ['#catTiles', 'Tap a category pill to filter the records and light up its days.'], ['#calMonthLabel', 'Use the arrows next to the month to move to another month.'], ['#searchBtn', 'Search by name, amount, category, account or dates.'], ['#shareViewLinkBtn', 'Share a Friends link or a Demo link.'], ['#hideNumbersBtn', 'Hide income and balances when someone is watching. Needs your password to show again.'], ['#pageTabs', 'These tabs are the main sections of the app.']],
   categories: [['#catTiles', 'Tap a colour tile to see only that category. This month total is shown on each tile.'], ['#subfilters', 'Then pick a sub-type to narrow it down.'], ['#list', 'Records are listed below. Change a category with the coloured box.']],
   compare: [['#cmpScope', 'Pick what to compare: all spending or one category.'], ['#cmpPreset', 'Pick the periods: this month vs last, week, or month by month.'], ['#cmpOneOff', 'Leave out big once-only items like a car deposit.']],
   splits: [['#linksChips', 'Filter by Split, Claim or Note.'], ['#splitsInsightsList', 'Cards that still need money or settling are listed first.']],
@@ -2082,7 +2104,7 @@ function startTour_() {
   if (!steps.length) { openHelp_(); return; }
   let i = 0;
   const hole = document.createElement('div'), bub = document.createElement('div');
-  hole.style.cssText = 'position:fixed;z-index:100003;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.72);border:2px solid #0a84ff;pointer-events:none;transition:all .2s';
+  hole.style.cssText = 'position:fixed;z-index:100003;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.72);border:2px solid #4a8be8;pointer-events:none;transition:all .2s';
   bub.style.cssText = 'position:fixed;z-index:100004;background:#fff;color:#111;border-radius:12px;padding:12px;max-width:290px;box-shadow:0 6px 24px rgba(0,0,0,.5)';
   document.body.appendChild(hole); document.body.appendChild(bub);
   const end = () => { hole.remove(); bub.remove(); };
@@ -2093,9 +2115,9 @@ function startTour_() {
       const r = el.getBoundingClientRect();
       hole.style.left = (r.left - 4) + 'px'; hole.style.top = (r.top - 4) + 'px'; hole.style.width = (r.width + 8) + 'px'; hole.style.height = (r.height + 8) + 'px';
       const below = r.bottom + 150 < window.innerHeight;
-      bub.innerHTML = `<div style="font-size:11px;color:#0a84ff;font-weight:700">Step ${i + 1} of ${steps.length}</div>
+      bub.innerHTML = `<div style="font-size:11px;color:#4a8be8;font-weight:700">Step ${i + 1} of ${steps.length}</div>
         <div style="font-size:14px;margin:4px 0 10px">${escapeHtml(steps[i][1])}</div>
-        <div style="display:flex;gap:8px;justify-content:space-between"><button id="tkEnd" style="border:0;background:transparent;color:#666">Skip</button><span><button id="tkMore" style="border:0;background:transparent;color:#0a84ff">Full guide</button> <button id="tkNext" style="padding:7px 14px;border-radius:8px;border:0;background:#0a84ff;color:#fff">${i === steps.length - 1 ? 'Done' : 'Next'}</button></span></div>`;
+        <div style="display:flex;gap:8px;justify-content:space-between"><button id="tkEnd" style="border:0;background:transparent;color:#666">Skip</button><span><button id="tkMore" style="border:0;background:transparent;color:#4a8be8">Full guide</button> <button id="tkNext" style="padding:7px 14px;border-radius:8px;border:0;background:#4a8be8;color:#fff">${i === steps.length - 1 ? 'Done' : 'Next'}</button></span></div>`;
       bub.style.left = Math.max(8, Math.min(window.innerWidth - 300, r.left)) + 'px';
       bub.style.top = below ? (r.bottom + 14) + 'px' : Math.max(8, r.top - 150) + 'px';
       bub.querySelector('#tkNext').onclick = () => { if (++i >= steps.length) end(); else show(); };
@@ -2112,7 +2134,7 @@ document.getElementById('helpBtn').onclick = startTour_;
 let noteTopic = null;
 let notesTopicView = null;
 const DEFAULT_TOPICS = ['Health', 'Trips', 'Work', 'Friends', 'Family'];
-const TOPIC_COLORS = ['#ff6b81', '#0a84ff', '#ff9f0a', '#30d158', '#bf5af2', '#00c7be', '#ffd60a', '#ff8a65'];
+const TOPIC_COLORS = ['#e07a94', '#4a8be8', '#d9894a', '#3fae78', '#8d6fe0', '#2fa7a1', '#d9b23f', '#e0794a'];
 function noteGroups_() { return remarkGroups().filter(g => g.kind === 'note'); }
 function allTopics_() {
   const set = new Set(DEFAULT_TOPICS);
@@ -2222,12 +2244,84 @@ function openSortNotes_() {
 // ===== Cash summary (Categories tab) =====
 function renderCashCard_() {
   let el = document.getElementById('cashCard');
-  if (!el) { el = document.createElement('div'); el.id = 'cashCard'; document.getElementById('categoriesPage').insertBefore(el, document.getElementById('catTiles')); }
+  if (!el) { el = document.createElement('div'); el.id = 'cashCard'; const hs = document.getElementById('historySummary'); hs.parentNode.insertBefore(el, hs); }
   const wd = allTxns.filter(t => t.category === 'Transfer' && t.subTag === 'To Cash' && txnFlow(t) === 'out').reduce((a, t) => a + Number(t.amount || 0), 0);
   const sp = allTxns.filter(t => t.account === 'Cash' && txnFlow(t) === 'out' && !NON_SPEND_CATEGORIES.includes(t.category)).reduce((a, t) => a + spendAmount(t), 0);
   if (!wd && !sp) { el.innerHTML = ''; return; }
   const left = wd - sp;
-  el.innerHTML = `<div class="cash-card"><div class="cash-t">💵 Cash</div><div class="cash-row"><span>Withdrawn <b>RM${wd.toFixed(0)}</b></span><span>Spent <b>RM${sp.toFixed(0)}</b></span><span style="color:${left < -0.5 ? '#ff453a' : '#30d158'}">Left <b>RM${left.toFixed(0)}</b></span></div><div class="cash-hint">Withdrawals are not counted as spending. Add what you spend in cash under the Cash account.</div></div>`;
+  const cashRows = allTxns.filter(t => t.account === 'Cash' || (t.category === 'Transfer' && t.subTag === 'To Cash')).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 15);
+  el.innerHTML = `<div class="cash-card"><div class="cash-t">💵 Cash</div><div class="cash-row"><span>Withdrawn <b>RM${wd.toFixed(0)}</b></span><span>Spent <b>RM${sp.toFixed(0)}</b></span><span style="color:${left < -0.5 ? '#e0685c' : '#3fae78'}">Left <b>RM${left.toFixed(0)}</b></span></div><div class="cash-hint">Withdrawals are not counted as spending. Add what you spend in cash under the Cash account.</div></div><div class="history-section-label" style="margin-top:10px">Cash records</div>${cashRows.map(t => renderTxnRow(t)).join('')}`;
+  attachCatSelectHandlers(); attachRemarkHandlers(); attachLinkHandlers();
+}
+
+
+// ===== Light / dark =====
+function applyTheme_() {
+  const light = localStorage.getItem('theme') === 'light';
+  document.body.classList.toggle('light', light);
+  const b = document.getElementById('themeBtn'); if (b) { b.textContent = light ? '🌙' : '☀️'; b.title = light ? 'Switch to dark' : 'Switch to light'; }
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = light ? '#f4f6fb' : '#0d1424';
+}
+document.getElementById('themeBtn').onclick = () => { localStorage.setItem('theme', localStorage.getItem('theme') === 'light' ? 'dark' : 'light'); applyTheme_(); };
+applyTheme_();
+
+// ===== Instant hover tips (mouse). Phones: tap =====
+(function () {
+  let tip = null;
+  const hide = () => { if (tip) { tip.remove(); tip = null; } };
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest && e.target.closest('[title],[data-tip]');
+    if (!el) { hide(); return; }
+    if (el.hasAttribute('title')) { el.setAttribute('data-tip', el.getAttribute('title')); el.removeAttribute('title'); }
+    const text = el.getAttribute('data-tip'); if (!text) return;
+    hide();
+    tip = document.createElement('div'); tip.className = 'tip-bubble'; tip.textContent = text;
+    document.body.appendChild(tip);
+    const r = el.getBoundingClientRect();
+    tip.style.left = Math.max(6, Math.min(window.innerWidth - tip.offsetWidth - 6, r.left + r.width / 2 - tip.offsetWidth / 2)) + 'px';
+    tip.style.top = (r.top - tip.offsetHeight - 8 < 4 ? r.bottom + 8 : r.top - tip.offsetHeight - 8) + 'px';
+  });
+  document.addEventListener('mouseout', e => { if (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest('[data-tip]')) hide(); });
+  document.addEventListener('scroll', hide, true);
+})();
+
+// ===== Note default category =====
+function noteDefaults_() {
+  const m = {};
+  customTags.filter(c => c.category === '__notecat__').forEach(c => { const i = c.subTag.indexOf('|'); if (i > 0) { const rest = c.subTag.slice(i + 1).split('|'); m[c.subTag.slice(0, i)] = { cat: rest[0], sub: rest[1] || '' }; } });
+  return m;
+}
+function applyNoteDefault_() {
+  if (linkMode !== 'note') return;
+  const sel = document.getElementById('linkCountAs');
+  if (!sel || sel.value) return;
+  const name = document.getElementById('splitPickerInput').value.trim();
+  if (!name) return;
+  const full = (noteTopic ? noteTopic + TOPIC_SEP : '') + name;
+  const d = noteDefaults_()[full.toLowerCase()];
+  if (!d) return;
+  const v = d.cat + '|' + d.sub;
+  if ([...sel.options].some(o => o.value === v)) { sel.value = v; const hint = document.getElementById('noteSimilar'); if (hint) hint.insertAdjacentHTML('beforeend', `<span class="nt-sim">Category filled in: ${escapeHtml(d.cat)}${d.sub ? ' · ' + escapeHtml(d.sub) : ''}</span>`); }
+}
+document.getElementById('splitPickerInput').addEventListener('input', () => { setTimeout(applyNoteDefault_, 0); });
+
+// ===== Who was this for: People note + remember =====
+const personAuto_ = new Set();
+async function autoApplyPeople_() {
+  if (VIEW_ONLY) return;
+  const map = {};
+  customTags.filter(c => c.category === '__person__').forEach(c => { const i = c.subTag.indexOf('|'); if (i > 0) map[c.subTag.slice(0, i)] = c.subTag.slice(i + 1); });
+  if (!Object.keys(map).length) return;
+  let changed = false;
+  for (const t of allTxnsRaw) {
+    if (t.category !== 'Transfer' || !(t.subTag === 'To Others' || t.subTag === 'From Others') || t.remark || personAuto_.has(t.row)) continue;
+    const r = map[String(t.merchant || '').toLowerCase()];
+    if (!r) continue;
+    personAuto_.add(t.row);
+    t.remark = r; changed = true;
+    await callApi('updateRemark', { row: t.row, remark: r });
+  }
+  if (changed) { applySplitOverlay_(); renderApp(); }
 }
 
 document.querySelectorAll('.chart-mode-btn').forEach(btn => {
@@ -2421,7 +2515,7 @@ function renderCompareMonths_() {
     if (prev && prev.total > 0) {
       const diff = m.total - prev.total;
       const pct = diff / prev.total * 100;
-      delta = `<span style="color:${diff > 0 ? '#ff453a' : '#30d158'}">${diff > 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(0)}%</span>`;
+      delta = `<span style="color:${diff > 0 ? '#e0685c' : '#3fae78'}">${diff > 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(0)}%</span>`;
     }
     const w = Math.max(0, Math.round(Math.max(m.total, 0) / max * 100));
     return `<div class="cmp-month-row">
@@ -2471,7 +2565,7 @@ function renderCompare() {
   const dA = cmpDays_(A[0], A[1]), dB = cmpDays_(B[0], B[1]);
   const dayVal = (d) => cmpPeriodTxns_(d, d, cmpScope).reduce((s, t) => s + spendAmount(t), 0);
   const max = Math.max(1, ...dA.map(dayVal), ...dB.map(dayVal));
-  const diffColor = diff > 0 ? '#ff453a' : (diff < 0 ? '#30d158' : 'inherit');
+  const diffColor = diff > 0 ? '#e0685c' : (diff < 0 ? '#3fae78' : 'inherit');
   const lbl = (rng) => rng[0] === rng[1] ? rng[0] : `${rng[0]} → ${rng[1]}`;
   document.getElementById('cmpResult').innerHTML = `
     <div class="cmp-cards">
@@ -2480,7 +2574,7 @@ function renderCompare() {
     </div>
     <div class="cmp-diff" style="color:${diffColor}">${diff > 0 ? '▲' : (diff < 0 ? '▼' : '=')} RM${Math.abs(diff).toFixed(2)}${pct !== null ? ` (${diff >= 0 ? '+' : '-'}${Math.abs(pct).toFixed(0)}%)` : ''} ${diff > 0 ? 'more' : (diff < 0 ? 'less' : '')} than B${samePointB !== null ? ' at the same point' : ''}</div>
     ${note ? `<div class="cmp-note">${note}</div>` : ''}
-    <div class="cmp-bars-label">A · day by day</div>${cmpBarsHtml_(dA, cmpScope, max, '#0a84ff')}
+    <div class="cmp-bars-label">A · day by day</div>${cmpBarsHtml_(dA, cmpScope, max, '#4a8be8')}
     <div class="cmp-bars-label">B · day by day</div>${cmpBarsHtml_(dB, cmpScope, max, '#8e8e93')}`;
 }
 document.getElementById('cmpScope').onchange = e => { cmpScope = e.target.value; renderCompare(); };
@@ -2583,6 +2677,7 @@ async function loadData() {
   applySplitOverlay_();
   seedRecentDayExpansion();
   renderApp();
+  autoApplyPeople_();
 }
 
 // Opens the Main list to a useful default on first load: the last 7 days'
@@ -2720,7 +2815,7 @@ function renderApp() {
     else if (insightsSubPage === 'splits') renderSplitsInsights(splitsFilterRemark);
     else if (insightsSubPage === 'commit') renderCommitments_();
   }
-  if (activePage === 'history') renderHistory();
+  if (activePage === 'history') { renderHistory(); renderCashCard_(); }
 }
 
 // Insights (Calendar/Charts/Splits) used to be its own top-level tab; now
@@ -2750,12 +2845,11 @@ function switchPage(page) {
   activePage = page;
   document.querySelectorAll('.page-tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   document.getElementById('mainPage').style.display = page === 'main' ? '' : 'none';
-  document.getElementById('categoriesPage').style.display = page === 'categories' ? '' : 'none';
   document.getElementById('insightsTab').style.display = page === 'insights' ? '' : 'none';
   document.getElementById('historyPage').style.display = page === 'history' ? '' : 'none';
   document.getElementById('reviewPage').style.display = page === 'review' ? '' : 'none';
   if (page === 'insights') switchInsightsSub(insightsSubPage);
-  if (page === 'history') renderHistory();
+  if (page === 'history') { renderHistory(); renderCashCard_(); }
   if (page === 'review') renderReviewList();
 }
 document.querySelectorAll('.page-tab').forEach(el => {
@@ -2935,6 +3029,10 @@ function renderCalendar() {
 // remark, extra tag) from right here, exactly like the Main list.
 function renderCalDayPanel() {
   const panelEl = document.getElementById('calDayPanel');
+  const hideBrowse = !!selectedCalendarDay;
+  const mb = document.getElementById('mainBrowse'), ct = document.getElementById('catTiles');
+  if (mb) mb.style.display = hideBrowse ? 'none' : '';
+  if (ct) ct.style.display = hideBrowse ? 'none' : '';
   if (!selectedCalendarDay) { panelEl.innerHTML = ''; return; }
   const dayTxns = sortTxns(allTxns.filter(t => t.date === selectedCalendarDay));
   const total = dayTxns
@@ -3110,9 +3208,9 @@ function trendBucketsFor(txns) {
 // the hue wheel to tell apart when several categories are plotted side by
 // side as bars. Each category gets its own distinct hue here instead.
 const TREND_CATEGORY_COLORS = {
-  Food: '#ff6b35', Transport: '#0a84ff', Vehicle: '#5e5ce6', Shopping: '#ff9f0a', Health: '#30d158', 'Personal Care': '#ff6482',
-  Entertainment: '#ffd60a', Subscriptions: '#bf5af2', Sports: '#64d2ff', Social: '#ff9ff3', Housing: '#ff375f', Bills: '#32ade6',
-  'Work Expenses': '#a2845e', Services: '#00c7be', Loss: '#ff453a', 'Savings & Investment': '#34c759', Unsure: '#bf5af2'
+  Food: '#e0794a', Transport: '#4a8be8', Vehicle: '#6f72d8', Shopping: '#d9894a', Health: '#3fae78', 'Personal Care': '#e07a94',
+  Entertainment: '#d9b23f', Subscriptions: '#8d6fe0', Sports: '#4fa8d8', Social: '#d98ad0', Housing: '#e07a94', Bills: '#4fa8d8',
+  'Work Expenses': '#a2845e', Services: '#2fa7a1', Loss: '#e0685c', 'Savings & Investment': '#3fae78', Unsure: '#8d6fe0'
 };
 
 // Compresses bar HEIGHT only (sign-preserving square root) so a month with
@@ -3218,7 +3316,7 @@ function renderTrends() {
       datasets: [{
         data: values.map(sqrtTransform),
         _raw: values,
-        backgroundColor: values.map((v, i) => (!isCustom && i === values.length - 1) ? '#f5a623' : '#3a3a3d'),
+        backgroundColor: values.map((v, i) => (!isCustom && i === values.length - 1) ? '#3a9bc4' : '#3a3a3d'),
         borderRadius: 6,
         maxBarThickness: isCustom ? 16 : 40
       }]
@@ -3551,7 +3649,7 @@ function renderReviewDates_() {
   section.style.display = '';
   document.getElementById('reviewDatesLabel').textContent = `Dates to confirm (${rows.length})`;
   el.innerHTML = `<div class="review-meta" style="margin:0 0 8px;color:var(--muted);font-size:12px;">These came from the bank days after you paid. Set the day you really paid, or keep the posted date for now.</div>` + rows.map(t => `
-    <div class="review-entry" style="border-left:3px solid #ff9f0a;border-radius:12px;">
+    <div class="review-entry" style="border-left:3px solid #d9894a;border-radius:12px;">
       <div style="display:flex;justify-content:space-between;gap:8px;">
         <div><b>${escapeHtml(txnTitle(t))}</b><div class="meta">Posted ${fmtShortDate_(t.postedDate || t.date)} · ${escapeHtml(t.account || '')}</div></div>
         <div style="font-weight:600;">RM${Number(t.amount || 0).toFixed(2)}</div>
@@ -3971,9 +4069,9 @@ function renderTotals(txns, incomeTxns) {
 // grey since money moves either direction, and Unsure stays purple as a
 // "needs review" flag.
 const CHART_COLORS = {
-  Food: '#ff6b35', Transport: '#0a84ff', Vehicle: '#5e5ce6', Shopping: '#ff9f0a', Health: '#30d158', 'Personal Care': '#ff6482',
-  Entertainment: '#ffd60a', Subscriptions: '#bf5af2', Sports: '#64d2ff', Social: '#ff9ff3', Housing: '#ff7a9c', Bills: '#32ade6',
-  'Work Expenses': '#a2845e', Services: '#00c7be', Loss: '#ff453a', 'Savings & Investment': '#34c759', Unsure: '#bf5af2', Transfer: '#8e8e93', Income: '#30d158'
+  Food: '#e0794a', Transport: '#4a8be8', Vehicle: '#6f72d8', Shopping: '#d9894a', Health: '#3fae78', 'Personal Care': '#e07a94',
+  Entertainment: '#d9b23f', Subscriptions: '#8d6fe0', Sports: '#4fa8d8', Social: '#d98ad0', Housing: '#e07a94', Bills: '#4fa8d8',
+  'Work Expenses': '#a2845e', Services: '#2fa7a1', Loss: '#e0685c', 'Savings & Investment': '#3fae78', Unsure: '#8d6fe0', Transfer: '#8e8e93', Income: '#3fae78'
 };
 
 // Not real spending — Transfer covers wallet top-ups (Card Reload), P2P
@@ -3990,10 +4088,10 @@ function colorFor(key) { return CHART_COLORS[key] || '#8e8e93'; }
 // of collapsing into one slice. Transfer's subtags are all grey shades since
 // the category itself is neutral regardless of which subtag.
 const SUBTAG_COLORS = {
-  Toll: '#0a84ff', Parking: '#64d2ff', Fuel: '#5e5ce6', Service: '#30d5ff', Ride: '#ff6961',
-  'Convenience Store': '#34c759', Hypermarket: '#30d158', Pharmacy: '#30d158', Supplements: '#34c759', Supplies: '#63e6be', Medical: '#ff2d55', Haircut: '#ff9500', Skincare: '#ff6482', Spa: '#ff9ff3', Delivery: '#ff9f0a', Streaming: '#ff6482', 'Apps & Software': '#5e5ce6', Gaming: '#bf5af2', Deposit: '#5e5ce6', Loan: '#0a84ff', Insurance: '#30b0c7', 'Road Tax': '#64d2ff', Registration: '#a2845e', Props: '#a2845e', Equipment: '#8e8e93', Legal: '#00c7be', Cleaning: '#34c759', Repairs: '#ff9f0a', Scam: '#ff453a', Fines: '#ff6961', Charges: '#8e8e93', Phone: '#32ade6', Internet: '#5e5ce6', Treat: '#ff9ff3', Gift: '#ff6482', Condolence: '#8e8e93',
-  Subscription: '#ff6482',
-  Rent: '#30b0c7', 'Water & Electric': '#64d2ff', WiFi: '#5e5ce6', 'Carpark Rent': '#0a84ff',
+  Toll: '#4a8be8', Parking: '#4fa8d8', Fuel: '#6f72d8', Service: '#30d5ff', Ride: '#e0685c',
+  'Convenience Store': '#3fae78', Hypermarket: '#3fae78', Pharmacy: '#3fae78', Supplements: '#3fae78', Supplies: '#63e6be', Medical: '#e07a94', Haircut: '#d9894a', Skincare: '#e07a94', Spa: '#d98ad0', Delivery: '#d9894a', Streaming: '#e07a94', 'Apps & Software': '#6f72d8', Gaming: '#8d6fe0', Deposit: '#6f72d8', Loan: '#4a8be8', Insurance: '#2fa7a1', 'Road Tax': '#4fa8d8', Registration: '#a2845e', Props: '#a2845e', Equipment: '#8e8e93', Legal: '#2fa7a1', Cleaning: '#3fae78', Repairs: '#d9894a', Scam: '#e0685c', Fines: '#e0685c', Charges: '#8e8e93', Phone: '#4fa8d8', Internet: '#6f72d8', Treat: '#d98ad0', Gift: '#e07a94', Condolence: '#8e8e93',
+  Subscription: '#e07a94',
+  Rent: '#2fa7a1', 'Water & Electric': '#4fa8d8', WiFi: '#6f72d8', 'Carpark Rent': '#4a8be8',
   // Yellow (matches .dot.Reload) — any movement of money between your OWN
   // accounts, called out distinctly from To Others/From Others (money
   // actually going to/from someone else) below. "Internal" used to be its
@@ -4002,9 +4100,9 @@ const SUBTAG_COLORS = {
   // it had become a fundamentally different kind of transaction, when it's
   // really the exact same "moved money between my own accounts" concept,
   // just now confirmed. All three share this yellow instead.
-  'Card Reload': '#ffcc00', 'TNG Card Top-up': '#ffcc00', 'Internal': '#ffcc00',
+  'Card Reload': '#d9b23f', 'TNG Card Top-up': '#d9b23f', 'Internal': '#d9b23f',
   'To Others': '#8e8e93', 'From Others': '#636366', 'To Cash': '#a2845e',
-  Salary: '#30d158', Interest: '#64d2ff', Other: '#bf5af2', Others: '#8e8e93'
+  Salary: '#3fae78', Interest: '#4fa8d8', Other: '#8d6fe0', Others: '#8e8e93'
 };
 function colorForSub(key) { return SUBTAG_COLORS[key] || '#8e8e93'; }
 
@@ -4110,7 +4208,7 @@ function renderChartOn(canvasId, txns, highlightKey, opts) {
   // Merchant names (Food mode) aren't in the static subtag palette, so hash
   // them to a color deterministically instead — keeps the same shop the
   // same color across renders without hardcoding every merchant by name.
-  const MERCHANT_PALETTE = ['#0a84ff', '#30d158', '#ff9f0a', '#bf5af2', '#64d2ff', '#ff375f', '#ffd60a', '#5e5ce6', '#ff6961', '#34c759'];
+  const MERCHANT_PALETTE = ['#4a8be8', '#3fae78', '#d9894a', '#8d6fe0', '#4fa8d8', '#e07a94', '#d9b23f', '#6f72d8', '#e0685c', '#3fae78'];
   function merchantColor(label) {
     if (label === 'Others') return '#8e8e93';
     let h = 0;
@@ -5639,7 +5737,7 @@ function renderTxnRow(t, opts) {
     <div class="txn txn2${rvKey}${rvCollapsed}" data-row="${t.row}" style="--cc:${colorFor(t.category)}">
       <div class="txn-top"${opts.reviewMode ? ` data-rv-toggle="${t.row}"` : ''}>
         <div class="merchant">${chev}<span class="merchant-text">${txnTitle(t)}</span>${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${syncedFlagHtml}</div>
-        <div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>
+        <div class="txn-top-r"><div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>${opts.reviewMode ? `<button class="review-btn confirm review-confirm-cat-btn" data-row="${t.row}">Confirm</button>` : ''}</div>
       </div>
       ${hintHtml}
       ${typeHintHtml}
@@ -5652,7 +5750,6 @@ function renderTxnRow(t, opts) {
             : `<select class="txn-cat-select${opts.reviewMode ? ' review-cat-select' : ''}" data-row="${t.row}" data-committed="${t.category}|${t.subTag || ''}">${categoryOptionsHtml(t.category, t.subTag, t.account)}</select>`}
           ${extraSelectHtml}
           ${extraAmountHtml}
-          ${opts.reviewMode ? `<button class="review-btn confirm review-confirm-cat-btn" data-row="${t.row}">Confirm</button>` : ''}
         </div>
         <div class="txn-actions">
           ${remarkBtnHtml}
@@ -5760,12 +5857,17 @@ function attachReviewConfirmHandlers() {
     btn.onclick = async () => {
       const row = Number(btn.dataset.row);
       const isIncoming = btn.dataset.direction === 'in';
-      const remark = await askTextInline_(isIncoming
-        ? 'Who sent you this transfer? (required to confirm)'
-        : 'Who/what was this transfer for? (required to confirm)');
-      if (remark === null) return;
-      const trimmed = remark.trim();
-      if (!trimmed) { alert('A remark is required to confirm this transfer.'); return; }
+      const t0 = allTxns.find(x => x.row === row);
+      const who = await askTextInline_(isIncoming ? 'Who sent you this? (a name like Dad or Jiejie)' : 'Who was this for? (a name like Dad or Jiejie)');
+      if (who === null) return;
+      const nm = who.trim();
+      if (!nm) { alert('A name is required to confirm this transfer.'); return; }
+      const remark = 'People' + TOPIC_SEP + nm;
+      const trimmed = remark;
+      const pkey = String(t0 ? t0.merchant : '').toLowerCase() + '|' + remark;
+      showMenu_('Remember ' + nm + '?', [
+        { label: 'Yes, remember', desc: 'Next transfer ' + (isIncoming ? 'from' : 'to') + ' ' + (t0 ? t0.merchant : 'this person') + ' is filled in and skips Review.', color: '#3fae78', run: async () => { try { await callApi('addCustomTag', { category: '__person__', subTag: pkey }); } catch (e) {} customTags.push({ category: '__person__', subTag: pkey }); } },
+        { label: 'Just this once', desc: 'Only this record.', color: '#8a97b2', run: () => {} }]);
       btn.disabled = true;
       btn.textContent = 'Confirming…';
       await callApi('updateRemark', { row, remark: trimmed });
@@ -5968,7 +6070,7 @@ function linkGroups_() { return remarkGroups(); }
 function splitGroups() { return remarkGroups().filter(g => g.kind !== 'note' && g.count >= 2); }
 function outstandingClaims_() { return linkGroups_().filter(g => g.kind === 'claim' && g.totalOut - g.totalIn > 0.005); }
 
-const LINK_COLORS = { split: '#0a84ff', claim: '#ff9f0a', note: '#00c7be' };
+const LINK_COLORS = { split: '#4a8be8', claim: '#d9894a', note: '#2fa7a1' };
 const LINK_LABELS = { split: 'Split', claim: 'Claim', note: 'Note' };
 function linkStatus_(g) {
   const owed = g.totalOut - g.totalIn;
@@ -5986,7 +6088,7 @@ function lockRowHtml_(g) {
   if (g.done) return `<div class="lock-row"><span>🔒 ${g.kind === 'note' ? 'Done' : 'Settled'}</span><button class="lock-btn" data-unlock="${key}">${g.kind === 'note' ? 'Reopen' : 'Unlock'}</button></div>`;
   const owed = g.totalOut - g.totalIn;
   const ready = g.kind === 'note' ? true : (g.kind === 'claim' ? owed <= 0.005 : g.totalIn > 0);
-  return ready ? `<div class="lock-row"><span></span><button class="lock-btn lock-go" data-lock="${key}">${g.kind === 'note' ? 'Mark done ✓' : 'Mark settled 🔒'}</button></div>` : '';
+  return true ? `<div class="lock-row"><span></span><button class="lock-btn lock-go" data-lock="${key}">${g.kind === 'note' ? 'Mark done ✓' : 'Mark settled 🔒'}</button></div>` : '';
 }
 async function setGroupDone_(key, on) {
   const g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
@@ -6007,7 +6109,7 @@ document.addEventListener('click', async e => {
   if (b.dataset.lock) {
     const key = b.dataset.lock, g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
     showMenu_(`${g && g.kind === 'note' ? 'Mark done' : 'Mark settled'}: ${stripMark_(g ? g.remark : key)}`, [
-      { label: 'Yes, lock it', desc: g && g.kind === 'note' ? 'Moves to Done. You can reopen it any time.' : 'It cannot be changed unless you enter your password and a reason.', color: '#30d158', run: () => setGroupDone_(key, true) },
+      { label: 'Yes, lock it', desc: g && g.kind === 'note' ? 'Moves to Done. You can reopen it any time.' : ((g && g.kind === 'claim' && g.totalOut - g.totalIn > 0.005) ? `RM${(g.totalOut - g.totalIn).toFixed(2)} is still unpaid. Settle anyway? ` : '') + 'It cannot be changed unless you enter your password and a reason.', color: '#3fae78', run: () => setGroupDone_(key, true) },
       { label: 'Not yet', desc: 'Leave it open.', color: '#8e8e93', run: () => {} }]);
   } else if (b.dataset.unlock) {
     const key = b.dataset.unlock, g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
@@ -6038,7 +6140,7 @@ function splitGroupCardHtml(g) {
   if (g.kind === 'claim') {
     const pct = g.totalOut > 0 ? Math.min(100, Math.round(g.totalIn / g.totalOut * 100)) : 0;
     statsHtml = `<div class="link-bar"><div class="link-bar-fill" style="width:${pct}%"></div></div>
-      <div class="split-group-summary"><span>Paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Claimed <b>RM${g.totalIn.toFixed(2)}</b></span><span style="color:${owed > 0 ? '#ff9f0a' : '#30d158'}">Owed <b>RM${owed.toFixed(2)}</b></span></div>`;
+      <div class="split-group-summary"><span>Paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Claimed <b>RM${g.totalIn.toFixed(2)}</b></span><span style="color:${owed > 0 ? '#d9894a' : '#3fae78'}">Owed <b>RM${owed.toFixed(2)}</b></span></div>`;
   } else if (g.kind === 'split') {
     statsHtml = `<div class="split-group-summary"><span>You paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Back <b>RM${g.totalIn.toFixed(2)}</b></span><span>Your share <b>${formatSignedRM(g.net)}</b></span></div>`;
   } else {
@@ -6093,8 +6195,8 @@ function renderSplitsInsights(filterRemark) {
     } else if (!shown.length) {
       el.innerHTML = '<div class="empty">Nothing here yet. Tap the ✎ on a record to link it as a Split, Claim or Note.</div>';
     } else {
-      el.innerHTML = (attention.length ? `<div class="link-section-title" style="color:#ff9f0a;">Needs attention (${attention.length})</div>` + attention.map(splitGroupCardHtml).join('') : '') +
-        (rest.length ? `<div class="link-section-title" style="color:#30d158;">${attention.length ? 'Done' : 'All'} (${rest.length})</div>` + rest.map(splitGroupCardHtml).join('') : '');
+      el.innerHTML = (attention.length ? `<div class="link-section-title" style="color:#d9894a;">Needs attention (${attention.length})</div>` + attention.map(splitGroupCardHtml).join('') : '') +
+        (rest.length ? `<div class="link-section-title" style="color:#3fae78;">${attention.length ? 'Done' : 'All'} (${rest.length})</div>` + rest.map(splitGroupCardHtml).join('') : '');
     }
   }
   el.querySelectorAll('.split-group-viewlist').forEach(btn => {
@@ -6159,6 +6261,8 @@ function renderLinkPicker_() {
   let groups = remarkGroups().filter(g => g.kind === linkMode && !g.done);
   if (linkMode === 'note') groups = noteGroupsForPicker_(groups);
   renderNoteTopics_();
+  document.getElementById('linkRememberText').textContent = linkMode === 'note' ? 'Always use this category for this note' : 'Remember for this merchant next time';
+  applyNoteDefault_();
   const listEl = document.getElementById('splitPickerList');
   const label = document.getElementById('splitPickerInputLabel');
   const input = document.getElementById('splitPickerInput');
@@ -6227,7 +6331,11 @@ async function saveLinkChoice_(remark) {
   }
   if (chosen) {
     await callApi('updateCategory', { row, category: chosen[0], subTag: chosen[1] });
-    if (remember && t && t.merchant) await callApi('saveMerchantRule', { rule: { merchant: t.merchant, category: chosen[0], subTag: chosen[1] } });
+    if (remember && linkMode === 'note' && remark) {
+      const sub = stripMark_(remark).toLowerCase() + '|' + chosen[0] + '|' + (chosen[1] || '');
+      try { await callApi('addCustomTag', { category: '__notecat__', subTag: sub }); } catch (e) {}
+      customTags.push({ category: '__notecat__', subTag: sub });
+    } else if (remember && t && t.merchant) await callApi('saveMerchantRule', { rule: { merchant: t.merchant, category: chosen[0], subTag: chosen[1] } });
   }
   await loadData();
 }
@@ -6240,7 +6348,7 @@ document.getElementById('splitPickerSave').onclick = () => {
     const full = noteTopic ? noteTopic + TOPIC_SEP + val : val;
     const t = allTxns.find(x => x.row === splitPickerRow);
     showMenu_('Confirm this note', [
-      { label: full, desc: `Attached to: ${t ? txnTitle(t) + ' · RM' + Number(t.amount).toFixed(2) : 'this record'}. Totals do not change.`, color: '#00c7be', run: () => saveLinkChoice_(full) },
+      { label: full, desc: `Attached to: ${t ? txnTitle(t) + ' · RM' + Number(t.amount).toFixed(2) : 'this record'}. Totals do not change.`, color: '#2fa7a1', run: () => saveLinkChoice_(full) },
       { label: 'Go back', desc: 'Change the note.', color: '#8e8e93', run: () => {} }]);
     return;
   }
@@ -8570,7 +8678,7 @@ function claimChipHtml_(t) {
   const cat = origCat_(t);
   if (cat !== 'Work Expenses' || txnFlow(t) !== 'out') return '';
   const g = t.remark ? remarkGroups().find(x => splitGroupKey_(x.remark) === splitGroupKey_(t.remark) && x.kind === 'claim') : null;
-  if (g && g.totalOut - g.totalIn <= 0.005) return '<span class="clock-chip" style="background:rgba(48,209,88,.2);color:#30d158;">✔ claimed</span>';
+  if (g && g.totalOut - g.totalIn <= 0.005) return '<span class="clock-chip" style="background:rgba(48,209,88,.2);color:#3fae78;">✔ claimed</span>';
   return '<span class="clock-chip clock-warn" title="Paid for work — not paid back yet">⏳ not claimed yet</span>';
 }
 function openDateDialog_(row) {
