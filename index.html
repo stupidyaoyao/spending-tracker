@@ -698,6 +698,14 @@
   .locked-row { display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 14px; cursor: pointer; }
   .locked-row .lr-amt { color: var(--muted); white-space: nowrap; }
   .locked-detail { padding: 8px; background: var(--card2); }
+  .sum-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .sum-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; margin-bottom: 6px; }
+  .sum-l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .sum-v { font-size: 28px; font-weight: 700; }
+  .sum-d { font-size: 15px; font-weight: 700; text-align: right; } .sum-d span { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+  .sum-line { font-size: 13px; color: var(--text); padding: 3px 0; border-top: 1px solid var(--line); }
+  .sug-btn { border: 0; background: var(--accent); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 12px; }
+  .sug-x { border: 0; background: transparent; color: var(--muted); font-size: 14px; }
   .link-seg { display:flex; gap:6px; margin:6px 0 8px; }
   .link-seg button { flex:1; padding:8px 0; border-radius:999px; border:1.5px solid; background:transparent; font-weight:600; font-size:14px; }
   .link-help { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.4; }
@@ -899,6 +907,7 @@
 
   <div id="insightsTab" style="display:none;">
   <div id="insightsPage">
+    <div id="insightsSummary"></div>
     <div class="insights-subnav" id="insightsSubnav">
       <button class="insights-subtab active" data-sub="compare" style="--tc:#8d6fe0">Compare</button>
       <button class="insights-subtab" data-sub="splits" style="--tc:#2fa7a1">Links</button>
@@ -929,6 +938,7 @@
     <div id="commitPage" style="display:none;">
       <div id="commitSummary"></div>
       <div id="commitList"></div>
+      <div id="commitSuggest"></div>
       <button class="commit-add" id="commitAddBtn">+ Add a commitment</button>
     </div>
 
@@ -1958,7 +1968,7 @@ document.getElementById('hideNumbersBtn').onclick = () => {
 };
 
 // ===== Two-step category picker =====
-function openCatSheet_(sel, keepLabel) {
+function openCatSheet_(sel, keepLabel, totals) {
   const opts = [...sel.options].map(o => ({ v: o.value, l: o.textContent, cur: o.selected }));
   const groups = {};
   const order = [];
@@ -1975,10 +1985,10 @@ function openCatSheet_(sel, keepLabel) {
   const choose = v => { ov.remove(); sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); };
   const step1 = () => {
     ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
-      <div style="font-weight:700;margin-bottom:8px">Pick a category</div>
+      <div style="font-weight:700;margin-bottom:8px">Pick a category${totals ? ' <span style="font-weight:400;color:var(--muted);font-size:12px">· ' + escapeHtml(periodLabel_()) + '</span>' : ''}</div>
       ${keep ? '<button data-keep="1" style="width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:0;background:var(--card2);color:inherit">' + (keepLabel || 'Keep as it is') + '</button>' : ''}
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:11px 12px;border-radius:10px;border:0;border-left:4px solid ${colorFor(c)};background:color-mix(in srgb, ${colorFor(c)} ${c === curCat ? 30 : 12}%, var(--card2));color:var(--text);font-weight:600;font-size:14px">${escapeHtml(c)}${groups[c].length > 1 ? ' <span style="color:var(--muted)">›</span>' : ''}</button>`).join('')}</div>
+      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:11px 12px;border-radius:10px;border:0;border-left:4px solid ${colorFor(c)};background:color-mix(in srgb, ${colorFor(c)} ${c === curCat ? 30 : 12}%, var(--card2));color:var(--text);font-weight:600;font-size:14px">${escapeHtml(c)}${groups[c].length > 1 ? ' <span style="color:var(--muted)">›</span>' : ''}${totals ? `<div style="font-size:11px;font-weight:400;color:var(--muted)">${totals[c] ? 'RM' + totals[c].toFixed(0) : '—'}</div>` : ''}</button>`).join('')}</div>
       <button data-x="1" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div>`;
     ov.querySelectorAll('[data-c]').forEach(b => { b.onclick = () => { const g = groups[b.dataset.c]; if (g.length === 1) choose(g[0].v); else step2(b.dataset.c); }; });
     const k = ov.querySelector('[data-keep]'); if (k) k.onclick = () => choose('');
@@ -2368,9 +2378,10 @@ function renderFilterBar_() {
   const cv = document.getElementById('fbCatV'), av = document.getElementById('fbAccV'), ch = document.getElementById('filterChips');
   if (!cv) return;
   cv.textContent = activeFilter === 'All' ? 'All' : activeFilter + (activeSubFilter !== 'All' ? ' · ' + activeSubFilter : '');
+  const pt = periodCatTotals_()[activeFilter];
   av.textContent = activeAccountFilter;
   let h = '';
-  if (activeFilter !== 'All') h += `<button class="soft-chip on" data-x="cat" style="--c:${colorFor(activeFilter)}">${escapeHtml(cv.textContent)} ✕</button>`;
+  if (activeFilter !== 'All') h += `<button class="soft-chip on" data-x="cat" style="--c:${colorFor(activeFilter)}">${escapeHtml(cv.textContent)}${pt ? ' · RM' + pt.toFixed(0) : ''} ✕</button>`;
   if (activeAccountFilter !== 'All') h += `<button class="soft-chip on" data-x="acc">${escapeHtml(activeAccountFilter)} ✕</button>`;
   ch.innerHTML = h;
   ch.querySelectorAll('[data-x]').forEach(b => { b.onclick = () => { if (b.dataset.x === 'cat') { activeFilter = 'All'; activeSubFilter = 'All'; } else activeAccountFilter = 'All'; render(); }; });
@@ -2380,7 +2391,7 @@ document.getElementById('fbCat').onclick = () => {
   sel.innerHTML = '<option value="">All categories</option>' + CATEGORY_OPTIONS.filter(o => o.subTag !== '__new__').map(o => `<option value="${optionValue(o)}">${escapeHtml(o.label)}</option>`).join('');
   sel.value = activeFilter === 'All' ? '' : activeFilter + '|' + (activeSubFilter === 'All' ? '' : activeSubFilter);
   sel.onchange = () => { const v = sel.value; if (!v) { activeFilter = 'All'; activeSubFilter = 'All'; } else { const parts = v.split('|'); activeFilter = parts[0]; activeSubFilter = parts[1] || 'All'; } render(); };
-  openCatSheet_(sel, 'All categories');
+  openCatSheet_(sel, 'All categories', periodCatTotals_());
 };
 document.getElementById('fbAcc').onclick = () => {
   showMenu_('Account', ['All'].concat(ACCOUNTS).map(a => ({ label: a, desc: a === 'All' ? 'Every account' : '', color: '#4a8be8', active: a === activeAccountFilter, run: () => { activeAccountFilter = a; render(); } })));
@@ -2412,6 +2423,95 @@ function jumpToRecord_(row) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 document.addEventListener('click', e => { const r = e.target.closest && e.target.closest('[data-jump-row]'); if (r) jumpToRecord_(Number(r.dataset.jumpRow)); });
+
+
+// ===== Category totals follow the calendar you are looking at =====
+function calRange_() {
+  if (calView === 'year') { const y = calendarMonth.getFullYear(); return [y + '-01-01', y + '-12-31']; }
+  const ds = calViewDates_(); return [ds[0], ds[ds.length - 1]];
+}
+function periodCatTotals_() {
+  const [from, to] = calRange_(); const m = {};
+  allTxns.forEach(t => {
+    if (!t.date || t.date < from || t.date > to || NON_SPEND_CATEGORIES.includes(t.category)) return;
+    if (activeAccountFilter !== 'All' && t.account !== activeAccountFilter) return;
+    m[t.category] = (m[t.category] || 0) + spendAmount(t);
+  });
+  return m;
+}
+function periodLabel_() {
+  if (calView === 'year') return String(calendarMonth.getFullYear());
+  if (calView === 'week') { const ds = calViewDates_(); return new Date(ds[0] + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' – ' + new Date(ds[6] + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
+  return calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+// ===== Insights summary =====
+function renderInsightsSummary_() {
+  const el = document.getElementById('insightsSummary');
+  if (!el) return;
+  if (VIEW_ONLY) { el.innerHTML = ''; return; }
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), day = now.getDate();
+  const iso = (yy, mm, dd) => yy + '-' + String(mm + 1).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+  const pm = new Date(y, m - 1, 1);
+  const curFrom = iso(y, m, 1), curTo = iso(y, m, day);
+  const prevFrom = iso(pm.getFullYear(), pm.getMonth(), 1), prevTo = iso(pm.getFullYear(), pm.getMonth(), Math.min(day, new Date(pm.getFullYear(), pm.getMonth() + 1, 0).getDate()));
+  const spendIn = (a, b) => allTxns.filter(t => t.date >= a && t.date <= b && !NON_SPEND_CATEGORIES.includes(t.category));
+  const cur = spendIn(curFrom, curTo), prev = spendIn(prevFrom, prevTo);
+  const sum = a => a.reduce((s, t) => s + spendAmount(t), 0);
+  const curT = sum(cur), prevT = sum(prev);
+  const byCat = {}; cur.forEach(t => { byCat[t.category] = (byCat[t.category] || 0) + spendAmount(t); });
+  const topCats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const byDay = {}; cur.forEach(t => { byDay[t.date] = (byDay[t.date] || 0) + spendAmount(t); });
+  const topDay = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0];
+  const topTx = cur.slice().sort((a, b) => spendAmount(b) - spendAmount(a))[0];
+  const diff = prevT > 0 ? (curT - prevT) / prevT * 100 : null;
+  const mName = now.toLocaleDateString('en-GB', { month: 'long' });
+  const dayName = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const lines = [];
+  if (topCats.length) lines.push(`Most spent on <b>${topCats.map(([c, v]) => escapeHtml(c) + ' RM' + v.toFixed(0)).join(', ')}</b>.`);
+  if (topDay) lines.push(`Biggest day: <b>${dayName(topDay[0])}</b> (RM${topDay[1].toFixed(0)}).`);
+  if (topTx) lines.push(`Biggest single payment: <b>${escapeHtml(txnTitle(topTx))}</b> RM${spendAmount(topTx).toFixed(0)}.`);
+  const active = commitments.filter(c => c.active !== 'no' && c.active !== false);
+  if (active.length) { const sts = active.map(commitStatus_); const missing = sts.filter(s => s.key === 'missing').length; lines.push(missing ? `<span style="color:#e0685c">${missing} commitment${missing === 1 ? '' : 's'} not seen yet this month.</span>` : 'All due commitments are paid or not due yet.'); }
+  el.innerHTML = `<div class="sum-card"><div class="sum-top"><div><div class="sum-l">${mName} so far</div><div class="sum-v">RM${curT.toFixed(0)}</div></div>${diff === null ? '' : `<div class="sum-d" style="color:${diff > 0 ? '#e0685c' : '#3fae78'}">${diff > 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(0)}% <span>vs same days last month</span></div>`}</div>${lines.map(l => `<div class="sum-line">${l}</div>`).join('')}</div>`;
+}
+
+// ===== Suggested commitments (you confirm each one) =====
+function suggestCommitments_() {
+  if (VIEW_ONLY) return [];
+  let dismissed = []; try { dismissed = JSON.parse(localStorage.getItem('dismissedSuggest') || '[]'); } catch (e) {}
+  const skipCats = new Set(['Food', 'Transport', 'Shopping', 'Entertainment', 'Income', 'Unsure', 'Savings & Investment', 'Loss']);
+  const since = new Date(); since.setMonth(since.getMonth() - 4); const sinceIso = calIso_(since);
+  const g = {};
+  allTxns.forEach(t => {
+    if (!t.date || t.date < sinceIso || txnFlow(t) !== 'out' || skipCats.has(t.category)) return;
+    const name = txnTitle(t).replace(/\s+\d{3,}.*$/, '').trim().toUpperCase();
+    if (!name || name === 'UNKNOWN') return;
+    (g[name] = g[name] || []).push(t);
+  });
+  const existing = commitments.map(c => String(c.match || c.name || '').toUpperCase().split(',').map(x => x.trim()).filter(Boolean)).flat();
+  const out = [];
+  Object.entries(g).forEach(([name, ts]) => {
+    const months = new Set(ts.map(t => t.date.slice(0, 7)));
+    if (months.size < 3 || ts.length > months.size * 2) return;
+    if (existing.some(k => name.includes(k) || k.includes(name))) return;
+    if (dismissed.includes(name)) return;
+    const amts = ts.map(t => Number(t.amount)).sort((a, b) => a - b), med = amts[Math.floor(amts.length / 2)];
+    if (amts.some(a => Math.abs(a - med) > Math.max(5, med * 0.25))) return;
+    const days = ts.map(t => Number(t.date.slice(8))).sort((a, b) => a - b);
+    out.push({ name, amount: med, dueDay: days[Math.floor(days.length / 2)], count: ts.length, months: months.size, category: ts[0].category });
+  });
+  return out.sort((a, b) => b.amount - a.amount).slice(0, 6);
+}
+function renderSuggestions_() {
+  const box = document.getElementById('commitSuggest');
+  if (!box) return;
+  const list = suggestCommitments_();
+  if (!list.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="link-section-title">Suggested (${list.length}) · check each one</div>` + list.map((s, i) => `<div class="commit-row sug-row" style="border-left:4px solid #4a8be8"><div class="commit-main"><div class="commit-name">${escapeHtml(s.name)}</div><div class="commit-sub">About RM${s.amount.toFixed(2)} · around the ${s.dueDay}${ordSuffix_(s.dueDay)} · seen in ${s.months} months · ${escapeHtml(s.category)}</div></div><span><button class="sug-btn" data-add="${i}">Review</button> <button class="sug-x" data-no="${i}" title="Not a commitment">✕</button></span></div>`).join('');
+  box.querySelectorAll('[data-add]').forEach(b => { b.onclick = () => { const s = list[Number(b.dataset.add)]; openCommitDialog_({ name: s.name.charAt(0) + s.name.slice(1).toLowerCase(), amount: s.amount, dueDay: s.dueDay, kind: 'fixed', cycle: 'monthly', match: s.name }); }; });
+  box.querySelectorAll('[data-no]').forEach(b => { b.onclick = () => { const s = list[Number(b.dataset.no)]; let d = []; try { d = JSON.parse(localStorage.getItem('dismissedSuggest') || '[]'); } catch (e) {} d.push(s.name); localStorage.setItem('dismissedSuggest', JSON.stringify(d)); renderSuggestions_(); }; });
+}
 
 document.querySelectorAll('.chart-mode-btn').forEach(btn => {
   btn.onclick = () => {
@@ -2909,7 +3009,8 @@ function renderApp() {
   if (activePage === 'insights') {
     if (insightsSubPage === 'compare') renderCompare();
     else if (insightsSubPage === 'splits') renderSplitsInsights(splitsFilterRemark);
-    else if (insightsSubPage === 'commit') renderCommitments_();
+    else if (insightsSubPage === 'commit') { renderCommitments_(); renderSuggestions_(); }
+    renderInsightsSummary_();
   }
   if (activePage === 'history') { renderHistory(); renderCashCard_(); }
 }
@@ -2928,7 +3029,8 @@ function switchInsightsSub(sub) {
   document.getElementById('trendsPage').style.display = sub === 'charts' ? '' : 'none';
   document.getElementById('splitsInsightsPage').style.display = sub === 'splits' ? '' : 'none';
   document.getElementById('commitPage').style.display = sub === 'commit' ? '' : 'none';
-  if (sub === 'commit') renderCommitments_();
+  renderInsightsSummary_();
+  if (sub === 'commit') { renderCommitments_(); renderSuggestions_(); }
   if (sub === 'compare') renderCompare();
   else if (sub === 'charts') renderTrends();
   else if (sub === 'splits') renderSplitsInsights(splitsFilterRemark);
@@ -3078,6 +3180,7 @@ function setCalView_(v) {
   renderCalendar();
 }
 function renderCalendar() {
+  try { renderFilterBar_(); } catch (e) {}
   if (calView === 'year') { renderCalYear_(); return; }
   const viewDates = calViewDates_();
   const year = calendarMonth.getFullYear();
