@@ -781,6 +781,15 @@
   .txn-top-r .review-btn { padding: 4px 10px; font-size: 12px; margin: 0; }
   .rv-collapsed .review-actions { display: flex; }
   .tip-bubble { position: fixed; z-index: 100005; background: var(--text); color: var(--bg); padding: 5px 9px; border-radius: 8px; font-size: 12px; font-weight: 600; pointer-events: none; max-width: 240px; }
+
+.link-cost{display:flex;align-items:baseline;gap:10px;margin:12px 0 4px}
+.link-cost-lbl{color:var(--muted);font-size:12px}
+.link-cost-val{font-size:26px;font-weight:700;letter-spacing:-.5px}
+.link-cost-val.ok{color:#3fae78}.link-cost-val.warn{color:#d9894a}
+.link-rows summary{cursor:pointer;color:var(--muted);font-size:12px;margin:8px 0;list-style:none}
+.link-rows summary::-webkit-details-marker{display:none}
+.link-rows summary::before{content:'▸ '}.link-rows[open] summary::before{content:'▾ '}
+.spo-date{opacity:.65;font-size:12px;margin-left:6px}
 </style>
 </head>
 <body>
@@ -1237,6 +1246,7 @@ async function rawPost_(action, extra) {
   return j;
 }
 async function callApi(action, extra) {
+  if (window.__staleData && !/^(ping|getFriendsKey|backupStatus)$/.test(action)) { staleNotice_(); return { ok: false, stale: true }; }
   if (VIEW_ONLY) {
     console.warn('Shared view is read-only — blocked action:', action);
     return { ok: false, viewOnly: true };
@@ -1274,7 +1284,10 @@ function askOwnerKey_() {
   document.body.appendChild(ov);
   const go = async () => {
     const k = ov.querySelector('#keyIn').value;
-    const j = await (await fetch(APPS_SCRIPT_URL + '?api=1&key=' + encodeURIComponent(k))).json();
+    const btn = ov.querySelector('#keyOk'); btn.disabled = true; btn.textContent = 'Checking…'; ov.querySelector('#keyErr').textContent = '';
+    let j; try { j = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'ping', key: k }) })).json(); } catch (e) { j = { error: 'network' }; }
+    btn.disabled = false; btn.textContent = 'Unlock';
+    if (j && j.error === 'network') { ov.querySelector('#keyErr').textContent = 'No connection. Please try again.'; return; }
     if (j && j.error === 'locked') { ov.querySelector('#keyErr').textContent = 'That key is not right.'; return; }
     localStorage.setItem(OWNER_KEY_LS, k); ov.remove(); loadData();
   };
@@ -3005,11 +3018,33 @@ function applySplitOverlay_() {
   });
 }
 
+const CACHE_LS_ = 'trackerDataCache_v1';
+function readDataCache_() { try { const c = JSON.parse(localStorage.getItem(CACHE_LS_) || 'null'); return c && c.transactions && c.transactions.length ? c : null; } catch (e) { return null; } }
+function setStaleBanner_(msg) {
+  let b = document.getElementById('staleBanner');
+  if (!b) { b = document.createElement('div'); b.id = 'staleBanner'; b.style.cssText = 'position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:9998;max-width:92vw;background:var(--card2);color:var(--text);border:1px solid var(--line2);padding:8px 14px;border-radius:999px;font-size:12px;box-shadow:0 4px 18px rgba(0,0,0,.35)'; document.body.appendChild(b); }
+  b.textContent = msg;
+}
+function removeStaleBanner_() { const b = document.getElementById('staleBanner'); if (b) b.remove(); }
+function staleNotice_() { setStaleBanner_('Still updating your data. Please wait a moment before editing.'); }
 async function loadData() {
-  document.getElementById('list').innerHTML = '<div class="empty">Loading…</div>';
+  if (!DEMO && !FRIENDS && !window.__cacheTried) {
+    window.__cacheTried = true;
+    const c = readDataCache_();
+    if (c) {
+      window.__staleData = true;
+      setStaleBanner_('Showing saved data from ' + new Date(c.cachedAt || Date.now()).toLocaleString() + '. Updating…');
+      try { await loadDataCore_(c); } catch (e) {}
+    }
+  }
+  return loadDataCore_();
+}
+async function loadDataCore_(pre) {
+  if (!pre) document.getElementById('list').innerHTML = '<div class="empty">Loading your data… this can take up to a minute.</div>';
   try {
-    const data = DEMO ? DEMO : await (await fetch(APPS_SCRIPT_URL + '?api=1' + (FRIENDS ? '&view=friends&fkey=' + encodeURIComponent(QS_.get('k') || '') : '&key=' + encodeURIComponent(ownerKey_())))).json();
+    const data = pre ? pre : DEMO ? DEMO : await (await fetch(APPS_SCRIPT_URL + '?api=1' + (FRIENDS ? '&view=friends&fkey=' + encodeURIComponent(QS_.get('k') || '') : '&key=' + encodeURIComponent(ownerKey_())))).json();
     if (data && data.error === 'locked') { if (FRIENDS) { document.getElementById('list').innerHTML = '<div class="empty">This link is no longer valid. Ask for a new one.</div>'; return; } askOwnerKey_(); return; }
+    if (!pre && !DEMO && !FRIENDS) { try { localStorage.setItem(CACHE_LS_, JSON.stringify(Object.assign({ cachedAt: Date.now() }, data))); } catch (e) {} }
     allTxnsRaw = data.transactions || [];
     allTxns = allTxnsRaw;
     merchantRules = data.merchantRules || [];
@@ -3021,12 +3056,15 @@ async function loadData() {
     friendsView = !!data.friendsView;
     applyCustomTags_();
   } catch (err) {
+    if (window.__staleData) { setStaleBanner_('Could not update. Showing saved data (editing is paused).'); return; }
     document.getElementById('list').innerHTML = '<div class="empty">Error loading data. Check your connection.</div>';
     return;
   }
   applySplitOverlay_();
   seedRecentDayExpansion();
   renderApp();
+  if (pre) return; // saved copy: never write back to the sheet from it
+  window.__staleData = false; removeStaleBanner_();
   autoApplyPeople_();
   autoLockClaims_();
 }
@@ -5354,6 +5392,8 @@ function txnTitle(t) {
 // 'out', and anything else defaults to 'in'.
 function txnFlow(t) {
   if (t.flow === 'in' || t.flow === 'out') return t.flow;
+  // Money received is always IN, whatever category the user later picks for it.
+  if (/^(Receive from Wallet|DUITNOW_RECEI|Cashback)/i.test(String(t.type || ''))) return 'in';
   if (t.category === 'Income') return 'in';
   if (t.category === 'Transfer') {
     if (t.subTag === 'To Others' || t.subTag === 'To Cash') return 'out';
@@ -6546,12 +6586,12 @@ function splitGroupCardHtml(g) {
   let statsHtml;
   if (g.kind === 'claim') {
     const pct = g.totalOut > 0 ? Math.min(100, Math.round(g.totalIn / g.totalOut * 100)) : 0;
-    statsHtml = `<div class="link-bar"><div class="link-bar-fill" style="width:${pct}%"></div></div>
+    statsHtml = `<div class="link-cost"><span class="link-cost-lbl">Still owed to you</span><span class="link-cost-val ${owed > 0 ? 'warn' : 'ok'}">RM${owed.toFixed(2)}</span></div><div class="link-bar"><div class="link-bar-fill" style="width:${pct}%"></div></div>
       <div class="split-group-summary"><span>Paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Claimed <b>RM${g.totalIn.toFixed(2)}</b></span><span style="color:${owed > 0 ? '#d9894a' : '#3fae78'}">Owed <b>RM${owed.toFixed(2)}</b></span></div>`;
   } else if (g.kind === 'split') {
-    statsHtml = `<div class="split-group-summary"><span>You paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Back <b>RM${g.totalIn.toFixed(2)}</b></span><span>Your share <b>${formatSignedRM(g.net)}</b></span></div>`;
+    statsHtml = `<div class="link-cost"><span class="link-cost-lbl">Your cost</span><span class="link-cost-val">RM${Math.max(0, g.totalOut - g.totalIn).toFixed(2)}</span></div><div class="split-group-summary"><span>Paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Paid back <b>RM${g.totalIn.toFixed(2)}</b></span></div>`;
   } else {
-    statsHtml = `<div class="split-group-summary"><span>Costs <b>RM${g.totalOut.toFixed(2)}</b></span><span>Recovered <b>RM${g.totalIn.toFixed(2)}</b></span><span>Net <b>${formatSignedRM(g.net)}</b></span></div>`;
+    statsHtml = `<div class="link-cost"><span class="link-cost-lbl">Net cost</span><span class="link-cost-val">RM${Math.max(0, g.totalOut - g.totalIn).toFixed(2)}</span></div><div class="split-group-summary"><span>Costs <b>RM${g.totalOut.toFixed(2)}</b></span><span>Recovered <b>RM${g.totalIn.toFixed(2)}</b></span><span>Net <b>${formatSignedRM(g.net)}</b></span></div>`;
   }
   return `
     <div class="split-group link-card" data-remark="${escapeHtml(g.remark)}" style="border-left:4px solid ${color};">
@@ -6562,8 +6602,8 @@ function splitGroupCardHtml(g) {
         </div>
         <span class="link-chip link-chip-${st.cls}">${st.text}</span>
       </div>
-      <div class="split-group-rows">${rowsHtml}</div>
       ${statsHtml}
+      <details class="link-rows"><summary>Who paid and who paid back</summary><div class="split-group-rows">${rowsHtml}</div></details>
       ${lockRowHtml_(g)}
       <button class="toolbar-btn card-toggle" data-key="${escapeHtml(splitGroupKey_(g.remark))}">Show records ▾</button>
       <div class="card-records" style="display:none"></div>
@@ -6665,25 +6705,35 @@ function renderLinkPicker_() {
   const listEl = document.getElementById('splitPickerList');
   const label = document.getElementById('splitPickerInputLabel');
   const input = document.getElementById('splitPickerInput');
+  input.setAttribute('list', 'linkNameList');
+  let dl = document.getElementById('linkNameList');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'linkNameList'; document.body.appendChild(dl); }
+  dl.innerHTML = [...new Set(remarkGroups().filter(g => g.kind === linkMode).map(g => stripMark_(g.remark).replace(/ (split|claim)$/i, '').replace(/ \(\d{1,2} [A-Z][a-z]{2}\)$/, '')))].map(n => `<option value="${escapeHtml(n)}">`).join('');
   if (linkMode === 'note') {
     label.textContent = 'What was this for?';
     input.placeholder = 'e.g. Hair cut, Salary recovery, Company props';
   } else {
-    label.textContent = linkMode === 'split' ? 'Or start a new split — we add "split" for you' : 'Or start a new claim — we add "claim" for you';
-    input.placeholder = linkMode === 'split' ? 'e.g. Sushi 31/7' : 'e.g. Shooting props';
+    label.textContent = linkMode === 'split' ? 'Or start a new split — we add "split" and the date for you' : 'Or start a new claim — we add "claim" and the date for you';
+    input.placeholder = linkMode === 'split' ? 'e.g. Sushi' : 'e.g. Shooting props';
   }
   if (!groups.length) {
     listEl.innerHTML = `<div class="split-picker-empty">No ${linkMode}s yet — type a name below.</div>`;
   } else {
-    listEl.innerHTML = groups.map(g => `
+    listEl.innerHTML = sortGroupsNear_(groups).map(g => `
       <div class="split-picker-option${g.remark === currentRemark ? ' selected' : ''}" data-remark="${escapeHtml(g.remark)}" style="border-left:3px solid ${LINK_COLORS[linkMode]};">
-        <span>${escapeHtml(linkMode === 'note' ? parseNote_(g.remark).name : g.remark)}</span>
+        <span>${escapeHtml(linkMode === 'note' ? parseNote_(g.remark).name : g.remark)}${linkMode !== 'note' && g.firstDate ? '<span class="spo-date">' + new Date(g.firstDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + '</span>' : ''}</span>
         <span class="spo-count">${g.count >= 2 ? `${g.count} records · net ${formatSignedRM(g.net)}` : '1 record so far'}</span>
       </div>`).join('');
     listEl.querySelectorAll('.split-picker-option').forEach(opt => {
       opt.onclick = () => { if (linkMode === 'note') { const pn = parseNote_(opt.dataset.remark); noteTopic = pn.topic || null; input.value = pn.name; renderLinkPicker_(); } else { saveLinkChoice_(opt.dataset.remark); } };
     });
   }
+}
+function sortGroupsNear_(gs) {
+  const t = allTxns.find(x => x.row === splitPickerRow);
+  if (!t || !t.date) return gs;
+  const d = new Date(t.date).getTime();
+  return gs.slice().sort((a, b) => Math.abs(new Date(a.firstDate).getTime() - d) - Math.abs(new Date(b.firstDate).getTime() - d));
 }
 async function openSplitPicker(row) {
   const t0 = allTxns.find(x => x.row === row);
@@ -6754,6 +6804,10 @@ document.getElementById('splitPickerSave').onclick = () => {
   if (val) {
     const existingNames = remarkGroups().map(g => g.remark);
     if (!existingNames.includes(val)) {
+      if (!/\(\d{1,2} [A-Z][a-z]{2}\)|\d{1,2}[\/.-]\d{1,2}/.test(val)) {
+        const tt = allTxns.find(x => x.row === splitPickerRow);
+        if (tt && tt.date) val += ' (' + new Date(tt.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ')';
+      }
       if (linkMode === 'split' && !/\bsplit\b/i.test(val)) val += ' split';
       if (linkMode === 'claim' && !/\bclaim\b/i.test(val)) val += ' claim';
     }
@@ -7900,7 +7954,8 @@ async function parsePdfFile(file) {
       date: r.date, time: r.time || '', amount: r.amount,
       category: guess.category, subTag: guess.subTag,
       merchant: r.merchant, source: 'TNG PDF Import', notes: r.type, type: r.type,
-      account: 'TNG'
+      account: 'TNG',
+      flow: /^(Receive from Wallet|DUITNOW_RECEI|Cashback|Reload)/i.test(String(r.type || '')) ? 'in' : 'out'
     });
   });
   // Independent verification pass: every date-row the column/type parser
