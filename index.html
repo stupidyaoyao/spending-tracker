@@ -802,6 +802,26 @@ body.theme-navy { background: linear-gradient(180deg,#0a1020,#0d1630) fixed; }
 
 .stick-bar { position: sticky; top: 0; z-index: 30; background: var(--bg); padding: 4px 0 2px; }
 body.theme-ice .stick-bar { background: #0f2230; }
+
+.cg-bar { margin: 6px 0; align-items: center; gap: 8px; }
+.cg-sum { font-size: 12px; color: var(--muted); }
+.cg-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); padding: 6px 2px; flex-wrap: wrap; gap: 6px; }
+.cg-node { margin-bottom: 6px; }
+.cg-head { width: 100%; display: flex; justify-content: space-between; align-items: center; min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 0.5px solid var(--line2); background: var(--card); color: var(--text); font-size: 14px; text-align: left; }
+.cg-head small { color: var(--muted); }
+.cg-neg { color: #e0685c; } .cg-pos { color: #3fae78; }
+.cg-body { padding: 4px 0 2px 6px; }
+.cg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cg-chip { min-height: 38px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line2); background: var(--card2); color: var(--text); font-size: 13px; }
+.cg-chip.on { background: #e0685c; border-color: #e0685c; color: #fff; text-decoration: line-through; }
+.cg-view { display: flex; gap: 6px; margin-bottom: 6px; } .cg-view button { min-height: 40px; border-radius: 10px; border: 0; background: var(--card2); color: var(--text); padding: 0 12px; } .cg-view button:first-child { flex: 1; text-align: left; }
+
+.cm-sw { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 10px; }
+.cm-sw button { width: 44px; min-height: 44px; border-radius: 12px; border: 1px solid var(--line2); background: var(--card2); color: var(--text); }
+.cm-sw span { font-weight: 600; } .cm-sw a { font-size: 12px; margin-left: 8px; color: var(--accent); }
+.cm-hist { margin-top: 8px; min-height: 36px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--card2); color: var(--muted); font-size: 12px; }
+
+.dup-flag { display: inline-block; margin-bottom: 4px; padding: 2px 10px; border-radius: 999px; background: rgba(217,137,74,.18); color: #d9894a; font-size: 11px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -899,6 +919,7 @@ body.theme-ice .stick-bar { background: #0f2230; }
       </select>
     </div>
 
+    <div class="toolbar cg-bar"><button class="toolbar-btn" id="cgBtn" style="flex:1;min-height:42px">Custom group and filter</button><span id="cgSum" class="cg-sum"></span></div>
     <div class="toolbar-secondary" id="toolbarSecondary" style="display:none;">
       <button class="toolbar-btn" id="expandAllBtn">Expand all</button>
     </div>
@@ -1777,8 +1798,13 @@ const COMMIT_PRESETS = [
 ];
 function commitMonthly_(c) { return (c.cycle === 'yearly') ? (Number(c.amount) || 0) / 12 : (Number(c.amount) || 0); }
 function ordSuffix_(n) { n = Number(n); return (n % 10 === 1 && n !== 11) ? 'st' : (n % 10 === 2 && n !== 12) ? 'nd' : (n % 10 === 3 && n !== 13) ? 'rd' : 'th'; }
+function cmNow_() {
+  const t = new Date(), off = window.__cmOn ? (window.__cmOff || 0) : 0;
+  if (!off) return t;
+  return off < 0 ? new Date(t.getFullYear(), t.getMonth() + off + 1, 0) : new Date(t.getFullYear(), t.getMonth() + off, 1);
+}
 function commitStatus_(c) {
-  const now = new Date();
+  const now = cmNow_();
   const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
   const startYm = (c.cycle !== 'yearly' && Number(c.dueMonth) > 12) ? Number(c.dueMonth) : 0;
   const nowYm = now.getFullYear() * 100 + now.getMonth() + 1;
@@ -1799,6 +1825,44 @@ function commitStatus_(c) {
   return { key: 'upcoming', text: `Due on the ${c.dueDay}${ordSuffix_(c.dueDay)}`, color: '#4a8be8', paid, due: Number(c.amount) || 0 };
 }
 function renderCommitments_() {
+  const sum0 = document.getElementById('commitSummary');
+  if (!sum0) return;
+  let sw = document.getElementById('cmSwitch');
+  if (!sw) { sw = document.createElement('div'); sw.id = 'cmSwitch'; sum0.parentNode.insertBefore(sw, sum0); }
+  const off = window.__cmOff || 0, base = new Date(), md = new Date(base.getFullYear(), base.getMonth() + off, 1);
+  sw.innerHTML = `<div class="cm-sw"><button id="cmPrev" aria-label="Previous month">\u25c0</button><span>${md.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}${off ? ' <a id="cmNow" href="#">Today</a>' : ''}</span><button id="cmNext" aria-label="Next month">\u25b6</button></div>`;
+  sw.querySelector('#cmPrev').onclick = () => { window.__cmOff = off - 1; renderCommitments_(); };
+  sw.querySelector('#cmNext').onclick = () => { window.__cmOff = off + 1; renderCommitments_(); };
+  const nw = sw.querySelector('#cmNow'); if (nw) nw.onclick = e => { e.preventDefault(); window.__cmOff = 0; renderCommitments_(); };
+  window.__cmOn = true;
+  try { renderCommitmentsCore_(); addCommitHistory_(); } finally { window.__cmOn = false; }
+}
+function addCommitHistory_() {
+  document.querySelectorAll('#commitList .commit-row').forEach(row => {
+    if (row.querySelector('.cm-hist')) return;
+    const b = document.createElement('button'); b.className = 'cm-hist'; b.textContent = 'History';
+    b.onclick = e => { e.stopPropagation(); e.preventDefault(); openCommitHistory_(row.dataset.cid); };
+    row.appendChild(b);
+  });
+}
+function openCommitHistory_(cid) {
+  const c = commitments.find(x => String(x.id) === String(cid)); if (!c) return;
+  const keep = window.__cmOff, rows = [];
+  window.__cmOn = true;
+  for (let i = 0; i < 12; i++) {
+    window.__cmOff = -i;
+    const st = commitStatus_(c), d = cmNow_();
+    rows.push({ m: d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), st });
+  }
+  window.__cmOff = keep; window.__cmOn = false;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:10px';
+  ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:18px;padding:16px;max-width:440px;width:100%;max-height:80vh;overflow:auto"><div style="font-weight:700;margin-bottom:10px">${escapeHtml(c.name || 'Payment')} \u00b7 last 12 months</div>${rows.map(r => `<div style="display:flex;justify-content:space-between;padding:10px 2px;border-bottom:0.5px solid var(--line)"><span>${r.m}</span><span style="color:${r.st.color}">${r.st.paid ? 'RM' + Number(r.st.paid).toFixed(2) : '\u2014'} \u00b7 ${escapeHtml(r.st.text || '')}</span></div>`).join('')}<button style="width:100%;min-height:44px;margin-top:12px;border-radius:12px;border:0;background:var(--card2);color:var(--text)" id="chClose">Close</button></div>`;
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  ov.querySelector('#chClose').onclick = () => ov.remove();
+}
+function renderCommitmentsCore_() {
   const list = document.getElementById('commitList'), sum = document.getElementById('commitSummary');
   if (!list) return;
   document.getElementById('commitAddBtn').style.display = VIEW_ONLY ? 'none' : '';
@@ -5168,6 +5232,89 @@ function sortTxns(txns) {
   return sorted;
 }
 
+function cg_() {
+  if (window.__cg === undefined) { try { window.__cg = JSON.parse(localStorage.getItem('cgState') || 'null'); } catch (e) { window.__cg = null; } }
+  return window.__cg;
+}
+const CG_LEVELS_ = [['', 'None'], ['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['category', 'Category'], ['sub', 'Sub-category'], ['merchant', 'Merchant'], ['account', 'Account']];
+function cgKey_(lv, t) {
+  const d = new Date(t.date);
+  if (lv === 'day') return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  if (lv === 'week') { const s0 = startOfWeek(d), e0 = new Date(s0); e0.setDate(e0.getDate() + 6); const f = x => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); return f(s0) + ' \u2013 ' + f(e0) + ' ' + e0.getFullYear(); }
+  if (lv === 'month') return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  if (lv === 'category') return t.category || 'Other';
+  if (lv === 'sub') return (t.category || 'Other') + (t.subTag ? ' \u00b7 ' + t.subTag : '');
+  if (lv === 'merchant') return t.merchant || t.notes || 'Unknown';
+  if (lv === 'account') return t.account || 'Unknown';
+  return '';
+}
+function cgTotal_(rs) { return rs.reduce((a, t) => a + (txnFlow(t) === 'in' ? 1 : -1) * Number(t.amount || 0), 0); }
+function cgFmt_(v) { return (v < 0 ? '-' : '+') + 'RM' + Math.abs(v).toFixed(2); }
+function cgRender_(rows, levels, depth, path) {
+  if (!levels.length) return rows.map(t => renderTxnRow(t)).join('');
+  const lv = levels[0], map = new Map();
+  rows.forEach(t => { const k = cgKey_(lv, t); if (!map.has(k)) map.set(k, []); map.get(k).push(t); });
+  let ents = [...map.entries()];
+  if (['category', 'sub', 'merchant', 'account'].includes(lv)) ents.sort((a, b) => Math.abs(cgTotal_(b[1])) - Math.abs(cgTotal_(a[1])));
+  window.__cgOpen = window.__cgOpen || new Set();
+  return ents.map(([k, rs]) => {
+    const id = path + '/' + k, open = window.__cgAll || window.__cgOpen.has(id), tot = cgTotal_(rs);
+    return `<div class="cg-node" style="margin-left:${depth * 8}px"><button class="cg-head" data-cgid="${escapeHtml(id)}"><span>${open ? '\u25be' : '\u25b8'} ${escapeHtml(k)}<small> \u00b7 ${rs.length}</small></span><b class="${tot < 0 ? 'cg-neg' : 'cg-pos'}">${cgFmt_(tot)}</b></button>${open ? `<div class="cg-body">${cgRender_(rs, levels.slice(1), depth + 1, id)}</div>` : ''}</div>`;
+  }).join('');
+}
+function cgSummary_() {
+  const el = document.getElementById('cgSum'), c = cg_();
+  if (!el) return;
+  const names = c ? c.levels.map(l => (CG_LEVELS_.find(x => x[0] === l) || [0, l])[1]).join(' \u203a ') : '';
+  el.textContent = c && c.levels.length ? names + (c.exclude && c.exclude.length ? ' \u00b7 excl. ' + c.exclude.length : '') : '';
+  const b = document.getElementById('cgBtn'); if (b) b.onclick = openCustomGroup_;
+}
+function renderCustomGroup_(sorted, alsoHtml) {
+  const c = cg_(), ex = c.exclude || [];
+  const rows = sorted.filter(t => !ex.includes(t.category));
+  const sec = document.getElementById('toolbarSecondary'); if (sec) sec.style.display = 'none';
+  cgSummary_();
+  const tot = cgTotal_(rows);
+  let html = `<div class="cg-top"><span>${rows.length} records \u00b7 ${cgFmt_(tot)}</span><span><button class="toolbar-btn" id="cgExp">Expand all</button> <button class="toolbar-btn" id="cgCol">Collapse all</button></span></div>`;
+  html += rows.length ? cgRender_(rows, c.levels, 0, '') : '<div class="empty">Nothing to show with these filters.</div>';
+  document.getElementById('list').innerHTML = html + (alsoHtml || '');
+  document.querySelectorAll('.cg-head').forEach(b => { b.onclick = () => { const id = b.dataset.cgid; window.__cgAll = false; if (window.__cgOpen.has(id)) window.__cgOpen.delete(id); else window.__cgOpen.add(id); render(); }; });
+  document.getElementById('cgExp').onclick = () => { window.__cgAll = true; render(); };
+  document.getElementById('cgCol').onclick = () => { window.__cgAll = false; window.__cgOpen = new Set(); render(); };
+  attachCatSelectHandlers(); attachExtraTagHandlers(); attachExtraTagAmountHandlers(); attachRemarkHandlers(); attachLinkHandlers(); attachFlagHandlers(); attachAlsoTaggedHandlers();
+}
+function openCustomGroup_() {
+  const c = cg_() || { levels: ['category', 'month'], exclude: ['Transfer'] };
+  let views = []; try { views = JSON.parse(localStorage.getItem('cgViews') || '[]'); } catch (e) {}
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:10px';
+  const sel = (i) => `<select class="cg-sel" data-lv="${i}" style="width:100%;min-height:44px;border-radius:12px;border:1px solid var(--line2);background:var(--card2);color:var(--text);padding:0 10px;font-size:16px;margin-bottom:8px">${CG_LEVELS_.map(o => `<option value="${o[0]}" ${(c.levels[i] || '') === o[0] ? 'selected' : ''}>${i + 1}. ${o[0] ? 'Group by ' + o[1] : 'Then by (optional)'}</option>`).join('')}</select>`;
+  const chips = ALL_CATEGORIES.map(k => `<button class="cg-chip ${(c.exclude || []).includes(k) ? 'on' : ''}" data-ex="${escapeHtml(k)}">${escapeHtml(k)}</button>`).join('');
+  ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:18px;padding:16px;max-width:440px;width:100%;max-height:88vh;overflow:auto">
+    <div style="font-weight:700;margin-bottom:10px">Custom group and filter</div>
+    ${sel(0)}${sel(1)}${sel(2)}
+    <div style="font-size:13px;color:var(--muted);margin:6px 0">Hide these categories</div>
+    <div class="cg-chips">${chips}</div>
+    ${views.length ? '<div style="font-size:13px;color:var(--muted);margin:12px 0 6px">Saved views</div>' + views.map((v, i) => `<div class="cg-view"><button data-lv-load="${i}">${escapeHtml(v.name)}</button><button data-lv-del="${i}" aria-label="Delete view">\u2715</button></div>`).join('') : ''}
+    <input id="cgName" placeholder="Name this view to save it" style="width:100%;min-height:44px;border-radius:12px;border:1px solid var(--line2);background:var(--card2);color:var(--text);padding:0 12px;font-size:16px;margin-top:12px">
+    <button id="cgApply" style="width:100%;min-height:46px;margin-top:12px;border-radius:12px;border:0;background:var(--accent);color:var(--on-accent,#1a1a1a);font-weight:600;font-size:15px">Apply</button>
+    <div style="display:flex;gap:8px;margin-top:8px"><button id="cgReset" style="flex:1;min-height:44px;border-radius:12px;border:0;background:var(--card2);color:var(--text)">Back to normal list</button><button id="cgClose" style="flex:1;min-height:44px;border-radius:12px;border:0;background:var(--card2);color:var(--text)">Close</button></div></div>`;
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  const read = () => ({ levels: [...ov.querySelectorAll('.cg-sel')].map(x => x.value).filter(Boolean), exclude: [...ov.querySelectorAll('.cg-chip.on')].map(x => x.dataset.ex) });
+  const apply = st => { window.__cg = st.levels.length ? st : null; try { localStorage.setItem('cgState', JSON.stringify(window.__cg)); } catch (e) {} window.__cgOpen = new Set(); window.__cgAll = false; ov.remove(); render(); };
+  ov.querySelectorAll('.cg-chip').forEach(b => { b.onclick = () => b.classList.toggle('on'); });
+  ov.querySelector('#cgApply').onclick = () => {
+    const st = read(), nm = ov.querySelector('#cgName').value.trim();
+    if (!st.levels.length) { alert('Pick at least one grouping.'); return; }
+    if (nm) { views = views.filter(v => v.name !== nm); views.push({ name: nm, levels: st.levels, exclude: st.exclude }); try { localStorage.setItem('cgViews', JSON.stringify(views)); } catch (e) {} }
+    apply(st);
+  };
+  ov.querySelector('#cgReset').onclick = () => apply({ levels: [], exclude: [] });
+  ov.querySelector('#cgClose').onclick = () => ov.remove();
+  ov.querySelectorAll('[data-lv-load]').forEach(b => { b.onclick = () => { const v = views[Number(b.dataset.lvLoad)]; apply({ levels: v.levels, exclude: v.exclude }); }; });
+  ov.querySelectorAll('[data-lv-del]').forEach(b => { b.onclick = () => { views.splice(Number(b.dataset.lvDel), 1); try { localStorage.setItem('cgViews', JSON.stringify(views)); } catch (e) {} ov.remove(); openCustomGroup_(); }; });
+  document.body.appendChild(ov);
+}
 function groupKeyFor(t) {
   if (groupMode === 'day') return new Date(t.date).toDateString();
   if (groupMode === 'week') { const s0 = startOfWeek(new Date(t.date)), e0 = new Date(s0); e0.setDate(e0.getDate() + 6); const f0 = x => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); return f0(s0) + ' \u2013 ' + f0(e0) + ' ' + e0.getFullYear(); }
@@ -5304,6 +5451,8 @@ function render() {
   }
 
   const sorted = sortTxns(filtered);
+  if (cg_() && cg_().levels.length) { renderCustomGroup_(sorted, alsoTaggedHtml); return; }
+  cgSummary_();
 
   if (groupMode === 'none') {
     let html = '<div class="day-group">';
@@ -6149,7 +6298,40 @@ function reloadPairLabel(t, syncMatch) {
 }
 
 const reviewExpanded = new Set();
+let dupCache_ = { ref: null, n: -1, set: new Set() };
+function dupSet_() {
+  const raw = (typeof allTxnsRaw !== 'undefined' && allTxnsRaw) || [];
+  if (dupCache_.ref === raw && dupCache_.n === raw.length) return dupCache_.set;
+  const m = new Map(), set = new Set();
+  raw.forEach(t => {
+    if (!t.date || !Number(t.amount) || t.category === 'Transfer') return;
+    const k = String(t.date).slice(0, 10) + '|' + Number(t.amount).toFixed(2) + '|' + txnFlow(t);
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(t);
+  });
+  m.forEach(arr => {
+    for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+      const a = arr[i], b = arr[j];
+      const toll = (a.category === 'Transport' && a.subTag === 'Toll') || (b.category === 'Transport' && b.subTag === 'Toll');
+      const ta = String(a.time || '').trim(), tb = String(b.time || '').trim();
+      let dup;
+      if (toll) dup = !!ta && ta === tb;
+      else if (ta && tb) dup = ta === tb;
+      else dup = a.source !== b.source;
+      if (dup) { set.add(a.row); set.add(b.row); }
+    }
+  });
+  dupCache_ = { ref: raw, n: raw.length, set };
+  return set;
+}
 function renderTxnRow(t, opts) {
+  let h = renderTxnRowBase_(t, opts);
+  try {
+    if (dupSet_().has(t.row)) h = h.replace(/^(\s*<div[^>]*class="[^"]*\btxn\b[^"]*"[^>]*>)/, '$1<span class="dup-flag" title="Same date and amount found in another record. Delete one if it is a real duplicate.">Possible duplicate</span>');
+  } catch (e) {}
+  return h;
+}
+function renderTxnRowBase_(t, opts) {
   opts = opts || {};
   const isReloadRow = t.category === 'Transfer' && RELOAD_SUBTAGS.includes(t.subTag);
   // Reload rows render exactly like every other Transfer row now (plain
