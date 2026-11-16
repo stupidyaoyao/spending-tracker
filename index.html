@@ -790,6 +790,18 @@
 .link-rows summary::-webkit-details-marker{display:none}
 .link-rows summary::before{content:'▸ '}.link-rows[open] summary::before{content:'▾ '}
 .spo-date{opacity:.65;font-size:12px;margin-left:6px}
+
+/* v10 themes */
+html.theme-navy, body.theme-navy { --bg:#0a1020; --card:#111a30; --card2:#16213d; --line:#1f2c4d; --line2:#2b3c66; --accent:#4a90e2; --text:#e8edf7; --muted:#8a97b2; --on-accent:#ffffff; }
+html.theme-ice, body.theme-ice { --bg:#0f2230; --card:#163040; --card2:#1b3a4b; --line:#27495a; --line2:#34606f; --accent:#7fd6e6; --text:#e8f1f5; --muted:#8fa9b6; --on-accent:#0a2330; }
+html.theme-milk, body.theme-milk { --bg:#f6f3ec; --card:#ffffff; --card2:#efebe2; --line:#e6e2d8; --line2:#d6d1c4; --accent:#3d6b4f; --text:#232a26; --muted:#7a8079; --on-accent:#ffffff; }
+body.theme-ice { background: linear-gradient(160deg,#16303f 0%,#0f2230 45%,#0a1722 100%) fixed; }
+body.theme-navy { background: linear-gradient(180deg,#0a1020,#0d1630) fixed; }
+.theme-ice .card, .theme-ice .txn { border: 0.5px solid rgba(160,220,235,.22); }
+.icon-btn.active, .filter-chip.active, .chart-mode-btn.active, .mini-cal-day.selected, .fab, .btn, .cal-view-seg button.on, .cal-filter-chip, .sug-btn, .page-tab.active, .insights-subtab.active { color: var(--on-accent, #1a1a1a) !important; }
+
+.stick-bar { position: sticky; top: 0; z-index: 30; background: var(--bg); padding: 4px 0 2px; }
+body.theme-ice .stick-bar { background: #0f2230; }
 </style>
 </head>
 <body>
@@ -835,12 +847,12 @@
 
       <div id="calDayPanel"></div>
     </div>
-    <div class="cat-strip" id="catTiles" style="display:none"></div>
+    <div class="stick-bar" id="stickBar"><div class="cat-strip" id="catTiles" style="display:none"></div>
     <div class="filter-bar" id="filterBar">
       <button class="fb-box" id="fbCat"><span class="fb-l">Category</span><span class="fb-v"><b id="fbCatV">All</b><i>▾</i></span></button>
       <button class="fb-box" id="fbAcc"><span class="fb-l">Account</span><span class="fb-v"><b id="fbAccV">All</b><i>▾</i></span></button>
     </div>
-    <div class="filter-chips" id="filterChips"></div>
+    <div class="filter-chips" id="filterChips"></div></div>
     <div id="mainBrowse">
 
     <div class="totals-all" id="totalsAll" style="display:none;"></div>
@@ -873,6 +885,7 @@
     <div class="toolbar">
       <select id="groupBy">
         <option value="day">Group by: Day</option>
+        <option value="week">Group by: Week</option>
         <option value="category">Group by: Category</option>
         <option value="merchant">Group by: Merchant</option>
         <option value="month">Group by: Month</option>
@@ -1340,7 +1353,7 @@ const CATEGORY_RULES = [
     'VILLAGE GROCER', 'ECONSAVE', 'PACIFIC', 'MR D.I.Y',
     'AEON DEPT', 'FASHION', 'UNIQLO', 'PADINI', 'H&M'
   ] },
-  { category: 'Shopping', subTag: 'Online', keywords: ['PINDUODUO', 'GWP', 'SHOPEE', 'LAZADA', 'TAOBAO'] },
+  { category: 'Shopping', subTag: 'Online', keywords: ['PINDUODUO', 'GWP', 'SHOPEE', 'LAZADA', 'TAOBAO', '2C2P'] },
   // Health/skincare shops — pharmacies specifically, not general Shopping.
   { category: 'Health', subTag: 'Pharmacy', keywords: [
     'GUARDIAN', 'WATSON', 'CARING PHARMACY', 'BIG PHARMACY', 'ALPRO PHARMACY',
@@ -2048,6 +2061,14 @@ document.getElementById('hideNumbersBtn').onclick = () => {
 };
 
 // ===== Two-step category picker =====
+const CAT_GROUPS_ = [
+  { n: 'Daily life', col: '#e08a5f', d: 'Food, Transport, Shopping, Health', cats: ['Food', 'Transport', 'Shopping', 'Health', 'Personal Care', 'Services'] },
+  { n: 'Fun and people', col: '#a79cf0', d: 'Entertainment, Sports, Social', cats: ['Entertainment', 'Sports', 'Social', 'Subscriptions'] },
+  { n: 'Home and vehicle', col: '#7fd6e6', d: 'Housing, Bills, Vehicle', cats: ['Housing', 'Bills', 'Vehicle'] },
+  { n: 'Work and money', col: '#6fd3a4', d: 'Income, Savings, Transfer', cats: ['Work Expenses', 'Income', 'Savings & Investment', 'Transfer'] },
+  { n: 'Other', col: '#9aa3ab', d: 'Loss, Unsure', cats: ['Loss', 'Unsure'] }
+];
+function grpOf_(c) { const g = CAT_GROUPS_.find(x => x.cats.includes(c)); return g ? g.n : 'Other'; }
 function openCatSheet_(sel, keepLabel, totals) {
   const opts = [...sel.options].map(o => ({ v: o.value, l: o.textContent, cur: o.selected }));
   const groups = {};
@@ -2063,12 +2084,48 @@ function openCatSheet_(sel, keepLabel, totals) {
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:10px';
   const choose = v => { ov.remove(); sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); };
+  let grpSel = null;
+  const groupStep_ = () => {
+    const gs = CAT_GROUPS_.filter(g => order.some(c => grpOf_(c) === g.n));
+    ov.innerHTML = `<div class="cat-sheet" style="background:var(--card);color:var(--text);border-radius:18px;padding:14px;max-width:440px;width:100%;max-height:85vh;overflow:auto">
+      <div style="font-weight:700;margin-bottom:10px">Pick a category</div>
+      <input id="csQ" placeholder="Search category" style="width:100%;height:42px;border-radius:12px;border:1px solid var(--line2);background:var(--card2);color:var(--text);padding:0 12px;font-size:16px;margin-bottom:10px">
+      <div id="csRes"></div>
+      ${keep ? '<button data-keep="1" style="width:100%;padding:12px;margin-bottom:10px;border-radius:12px;border:0;background:var(--card2);color:inherit">' + (keepLabel || 'Keep as it is') + '</button>' : ''}
+      <div id="csGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+      ${gs.map((g, i) => `<button data-g="${i}" style="text-align:left;padding:14px 12px;min-height:84px;border-radius:14px;border:1px solid var(--line2);background:var(--card2);color:var(--text)"><div style="font-weight:600;font-size:15px"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${g.col};margin-right:7px"></span>${g.n}</div><div style="font-size:12px;color:var(--muted);margin-top:5px;line-height:1.35">${g.d}</div></button>`).join('')}
+      </div>
+      <button data-x="1" style="width:100%;margin-top:12px;padding:12px;border-radius:12px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div>`;
+    ov.querySelectorAll('[data-g]').forEach(b => { b.onclick = () => { grpSel = gs[Number(b.dataset.g)].n; step1(); }; });
+    const kb = ov.querySelector('[data-keep]'); if (kb) kb.onclick = () => choose(keep.v);
+    ov.querySelector('[data-x]').onclick = () => ov.remove();
+    const qi = ov.querySelector('#csQ'), res = ov.querySelector('#csRes'), grid = ov.querySelector('#csGrid');
+    qi.oninput = () => {
+      const q = qi.value.trim().toLowerCase();
+      if (!q) { res.innerHTML = ''; grid.style.display = ''; return; }
+      grid.style.display = 'none';
+      const hits = opts.filter(o => o.v && o.l.toLowerCase().includes(q)).slice(0, 8);
+      res.innerHTML = hits.map((o, i) => `<button data-r="${i}" style="display:block;width:100%;text-align:left;padding:12px;margin-bottom:6px;border-radius:12px;border:0;background:var(--card2);color:var(--text)">${escapeHtml(o.l)}</button>`).join('') || '<div style="color:var(--muted);padding:8px">No match</div>';
+      res.querySelectorAll('[data-r]').forEach(b => { b.onclick = () => choose(hits[Number(b.dataset.r)].v); });
+    };
+  };
   const step1 = () => {
+    if (!grpSel && order.length > 6) { groupStep_(); return; }
+    step1c();
+    if (grpSel) {
+      const box = ov.firstElementChild, bk = document.createElement('button');
+      bk.textContent = '\u2039 All groups';
+      bk.style.cssText = 'border:0;background:none;color:var(--accent);padding:4px 0 10px;font-size:14px';
+      bk.onclick = () => { grpSel = null; step1(); };
+      box.insertBefore(bk, box.firstChild);
+    }
+  };
+  const step1c = () => {
     ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:80vh;overflow:auto">
       <div style="font-weight:700;margin-bottom:8px">Pick a category${totals ? ' <span style="font-weight:400;color:var(--muted);font-size:12px">· ' + escapeHtml(periodLabel_()) + '</span>' : ''}</div>
       ${keep ? '<button data-keep="1" style="width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:0;background:var(--card2);color:inherit">' + (keepLabel || 'Keep as it is') + '</button>' : ''}
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-      ${order.map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:11px 12px;border-radius:10px;border:0;border-left:4px solid ${colorFor(c)};background:color-mix(in srgb, ${colorFor(c)} ${c === curCat ? 30 : 12}%, var(--card2));color:var(--text);font-weight:600;font-size:14px">${escapeHtml(c)}${groups[c].length > 1 ? ' <span style="color:var(--muted)">›</span>' : ''}${totals ? `<div style="font-size:11px;font-weight:400;color:var(--muted)">${totals[c] ? 'RM' + totals[c].toFixed(0) : '—'}${(calView === 'month' && budgets_()[c]) ? ' / ' + budgets_()[c] : ''}</div>${(calView === 'month' && budgets_()[c]) ? `<div style="height:4px;background:var(--line);border-radius:2px;margin-top:4px"><div style="height:4px;border-radius:2px;width:${Math.min(100, (totals[c] || 0) / budgets_()[c] * 100)}%;background:${budgetBarColor_((totals[c] || 0) / budgets_()[c] * 100)}"></div></div>` : ''}` : ''}</button>`).join('')}</div>
+      ${order.filter(c => !grpSel || grpOf_(c) === grpSel).map(c => `<button data-c="${escapeHtml(c)}" style="text-align:left;padding:11px 12px;border-radius:10px;border:0;border-left:4px solid ${colorFor(c)};background:color-mix(in srgb, ${colorFor(c)} ${c === curCat ? 30 : 12}%, var(--card2));color:var(--text);font-weight:600;font-size:14px">${escapeHtml(c)}${groups[c].length > 1 ? ' <span style="color:var(--muted)">›</span>' : ''}${totals ? `<div style="font-size:11px;font-weight:400;color:var(--muted)">${totals[c] ? 'RM' + totals[c].toFixed(0) : '—'}${(calView === 'month' && budgets_()[c]) ? ' / ' + budgets_()[c] : ''}</div>${(calView === 'month' && budgets_()[c]) ? `<div style="height:4px;background:var(--line);border-radius:2px;margin-top:4px"><div style="height:4px;border-radius:2px;width:${Math.min(100, (totals[c] || 0) / budgets_()[c] * 100)}%;background:${budgetBarColor_((totals[c] || 0) / budgets_()[c] * 100)}"></div></div>` : ''}` : ''}</button>`).join('')}</div>
       <button data-x="1" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:0;background:var(--card2);color:var(--text)">Cancel</button></div>`;
     ov.querySelectorAll('[data-c]').forEach(b => { b.onclick = () => { const g = groups[b.dataset.c]; if (g.length === 1) choose(g[0].v); else step2(b.dataset.c); }; });
     const k = ov.querySelector('[data-keep]'); if (k) k.onclick = () => choose('');
@@ -2349,13 +2406,37 @@ function renderCashCard_() {
 
 
 // ===== Light / dark =====
-function applyTheme_() {
-  const light = localStorage.getItem('theme') === 'light';
-  document.body.classList.toggle('light', light); document.documentElement.classList.toggle('light', light);
-  const b = document.getElementById('themeBtn'); if (b) { b.textContent = light ? '🌙' : '☀️'; b.title = light ? 'Switch to dark' : 'Switch to light'; }
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = light ? '#f4f6fb' : '#0d1424';
+const THEMES_ = [
+  { id: 'ice', n: 'Ice glass', sw: 'linear-gradient(135deg,#16303f,#7fd6e6)', meta: '#0f2230' },
+  { id: 'milk', n: 'Milk white', sw: 'linear-gradient(135deg,#f6f3ec,#3d6b4f)', meta: '#f6f3ec' },
+  { id: 'navy', n: 'Dark navy', sw: 'linear-gradient(135deg,#0a1020,#4a90e2)', meta: '#0a1020' }
+];
+function themeId_() {
+  let t = null; try { t = localStorage.getItem('theme2'); if (!t) t = localStorage.getItem('theme') === 'light' ? 'milk' : 'ice'; } catch (e) {}
+  return THEMES_.some(x => x.id === t) ? t : 'ice';
 }
-document.getElementById('themeBtn').onclick = () => { localStorage.setItem('theme', localStorage.getItem('theme') === 'light' ? 'dark' : 'light'); applyTheme_(); };
+function applyTheme_() {
+  const id = themeId_(), light = id === 'milk';
+  [document.documentElement, document.body].forEach(el => {
+    THEMES_.forEach(x => el.classList.remove('theme-' + x.id));
+    el.classList.add('theme-' + id); el.classList.toggle('light', light);
+  });
+  const b = document.getElementById('themeBtn'); if (b) { b.textContent = '\u{1F3A8}'; b.title = 'Colour theme'; }
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = THEMES_.find(x => x.id === id).meta;
+}
+function openThemeSheet_() {
+  const cur = themeId_(), ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:10px';
+  ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:18px;padding:16px;max-width:440px;width:100%">
+    <div style="font-weight:700;margin-bottom:12px">Colour theme</div>
+    ${THEMES_.map(x => `<button data-t="${x.id}" style="display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 12px;margin-bottom:8px;border-radius:14px;border:2px solid ${x.id === cur ? 'var(--accent)' : 'var(--line2)'};background:var(--card2);color:var(--text);font-size:15px;text-align:left"><span style="width:38px;height:38px;border-radius:12px;background:${x.sw};flex:none"></span>${x.n}${x.id === cur ? '<span style="margin-left:auto;color:var(--accent)">\u2713</span>' : ''}</button>`).join('')}
+    <button data-x="1" style="width:100%;padding:12px;border-radius:12px;border:0;background:var(--card2);color:var(--text)">Close</button></div>`;
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.querySelectorAll('[data-t]').forEach(b => { b.onclick = () => { try { localStorage.setItem('theme2', b.dataset.t); } catch (e) {} applyTheme_(); ov.remove(); }; });
+  ov.querySelector('[data-x]').onclick = () => ov.remove();
+  document.body.appendChild(ov);
+}
+document.getElementById('themeBtn').onclick = openThemeSheet_;
 applyTheme_();
 
 // ===== Instant hover tips (mouse). Phones: tap =====
@@ -2996,6 +3077,7 @@ function expandParts_(raw) {
 function applySplitOverlay_() {
   allTxns = expandParts_(allTxnsRaw);
   allTxns.forEach(t => {
+    if (t._origDate !== undefined) { t.date = t._origDate; delete t._origDate; }
     if (t._ovr) { t.category = t._origCat; t.subTag = t._origSub; if (t._origFlowMissing) delete t.flow; delete t._ovr; delete t._origFlowMissing; }
   });
   const groups = {};
@@ -3010,6 +3092,7 @@ function applySplitOverlay_() {
     if (!spends.length) return;
     const payer = spends.reduce((a, b) => Number(b.amount || 0) > Number(a.amount || 0) ? b : a);
     g.forEach(t => {
+      if (txnFlow(t) === 'in' && payer.date && t.date !== payer.date) { t._origDate = t.date; t.date = payer.date; }
       if (!isReimbursementRow_(t)) return;
       t._ovr = true; t._origCat = t.category; t._origSub = t.subTag;
       if (t.flow !== 'in' && t.flow !== 'out') { t._origFlowMissing = true; t.flow = 'in'; }
@@ -3067,6 +3150,23 @@ async function loadDataCore_(pre) {
   window.__staleData = false; removeStaleBanner_();
   autoApplyPeople_();
   autoLockClaims_();
+  autoPangRent_();
+}
+async function autoPangRent_() {
+  if (DEMO || FRIENDS || VIEW_ONLY || window.__staleData || window.__pangBusy) return;
+  const RENT = 550, WIFI = 69;
+  const cand = (allTxnsRaw || []).filter(t => /PANG KIM MENG/i.test(String(t.merchant || '')) && txnFlow(t) === 'out' && !t.parts && t.category === 'Housing' && Number(t.amount) >= RENT + WIFI && Number(t.amount) < 1500);
+  if (!cand.length) return;
+  window.__pangBusy = true;
+  try {
+    for (const t of cand) {
+      const rest = Math.round((Number(t.amount) - RENT - WIFI) * 100) / 100;
+      const parts = [{ category: 'Housing', subTag: 'Rent', amount: RENT }, { category: 'Housing', subTag: 'WiFi', amount: WIFI }];
+      if (rest > 0.005) parts.push({ category: 'Bills', subTag: 'Water & Electric', amount: rest });
+      await callApi('updateParts', { row: t.row, parts: JSON.stringify(parts) });
+    }
+    await loadData();
+  } finally { window.__pangBusy = false; }
 }
 
 // Opens the Main list to a useful default on first load: the last 7 days'
@@ -3432,7 +3532,7 @@ function renderCalendar() {
         styleAttr = ' style="background:rgba(10,132,255,.55);"';
         numStyle = ' style="color:#fff;opacity:0.9;"';
         amtStyle = ' style="color:#fff;"';
-        cellAmtText = ns.net === 0 ? ('×' + ns.count) : ((ns.net > 0 ? '+RM' : '-RM') + (Math.abs(ns.net) >= 1000 ? (Math.abs(ns.net) / 1000).toFixed(1) + 'K' : Math.abs(ns.net).toFixed(0)));
+        cellAmtText = activeFilter === 'Transfer' ? ('RM' + (Math.max(ns.inAmt, ns.outAmt) >= 1000 ? (Math.max(ns.inAmt, ns.outAmt) / 1000).toFixed(1) + 'K' : Math.max(ns.inAmt, ns.outAmt).toFixed(0)) + (Math.abs(ns.inAmt - ns.outAmt) > 0.5 ? ' !' : '')) : ns.net === 0 ? ('×' + ns.count) : ((ns.net > 0 ? '+RM' : '-RM') + (Math.abs(ns.net) >= 1000 ? (Math.abs(ns.net) / 1000).toFixed(1) + 'K' : Math.abs(ns.net).toFixed(0)));
       }
     } else if (total > 0) {
       const rgb = heatRank_(total, posTotals);
@@ -5070,6 +5170,7 @@ function sortTxns(txns) {
 
 function groupKeyFor(t) {
   if (groupMode === 'day') return new Date(t.date).toDateString();
+  if (groupMode === 'week') { const s0 = startOfWeek(new Date(t.date)), e0 = new Date(s0); e0.setDate(e0.getDate() + 6); const f0 = x => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); return f0(s0) + ' \u2013 ' + f0(e0) + ' ' + e0.getFullYear(); }
   if (groupMode === 'category') return t.category + (t.subTag ? ' · ' + t.subTag : '');
   if (groupMode === 'merchant') return t.merchant || t.notes || 'Unknown';
   return '__all__';
@@ -5317,7 +5418,7 @@ function render() {
     secondary.style.display = '';
     btn.textContent = allExpanded ? 'Collapse all' : 'Expand all';
     btn.onclick = () => {
-      if (allExpanded) expandedGroups.clear();
+      if (allExpanded) { expandedGroups.clear(); if (groupMode === 'day' && order.length > 10) { groupMode = 'week'; const gb0 = document.getElementById('groupBy'); if (gb0) gb0.value = 'week'; } }
       else order.forEach(k => expandedGroups.add(k));
       render();
     };
