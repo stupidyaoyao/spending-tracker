@@ -822,6 +822,14 @@ body.theme-ice .stick-bar { background: #0f2230; }
 .cm-hist { margin-top: 8px; min-height: 36px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--card2); color: var(--muted); font-size: 12px; }
 
 .dup-flag { display: inline-block; margin-bottom: 4px; padding: 2px 10px; border-radius: 999px; background: rgba(217,137,74,.18); color: #d9894a; font-size: 11px; font-weight: 600; }
+
+#savePill { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 9999; display: none; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; background: var(--card2); color: var(--text); border: 1px solid var(--line2); font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+#savePill.err { background: #e0685c; color: #fff; border-color: #e0685c; }
+.sp-spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line2); border-top-color: var(--accent); animation: spSpin .8s linear infinite; display: inline-block; }
+@keyframes spSpin { to { transform: rotate(360deg); } }
+.name-preview { font-size: 13px; color: var(--accent); margin-top: 6px; min-height: 18px; }
+.bud-row { border-left: 0 !important; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 18%, var(--card)), var(--card) 75%) !important; border: 0.5px solid var(--line2); }
+.bud-row .link-bar-fill { background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 55%, #ffffff)) !important; }
 </style>
 </head>
 <body>
@@ -1212,6 +1220,9 @@ body.theme-ice .stick-bar { background: #0f2230; }
       <div class="field">
         <label id="splitPickerInputLabel"></label>
         <input type="text" id="splitPickerInput" placeholder="">
+        <input type="text" id="splitPickerWith" list="linkWithList" placeholder="With (optional), e.g. Raimin" style="margin-top:8px;display:none">
+        <datalist id="linkWithList"></datalist>
+        <div id="splitPickerPreview" class="name-preview"></div>
         <div id="noteSimilar" class="note-similar"></div>
       </div>
       <div class="field">
@@ -1279,6 +1290,26 @@ async function rawPost_(action, extra) {
   if (j && j.error === 'locked') { askOwnerKey_(); }
   return j;
 }
+const OPT_ACTIONS_ = { updateRemark: 1, updateCategory: 1, updateFlow: 1, updateDate: 1, updateParts: 1 };
+function optimisticApply_(t, action, extra) {
+  if (action === 'updateRemark') t.remark = extra.remark;
+  else if (action === 'updateCategory') { t.category = extra.category; t.subTag = extra.subTag || ''; }
+  else if (action === 'updateFlow') t.flow = extra.flow;
+  else if (action === 'updateDate') { t.date = extra.date; if (extra.status !== undefined) t.dateStatus = extra.status; }
+  else if (action === 'updateParts') t.parts = extra.parts;
+  try { applySplitOverlay_(); renderApp(); } catch (e) { console.warn(e); }
+}
+let savePillTimer_ = null;
+function savePill_(msg, hideMs, isErr) {
+  let p = document.getElementById('savePill');
+  if (!p) { p = document.createElement('div'); p.id = 'savePill'; document.body.appendChild(p); }
+  p.className = isErr ? 'err' : '';
+  p.innerHTML = (isErr || msg === 'Saved' ? '' : '<i class="sp-spin"></i>') + msg;
+  p.style.display = 'flex';
+  p.onclick = isErr ? () => { p.style.display = 'none'; loadData(); } : null;
+  clearTimeout(savePillTimer_);
+  if (hideMs) savePillTimer_ = setTimeout(() => { p.style.display = 'none'; }, hideMs);
+}
 async function callApi(action, extra) {
   if (window.__staleData && !/^(ping|getFriendsKey|backupStatus)$/.test(action)) { staleNotice_(); return { ok: false, stale: true }; }
   if (VIEW_ONLY) {
@@ -1291,6 +1322,17 @@ async function callApi(action, extra) {
     if (t) { const prev = { row: extra.row }; UNDO_ACTIONS[action].forEach(k => { prev[k] = t[k] === undefined || t[k] === null ? '' : t[k]; }); undo = { action, prev, label: action === 'updateCategory' ? `${t.category}${t.subTag ? ' · ' + t.subTag : ''} → ${extra.category}${extra.subTag ? ' · ' + extra.subTag : ''}` : action === 'updateRemark' ? 'Note changed' : action === 'updateParts' ? 'Breakdown changed' : 'Tag changed' }; }
   }
   const now = Date.now(); const bulk = now - lastCallAt_ < 700; lastCallAt_ = now;
+  if (OPT_ACTIONS_[action] && extra && extra.row && !bulk && typeof allTxnsRaw !== 'undefined') {
+    const rt = allTxnsRaw.find(x => x.row === extra.row);
+    if (rt) {
+      optimisticApply_(rt, action, extra);
+      window.__skipNextLoad = true;
+      savePill_('Saving\u2026');
+      rawPost_(action, extra).then(j => { if (j && j.ok !== false) savePill_('Saved', 1400); else { window.__skipNextLoad = false; savePill_('Couldn\u2019t save. Tap to reload', 0, true); } }).catch(() => { window.__skipNextLoad = false; savePill_('Couldn\u2019t save. Tap to reload', 0, true); });
+      if (undo) showUndo_(undo);
+      return { ok: true, pending: true };
+    }
+  }
   const r = await rawPost_(action, extra);
   if (bulk) hideUndo_();
   else if (undo && r && r.ok !== false) showUndo_(undo);
@@ -2489,16 +2531,15 @@ function applyTheme_() {
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = THEMES_.find(x => x.id === id).meta;
 }
 function openThemeSheet_() {
-  const cur = themeId_(), ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:10px';
-  ov.innerHTML = `<div style="background:var(--card);color:var(--text);border-radius:18px;padding:16px;max-width:440px;width:100%">
-    <div style="font-weight:700;margin-bottom:12px">Colour theme</div>
-    ${THEMES_.map(x => `<button data-t="${x.id}" style="display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 12px;margin-bottom:8px;border-radius:14px;border:2px solid ${x.id === cur ? 'var(--accent)' : 'var(--line2)'};background:var(--card2);color:var(--text);font-size:15px;text-align:left"><span style="width:38px;height:38px;border-radius:12px;background:${x.sw};flex:none"></span>${x.n}${x.id === cur ? '<span style="margin-left:auto;color:var(--accent)">\u2713</span>' : ''}</button>`).join('')}
-    <button data-x="1" style="width:100%;padding:12px;border-radius:12px;border:0;background:var(--card2);color:var(--text)">Close</button></div>`;
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
-  ov.querySelectorAll('[data-t]').forEach(b => { b.onclick = () => { try { localStorage.setItem('theme2', b.dataset.t); } catch (e) {} applyTheme_(); ov.remove(); }; });
-  ov.querySelector('[data-x]').onclick = () => ov.remove();
-  document.body.appendChild(ov);
+  const ex = document.getElementById('themePop'); if (ex) { ex.remove(); return; }
+  const btn = document.getElementById('themeBtn'), r = btn.getBoundingClientRect(), cur = themeId_();
+  const pop = document.createElement('div'); pop.id = 'themePop';
+  pop.style.cssText = 'position:fixed;z-index:100000;top:' + (r.bottom + 8) + 'px;left:' + Math.max(8, Math.min(r.left - 90, innerWidth - 238)) + 'px;width:230px;background:var(--card);color:var(--text);border:1px solid var(--line2);border-radius:16px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.4)';
+  pop.innerHTML = THEMES_.map(x => `<button data-t="${x.id}" style="display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:6px 8px;border-radius:12px;border:0;background:${x.id === cur ? 'var(--card2)' : 'transparent'};color:var(--text);font-size:15px;text-align:left"><span style="width:30px;height:30px;border-radius:10px;background:${x.sw};flex:none"></span>${x.n}${x.id === cur ? '<span style="margin-left:auto;color:var(--accent)">\u2713</span>' : ''}</button>`).join('');
+  pop.querySelectorAll('[data-t]').forEach(b => { b.onclick = () => { try { localStorage.setItem('theme2', b.dataset.t); } catch (e) {} applyTheme_(); pop.remove(); }; });
+  document.body.appendChild(pop);
+  const closer = e => { if (!pop.contains(e.target) && e.target !== btn) { pop.remove(); document.removeEventListener('click', closer, true); } };
+  setTimeout(() => document.addEventListener('click', closer, true), 0);
 }
 document.getElementById('themeBtn').onclick = openThemeSheet_;
 applyTheme_();
@@ -2756,13 +2797,27 @@ async function saveBudget_(cat, amt) {
   customTags.push({ category: '__budget__', subTag: sub });
   try { await callApi('addCustomTag', { category: '__budget__', subTag: sub }); } catch (e) {}
 }
+function budNow_() { const t = new Date(), o = window.__budOn ? (window.__budOff || 0) : 0; return o ? new Date(t.getFullYear(), t.getMonth() + o, 1) : t; }
 function monthSpendByCat_() {
-  const now = new Date(), ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'), m = {};
+  const now = budNow_(), ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'), m = {};
   allTxns.forEach(t => { if (!t.date || t.date.slice(0, 7) !== ym || NON_SPEND_CATEGORIES.includes(t.category)) return; m[t.category] = (m[t.category] || 0) + spendAmount(t); });
   return m;
 }
 function budgetBarColor_(p) { return p >= 100 ? '#e0685c' : p >= 80 ? '#d9894a' : '#3fae78'; }
 function renderBudgets_() {
+  const el0 = document.getElementById('budgetList');
+  if (!el0) return;
+  let sw = document.getElementById('budSwitch');
+  if (!sw) { sw = document.createElement('div'); sw.id = 'budSwitch'; el0.parentNode.insertBefore(sw, el0); }
+  const off = window.__budOff || 0, md = new Date(new Date().getFullYear(), new Date().getMonth() + off, 1);
+  sw.innerHTML = `<div class="cm-sw"><button id="budPrev" aria-label="Previous month">\u25c0</button><span>${md.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}${off ? ' <a id="budNow" href="#">Today</a>' : ''}</span><button id="budNext" aria-label="Next month">\u25b6</button></div>`;
+  sw.querySelector('#budPrev').onclick = () => { window.__budOff = off - 1; renderBudgets_(); };
+  sw.querySelector('#budNext').onclick = () => { window.__budOff = off + 1; renderBudgets_(); };
+  const bn = sw.querySelector('#budNow'); if (bn) bn.onclick = e => { e.preventDefault(); window.__budOff = 0; renderBudgets_(); };
+  window.__budOn = true;
+  try { renderBudgetsCore_(); } finally { window.__budOn = false; }
+}
+function renderBudgetsCore_() {
   const el = document.getElementById('budgetList');
   if (!el) return;
   const b = budgets_(), spent = monthSpendByCat_();
@@ -3175,6 +3230,7 @@ function setStaleBanner_(msg) {
 function removeStaleBanner_() { const b = document.getElementById('staleBanner'); if (b) b.remove(); }
 function staleNotice_() { setStaleBanner_('Still updating your data. Please wait a moment before editing.'); }
 async function loadData() {
+  if (window.__skipNextLoad) { window.__skipNextLoad = false; return; }
   if (!DEMO && !FRIENDS && !window.__cacheTried) {
     window.__cacheTried = true;
     const c = readDataCache_();
@@ -4266,8 +4322,10 @@ function renderReviewDates_() {
         <input type="date" class="rd-input" data-row="${t.row}" value="${String(t.date).slice(0, 10)}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--card);color:inherit;">
         <button class="review-btn confirm rd-save" data-row="${t.row}">Set date</button>
         <button class="review-btn rd-skip" data-row="${t.row}">Keep</button>
+        <button class="review-btn rd-link" data-row="${t.row}">Split / Claim</button>
       </div>
     </div>`).join('');
+  el.querySelectorAll('.rd-link').forEach(b => { b.onclick = () => openSplitPicker(Number(b.dataset.row)); });
   el.querySelectorAll('.rd-save').forEach(btn => {
     btn.onclick = async () => {
       const row = Number(btn.dataset.row);
@@ -6945,6 +7003,7 @@ function updateLinksBadge_() {
 // scrolls its Splits section into view, rather than switching to a
 // separate page the way it used to.
 function openSplitsInsights(filterRemark) {
+  const so0 = document.getElementById('searchOverlay'); if (so0) so0.remove();
   splitsFilterRemark = filterRemark || null;
   switchPage('insights');
   switchInsightsSub('splits');
@@ -7073,8 +7132,33 @@ async function saveLinkChoice_(remark) {
 }
 document.getElementById('splitPickerClose').onclick = closeSplitPicker;
 document.querySelectorAll('#linkSeg button').forEach(b => { b.onclick = () => { linkMode = b.dataset.mode; renderLinkPicker_(); }; });
+(function () {
+  const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const upd = () => {
+    const inp = document.getElementById('splitPickerInput'), wi = document.getElementById('splitPickerWith'), pv = document.getElementById('splitPickerPreview');
+    if (!inp || !wi || !pv) return;
+    const show = typeof linkMode !== 'undefined' && linkMode !== 'note';
+    wi.style.display = show ? '' : 'none';
+    if (!show) { pv.textContent = ''; return; }
+    try {
+      const dl = document.getElementById('linkWithList');
+      if (dl && !dl.dataset.f) { const names = new Set(); remarkGroups().forEach(g => { const m = /\sw\/(.+?)(\s\(|\s(split|claim)\b|$)/i.exec(g.remark || ''); if (m) m[1].split(/[&\/]/).forEach(n => { n = n.trim(); if (n) names.add(n); }); }); dl.innerHTML = [...names].map(n => `<option value="${escapeHtml(n)}">`).join(''); dl.dataset.f = '1'; }
+    } catch (e) {}
+    let v = inp.value.trim();
+    if (!v) { pv.textContent = ''; return; }
+    if (wi.value.trim() && !/\sw\//i.test(v)) v += ' w/' + wi.value.trim();
+    const tt = allTxns.find(x => x.row === splitPickerRow);
+    if (!/\(\d{1,2} [A-Z][a-z]{2}\)|\d{1,2}[\/.-]\d{1,2}/.test(v) && tt && tt.date) { const d = new Date(String(tt.date).slice(0, 10) + 'T00:00:00'); v += ' (' + d.getDate() + ' ' + MO[d.getMonth()] + ')'; }
+    if (linkMode === 'split' && !/\bsplit\b/i.test(v)) v += ' split';
+    if (linkMode === 'claim' && !/\bclaim\b/i.test(v)) v += ' claim';
+    pv.textContent = 'Will be saved as: ' + v;
+  };
+  ['splitPickerInput', 'splitPickerWith'].forEach(id => { const e = document.getElementById(id); if (e) e.addEventListener('input', upd); });
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-mode]')) setTimeout(upd, 0); });
+})();
 document.getElementById('splitPickerSave').onclick = () => {
   let val = document.getElementById('splitPickerInput').value.trim();
+  { const wv0 = document.getElementById('splitPickerWith'); if (val && wv0 && wv0.value.trim() && linkMode !== 'note' && !/\sw\//i.test(val)) val += ' w/' + wv0.value.trim(); }
   if (linkMode === 'note') {
     if (!val) { saveLinkChoice_(''); return; }
     const full = noteTopic ? noteTopic + TOPIC_SEP + val : val;
