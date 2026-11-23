@@ -845,6 +845,9 @@ html,body{overflow-x:clip;max-width:100%}.cal-grid{grid-template-columns:repeat(
 
 /* v15 sort-notes dialog buttons */
 #snNo{padding:10px 14px!important;border-radius:10px!important;border:1px solid var(--line2)!important;color:var(--text)!important;min-height:44px}#snOk{padding:10px 16px!important;border-radius:10px!important;background:var(--accent)!important;color:#0d1424!important;font-weight:500;min-height:44px}
+
+/* v16 link dialog and links page */
+#linkSeg{display:flex!important;flex-direction:column;gap:8px}#linkSeg button{width:100%;text-align:left;min-height:56px;padding:10px 14px;border-radius:12px;display:flex;flex-direction:column;gap:2px}#linkSeg button span{font-size:15px;font-weight:500}#linkSeg button small{font-size:12px;font-weight:400;color:var(--muted)}#linkSeg button.active small,#linkSeg button.on small{color:inherit}.note-similar{display:none!important}.link-more{margin:8px 0}.link-more>summary{min-height:44px;display:flex;align-items:center;color:var(--accent);cursor:pointer;font-size:14px}#splitsInsightsList .cat-tiles{display:block!important}#splitsInsightsList .cat-tile{display:flex!important;width:100%;flex-direction:row!important;justify-content:space-between;align-items:center;gap:12px;min-height:48px;padding:10px 4px!important;border-radius:0!important;border:0!important;border-top:1px solid var(--line)!important;border-left:0!important;box-shadow:none!important;background:transparent!important;text-align:left}#splitsInsightsList .cat-tile .ct-name{font-weight:500;overflow-wrap:anywhere}#splitsInsightsList .cat-tile .ct-sub{color:var(--muted);font-size:12px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -1227,9 +1230,9 @@ html,body{overflow-x:clip;max-width:100%}.cal-grid{grid-template-columns:repeat(
       <span class="close-x" id="splitPickerClose">✕</span>
       <h2>Link this record <button class="help-dot" data-help="linkdlg">?</button></h2>
       <div class="link-seg" id="linkSeg">
-        <button data-mode="split" style="--c:#4a8be8">Split</button>
-        <button data-mode="claim" style="--c:#d9894a">Claim</button>
-        <button data-mode="note" style="--c:#2fa7a1">Note</button>
+        <button data-mode="split" style="--c:#4a8be8"><span>Shared with someone</span><small>We both paid or ate together</small></button>
+        <button data-mode="claim" style="--c:#d9894a"><span>Someone pays me back</span><small>Match it to what I paid first, or money owed to me</small></button>
+        <button data-mode="note" style="--c:#2fa7a1"><span>Just a label</span><small>Group it under a topic. Totals never change</small></button>
       </div>
       <div class="link-help" id="linkHelp"></div>
       <div class="note-topics" id="noteTopics"></div>
@@ -1242,11 +1245,11 @@ html,body{overflow-x:clip;max-width:100%}.cal-grid{grid-template-columns:repeat(
         <div id="splitPickerPreview" class="name-preview"></div>
         <div id="noteSimilar" class="note-similar"></div>
       </div>
-      <div class="field">
+      <details class="link-more"><summary>More options</summary><div class="field">
         <label>Also count this record as (optional)</label>
         <select id="linkCountAs"></select>
         <label class="preview-remember" style="margin-top:6px;"><input type="checkbox" id="linkRemember"> <span id="linkRememberText">Remember for this merchant next time</span></label>
-      </div>
+      </div></details>
       <div class="split-picker-actions">
         <button class="btn" id="splitPickerSave">Save</button>
         <button class="split-picker-clear" id="splitPickerClear">Clear link</button>
