@@ -851,6 +851,9 @@ html,body{overflow-x:clip;max-width:100%}.cal-grid{grid-template-columns:repeat(
 
 /* v17 one-off detail and Compare removal */
 .ov-gh{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:12px 0 4px}.ov-tk{width:44px;height:44px;background:none;border:0;position:relative;cursor:pointer;flex-shrink:0}.ov-tk::before{content:"";position:absolute;inset:12px;border:1.5px solid var(--muted);border-radius:5px}.ov-tk.on::before{background:var(--accent);border-color:var(--accent)}.ov-tk.on::after{content:"";position:absolute;left:18px;top:14px;width:6px;height:11px;border:solid #0d1424;border-width:0 2px 2px 0;transform:rotate(45deg)}.ov-tk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* v17b import account check and grouped categories */
+.imp-acct{background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:16px;margin:0 0 12px}.imp-acct.ok{border-color:var(--line2)}.imp-acct.need{outline:2px solid #d4695c}.imp-l{font-size:12px;color:var(--muted)}.imp-n{font-size:20px;font-weight:500;margin:2px 0 10px;overflow-wrap:anywhere}.imp-warn{background:#2a2418;border:1px solid #6b5420;border-radius:10px;padding:12px;margin:0 0 12px;display:flex;flex-direction:column;gap:6px;font-size:13px}.imp-b{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line2);background:transparent;color:var(--text);cursor:pointer;font-size:14px}.imp-b.main{background:var(--accent);border-color:var(--accent);color:#0d1424;font-weight:500;width:100%}.imp-b:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -3507,6 +3510,37 @@ el.innerHTML=h};
 document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('#overviewPage [data-ov]');if(!b)return;var s=st(),a=b.dataset.ov;
 if(a==='prev')s.off=(s.off||0)+1;else if(a==='next')s.off=Math.max(0,(s.off||0)-1);else if(a==='fixed')s.fixed=s.fixed?0:1;else if(a==='oneoff')s.oneoff=s.oneoff?0:1;else if(a==='showhid'){showHid=!showHid}else if(a==='tick')s.lab[b.dataset.k]=b.dataset.on==='1'?'hide':'everyday';else if(a==='one')s.lab[b.dataset.k]='oneoff';else if(a==='eve')s.lab[b.dataset.k]='everyday';
 save(s);renderOverview_()});
+})();
+
+(function () {
+  const orig = window.categoryOptionsHtml;
+  if (typeof orig !== 'function') return;
+  window.categoryOptionsHtml = function () {
+    const h = orig.apply(this, arguments);
+    try {
+      const box = document.createElement('select'); box.innerHTML = h;
+      const opts = [...box.querySelectorAll('option')];
+      if (opts.length < 8) return h;
+      const groups = [], map = {};
+      opts.forEach(function (o) {
+        const t = o.textContent || ''; const i = t.indexOf(' · ');
+        const g = i > 0 ? t.slice(0, i) : t;
+        if (!map[g]) { map[g] = { name: g, opts: [] }; groups.push(map[g]); }
+        const c = o.cloneNode(true);
+        if (i > 0) c.textContent = t.slice(i + 3); else if (map[g].opts.length === 0) c.dataset.base = '1';
+        map[g].opts.push(c);
+      });
+      const out = document.createElement('select');
+      groups.forEach(function (g) {
+        if (g.opts.length === 1 && !g.opts[0].dataset.base) { out.appendChild(g.opts[0]); return; }
+        if (g.opts.length === 1) { out.appendChild(g.opts[0]); return; }
+        const og = document.createElement('optgroup'); og.label = g.name;
+        g.opts.forEach(function (c) { if (c.dataset.base) c.textContent = g.name + ' (general)'; og.appendChild(c); });
+        out.appendChild(og);
+      });
+      return out.innerHTML;
+    } catch (e) { return h; }
+  };
 })();
 function switchInsightsSub(sub) {
   insightsSubPage = sub;
@@ -9151,6 +9185,48 @@ function applyCategoryToMerchantSiblings(idx) {
   if (changed) renderImportPreview();
 }
 
+
+function importAcctBannerHtml_() {
+  try {
+    const rows = pendingImportRows || [];
+    if (!rows.length) return '';
+    const sig = rows.length + '|' + rows[0].date + '|' + rows[0].amount + '|' + (rows[0].account || '');
+    if (window.__acctSig !== sig) { window.__acctSig = sig; window.__acctOk = false; }
+    if (!window.__gateOn) {
+      window.__gateOn = 1;
+      importBackdrop.addEventListener('click', function (e) {
+        if (!(e.target === importSubmitBtn || importSubmitBtn.contains(e.target))) return;
+        if (pendingImportRows.length && !window.__acctOk) {
+          e.stopImmediatePropagation(); e.preventDefault();
+          const el = document.querySelector('.imp-acct');
+          if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('need'); setTimeout(function () { el.classList.remove('need'); }, 1600); }
+        }
+      }, true);
+      document.addEventListener('click', function (e) {
+        const b = e.target.closest && e.target.closest('[data-imp]');
+        if (!b) return;
+        if (b.dataset.imp === 'ok') { window.__acctOk = true; renderImportPreview(); }
+        else if (b.dataset.imp === 'cancel') { importBackdrop.classList.remove('open'); }
+      });
+    }
+    const names = {};
+    rows.forEach(function (r) { const a = r.account || 'TNG'; names[a] = (names[a] || 0) + 1; });
+    const list = Object.keys(names).map(function (a) { return a + ' (' + names[a] + ')'; }).join(', ');
+    const pool = (typeof allTxnsRaw !== 'undefined' && allTxnsRaw.length) ? allTxnsRaw : allTxns;
+    const other = {};
+    rows.forEach(function (r) {
+      const hit = pool.find(function (t) { return t.account !== (r.account || 'TNG') && importRowsMatch(Object.assign({}, t, { account: r.account || 'TNG' }), r); });
+      if (hit) other[hit.account] = (other[hit.account] || 0) + 1;
+    });
+    let warn = '';
+    const top = Object.keys(other).sort(function (a, b) { return other[b] - other[a]; })[0];
+    if (top && other[top] >= Math.max(3, Math.ceil(rows.length / 2))) {
+      warn = '<div class="imp-warn"><b>Wrong account?</b><span>' + other[top] + ' of ' + rows.length + ' rows already exist under ' + escapeHtml(top) + '. Check the account before saving.</span><button class="imp-b" data-imp="cancel">Cancel this upload</button></div>';
+    }
+    return '<div class="imp-acct' + (window.__acctOk ? ' ok' : '') + '"><div class="imp-l">Uploading to</div><div class="imp-n">' + escapeHtml(list) + '</div>' + warn +
+      (window.__acctOk ? '<div class="imp-l">Account confirmed</div>' : '<button class="imp-b main" data-imp="ok">Yes, this is the right account</button>') + '</div>';
+  } catch (e) { return ''; }
+}
 function renderImportPreview() {
   // Sorting/grouping only changes what order rows are DISPLAYED in — the
   // underlying pendingImportRows array (and its indices) never gets
@@ -9236,7 +9312,7 @@ function renderImportPreview() {
     `).join('');
   };
 
-  let html = '';
+  let html = importAcctBannerHtml_();
 
   if (pendingImportBeforeOpening.length) {
     const chevron = importBeforeOpeningCollapsed ? '▸' : '▾';
