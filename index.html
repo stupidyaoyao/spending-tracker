@@ -9422,6 +9422,11 @@ function importRowsMatch(a, b) {
     (b.postedDate && b.postedDate === a.date) ||
     (a.postedDate && b.postedDate && a.postedDate === b.postedDate);
   const sameAmount = Math.abs(Number(a.amount || 0) - Number(b.amount || 0)) < 0.005;
+  // v14: a received-from-wallet row can sit a day or two off the statement date (the app moves it to the day you paid). Same person + same amount within 3 days = same payment, so a re-import is not added twice.
+  if (sameAccount && sameAmount && !sameDate && Number(a.amount || 0) >= 5 && txnFlow(a) === 'in' && txnFlow(b) === 'in' &&
+      /receive from wallet/i.test(String(a.type || '')) && String(a.type || '').trim().toLowerCase() === String(b.type || '').trim().toLowerCase() &&
+      importRowContext(a) && importRowContext(a) === importRowContext(b) &&
+      Math.abs((new Date(a.date + 'T00:00:00') - new Date(b.date + 'T00:00:00')) / 864e5) <= 3) return true;
   if (!sameAccount || !sameDate || !sameAmount) return false;
   if (isReloadishImportRow(a) && isReloadishImportRow(b)) return true;
   // PBank's raw statement "Type" code (DUITNOW QR DR, DEP-ECP, etc.) is the
