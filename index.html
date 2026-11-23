@@ -907,6 +907,51 @@ html,body{overflow-x:clip;max-width:100%}.cal-grid{grid-template-columns:repeat(
   .ec-card { border-top:1px solid var(--line); padding:12px 0; } .ec-t { font-size:13px; color:var(--muted); margin-bottom:6px; }
   .ec-r { display:flex; gap:8px; margin-top:8px; } .ec-r input { flex:1; min-width:0; min-height:44px; padding:0 12px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:var(--card2); color:var(--text); }
   .ov-sg { display:flex; justify-content:space-between; font-size:13px; font-weight:500; color:var(--text); margin:14px 0 4px; }
+  /* v22 calm rows */
+  .ic-dots { --ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='1'/%3E%3Ccircle cx='19' cy='12' r='1'/%3E%3Ccircle cx='5' cy='12' r='1'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Food"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Transport"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6v6M16 6v6M2 12h19.6M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3M9 18h5'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3Ccircle cx='16' cy='18' r='2'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Vehicle"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2M9 17h6'/%3E%3Ccircle cx='7' cy='17' r='2'/%3E%3Ccircle cx='17' cy='17' r='2'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Shopping"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4ZM3 6h18M16 10a4 4 0 0 1-8 0'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Health"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Personal Care"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Entertainment"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 3l14 9-14 9V3z'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Subscriptions"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 2 4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Sports"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 6.5l11 11M21 21l-1-1M3 3l1 1M18 22l4-4M2 6l4-4M3 10l7-7M14 21l7-7'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Social"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Housing"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Bills"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Work Expenses"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='7' width='20' height='14' rx='2'/%3E%3Cpath d='M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Services"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Loss"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3M12 9v4M12 17h.01'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Savings & Investment"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 7 13.5 15.5 8.5 10.5 2 17M16 7h6v6'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Income"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 7 7 17M17 17H7V7'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Transfer"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4'/%3E%3C/svg%3E"); }
+  .txn2[data-cat="Unsure"] { --ti:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01'/%3E%3C/svg%3E"); }
+  .day-group { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:12px; min-width:0; max-width:100%; }
+  .day-group > .day-header { padding:12px 14px; }
+  .txn2:not(.rv-row) { position:relative; background:transparent !important; border:0 !important; border-top:1px solid var(--line) !important; border-radius:0 !important; box-shadow:none !important; margin:0 !important; padding:12px 12px 12px 62px !important; min-width:0; max-width:100%; box-sizing:border-box; }
+  .txn2:not(.rv-row)::before { content:''; position:absolute; left:12px; top:12px; width:36px; height:36px; border-radius:10px; background:color-mix(in srgb, var(--cc) 16%, transparent); }
+  .txn2:not(.rv-row)::after { content:''; position:absolute; left:21px; top:21px; width:18px; height:18px; background:var(--cc); -webkit-mask:var(--ti, none) center/contain no-repeat; mask:var(--ti, none) center/contain no-repeat; }
+  .txn2:not(.rv-row) .merchant-text { font-size:15px; font-weight:500; overflow-wrap:anywhere; }
+  .txn2:not(.rv-row) .amount { color:var(--text) !important; font-weight:500; font-variant-numeric:tabular-nums; }
+  .txn2:not(.rv-row) .amount.in { color:#3fae78 !important; }
+  .txn2:not(.rv-row) .meta { font-size:12px; color:var(--muted); margin-top:2px; }
+  .txn2:not(.rv-row) .date-edit { text-decoration:none !important; border:0 !important; }
+  .txn2:not(.rv-row) .tbc-flag { background:transparent !important; color:var(--muted) !important; border:1px solid var(--line); font-weight:400 !important; font-size:11px; text-transform:none !important; letter-spacing:0 !important; padding:1px 8px; }
+  .txn2:not(.rv-row) .transfer-hint { color:var(--muted) !important; font-size:12px; }
+  .txn2:not(.rv-row) .txn-top-r { display:flex; align-items:center; gap:2px; }
+  .txn-more { width:44px; height:44px; margin:-8px -10px -8px 0; display:inline-flex; align-items:center; justify-content:center; border:0; background:transparent; color:var(--muted); border-radius:10px; }
+  .txn2:not(.rv-row) .txn-cat-select { width:auto; max-width:100%; min-height:36px; height:36px; border:1px solid var(--line) !important; border-radius:18px !important; background-color:transparent !important; color:var(--text); font-size:13px; padding:0 12px; margin-top:6px; }
+  .txn2:not(.rv-row) .txn-bottom { display:block; }
+  .txn2:not(.rv-row) .txn-extratag-select, .txn2:not(.rv-row) .txn-actions { display:none !important; }
+  .txn2.acts-open .txn-extratag-select { display:inline-block !important; }
+  .txn2.acts-open .txn-actions { display:flex !important; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .txn2.acts-open .txn-actions button { min-height:44px; min-width:44px; }
+  .ng-nums { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:10px 0; font-variant-numeric:tabular-nums; }
+  .ng-nums span { display:block; font-size:12px; color:var(--muted); } .ng-nums b { font-size:18px; font-weight:500; color:var(--text); }
+  .ng-card .lock-btn { margin-top:10px; }
+  .txn2.acts-open .txn-extratag-select { min-height:36px; height:36px; border-radius:18px !important; padding:0 12px; margin-top:6px; font-size:13px; }
 </style>
 </head>
 <body>
@@ -3563,7 +3608,7 @@ if(cats.length&&c.sal>0){h+='<div class="ov-card"><div class="ov-h">Where your s
 var by={};all.forEach(function(t){var v=spendOf(t);if(v>0&&!isSalary(t))(by[t.category]=by[t.category]||[]).push(v)});
 var ch=c.rows.filter(function(t){var v=spendOf(t);if(v<100||s.lab[key(t)])return false;var a=by[t.category]||[];return a.length>=5?v>2.5*med(a):v>=200}).slice(0,5);
 if(ch.length){h+='<div class="ov-card"><div class="ov-h">Check these <span class="qm" title="Purchases much bigger than usual for their category. Mark one-offs to keep them out of your everyday figure.">?</span></div><div class="ov-sub">Bigger than usual for their category. Mark one-offs so they stay out of your everyday figure.</div>';ch.forEach(function(t){h+='<div class="ov-li"><div><b>'+escapeHtml(t.merchant||t.subTag||t.category)+'</b><span>'+fmtShortDate_((t.date||'').slice(0,10))+' · '+escapeHtml(t.category)+'</span></div><em>'+fm(spendOf(t))+'</em><span class="ov-acts"><button class="ov-lk" data-ov="one" data-k="'+escapeHtml(key(t))+'">One-off</button><button class="ov-lk" data-ov="eve" data-k="'+escapeHtml(key(t))+'">Everyday</button></span></div>'});h+='</div>'}
-h+='<div class="ov-card"><div class="ov-h">History</div>';ks.slice().reverse().slice(0,8).forEach(function(q){var x=calc(q,s,all);if(x.sal<=0)return;h+='<div class="ov-hi"><span>'+lbl(q)+'</span><div class="ov-bar sm"><i class="'+(x.saved<0?'neg':'')+'" style="width:'+Math.max(0,Math.min(100,x.pct))+'%"></i></div><b class="'+(x.saved>=0?'pos':'neg')+'">'+x.pct+'%</b></div>'});h+='</div>';
+h+=window.ngCard_(c.a,c.b);h+='<div class="ov-card"><div class="ov-h">History</div>';ks.slice().reverse().slice(0,8).forEach(function(q){var x=calc(q,s,all);if(x.sal<=0)return;h+='<div class="ov-hi"><span>'+lbl(q)+'</span><div class="ov-bar sm"><i class="'+(x.saved<0?'neg':'')+'" style="width:'+Math.max(0,Math.min(100,x.pct))+'%"></i></div><b class="'+(x.saved>=0?'pos':'neg')+'">'+x.pct+'%</b></div>'});h+='</div>';
 el.innerHTML=h};
 document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('#overviewPage [data-ov]');if(!b)return;var s=st(),a=b.dataset.ov;
 if(a==='prev')s.off=(s.off||0)+1;else if(a==='next')s.off=Math.max(0,(s.off||0)-1);else if(a==='fixed')s.fixed=s.fixed?0:1;else if(a==='oneoff')s.oneoff=s.oneoff?0:1;else if(a==='showhid'){showHid=!showHid}else if(a==='tick')s.lab[b.dataset.k]=b.dataset.on==='1'?'hide':'everyday';else if(a==='one')s.lab[b.dataset.k]='oneoff';else if(a==='eve')s.lab[b.dataset.k]='everyday';
@@ -6846,14 +6891,14 @@ function renderTxnRowBase_(t, opts) {
   const rvCollapsed = (opts.reviewMode && !(reviewAllOpen || reviewExpanded.has(t.row))) ? ' rv-collapsed' : '';
   const chev = opts.reviewMode ? `<span class="rv-chev">${rvCollapsed ? '▸' : '▾'}</span>` : '';
   return `
-    <div class="txn txn2${rvKey}${rvCollapsed}" data-row="${t.row}" style="--cc:${colorFor(t.category)}">
+    <div class="txn txn2${rvKey}${rvCollapsed}" data-row="${t.row}" data-cat="${escapeHtml(t.category)}" style="--cc:${colorFor(t.category)}">
       <div class="txn-top"${opts.reviewMode ? ` data-rv-toggle="${t.row}"` : ''}>
         <div class="merchant">${chev}<span class="merchant-text">${txnTitle(t)}</span>${tbcFlagHtml}${reloadFlagHtml}${pendingSyncFlagHtml}${syncedFlagHtml}</div>
-        <div class="txn-top-r"><div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>${opts.reviewMode ? `<button class="review-btn confirm review-confirm-cat-btn" data-row="${t.row}">Confirm</button>` : ''}</div>
+        <div class="txn-top-r"><div class="${amtClass}">${sign}RM${Number(t.amount || 0).toFixed(2)}</div>${opts.reviewMode ? `<button class="review-btn confirm review-confirm-cat-btn" data-row="${t.row}">Confirm</button>` : '<button type="button" class="txn-more" aria-label="More actions" aria-expanded="false"><i class="ic ic-dots"></i></button>'}</div>
       </div>
       ${hintHtml}
       ${typeHintHtml}
-      <div class="meta"><span class="date-edit" data-edit-date="${t.row}" title="Tap to change the paid date">${new Date(t.date).toLocaleDateString()}</span> · ${t.time || 'No time record'} · ${t.account || 'TNG'}${clockChipHtml_(t)}${claimChipHtml_(t)}${(!VIEW_ONLY && !t.remark && /^(Fund Transfer|Transfer to Wallet)$/i.test(t.merchant || '')) ? `<button class="who-chip" data-who-row="${t.row}">Who?</button>` : ''}</div>
+      <div class="meta"><span class="date-edit" data-edit-date="${t.row}" title="Tap to change the paid date">${new Date(t.date).toLocaleDateString()}</span>${t.time ? ' · ' + t.time : ''} · ${t.account || 'TNG'}${clockChipHtml_(t)}${claimChipHtml_(t)}${(!VIEW_ONLY && !t.remark && /^(Fund Transfer|Transfer to Wallet)$/i.test(t.merchant || '')) ? `<button class="who-chip" data-who-row="${t.row}">Who?</button>` : ''}</div>
       ${remarkHtml}
       <div class="txn-bottom">
         <div class="cat-select-row">
@@ -7319,6 +7364,24 @@ window.openCategories_ = function () {
     }
   });
 };
+document.addEventListener('click', function (e) { const b = e.target.closest && e.target.closest('.txn-more'); if (!b) return; e.stopPropagation(); const r = b.closest('.txn2'); const on = r.classList.toggle('acts-open'); b.setAttribute('aria-expanded', on ? 'true' : 'false'); }, true);
+window.ngCard_ = function (a, b) {
+  try {
+    const money = function (n) { return 'RM' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+    const gs = linkGroups_().filter(function (g) { return g.kind === 'claim' && /previous job|ng elevate/i.test(stripMark_(g.remark)); });
+    if (!gs.length) return '';
+    let recv = 0, owed = 0, rows = '';
+    gs.forEach(function (g) {
+      let r = 0; g.txns.forEach(function (t) { const d = String(t.date || '').slice(0, 10); if (txnFlow(t) === 'in' && d >= a && d <= b) r += Number(t.amount || 0); });
+      const o = Math.max(0, g.totalOut - g.totalIn); recv += r; owed += o;
+      rows += '<div class="ov-li"><div><b>' + escapeHtml(stripMark_(g.remark)) + '</b><span>' + (o > 0.005 ? 'Still owed to you' : 'Fully paid back') + '</span></div><em>' + money(o) + '</em></div>';
+    });
+    return '<div class="ov-card ng-card"><div class="ov-h">NG Elevate claim <span class="qm" title="Back pay from your previous job. It is shown here on its own and is not counted in this month\'s salary or savings.">?</span></div><div class="ov-sub">Shown on its own. Not counted in this month\'s salary or savings.</div>' +
+      '<div class="ng-nums"><div><span>Received this month</span><b>' + money(recv) + '</b></div><div><span>Still owed</span><b>' + money(owed) + '</b></div></div>' + rows +
+      '<button type="button" class="lock-btn" data-ngopen="1">Open in Links</button></div>';
+  } catch (e) { return ''; }
+};
+document.addEventListener('click', function (e) { const b = e.target.closest && e.target.closest('[data-ngopen]'); if (!b) return; switchInsightsSub('splits'); const c = document.querySelector('#linksChips [data-filter=claim]'); if (c) c.click(); }, true);
 window.openPayback_ = function (key) {
   const g = remarkGroups().find(function (x) { return splitGroupKey_(x.remark) === key; });
   if (!g) return;
