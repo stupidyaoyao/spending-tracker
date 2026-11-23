@@ -836,6 +836,9 @@ body.theme-ice .stick-bar { background: #0f2230; }
 .fab.secondary { border: 1px solid var(--line2); }
 
 .fab.secondary { color: var(--text) !important; }
+
+/* v13 overview */
+#overviewPage{padding:0 0 24px}.ov-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}.ov-sw{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}.ov-sw-t{text-align:center;display:flex;flex-direction:column;gap:2px}.ov-sw-t b{font-weight:500;font-size:15px}.ov-sw-t span{font-size:12px;color:var(--muted)}.ov-nav{width:44px;height:44px;border-radius:10px;border:1px solid var(--line2);background:transparent;color:var(--text);font-size:12px;cursor:pointer}.ov-nav:disabled{opacity:.35;cursor:default}.ov-nav:focus-visible,.ov-chip:focus-visible,.ov-lk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.ov-big{display:flex;flex-direction:column;gap:2px;margin:8px 0 12px}.ov-lab,.ov-pct,.ov-vs,.ov-sub,.ov-cat-s{font-size:12px;color:var(--muted)}.ov-fig{font-size:32px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.15}.pos{color:var(--income,#3fae78)}.neg{color:#d4695c}.ov-bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:0 0 12px}.ov-bar.sm{height:4px;margin:6px 0 4px}.ov-bar i{display:block;height:100%;background:var(--accent);border-radius:4px}.ov-bar i.neg{background:#d4695c}.ov-row{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;font-variant-numeric:tabular-nums}.ov-row span{color:var(--muted)}.ov-row b{font-weight:500}.ov-vs{margin-top:8px}.ov-note,.ov-empty{font-size:14px;color:var(--muted);padding:8px 0}.ov-empty p{margin:8px 0 0}.ov-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}.ov-chl{font-size:12px;color:var(--muted)}.ov-chip{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-size:13px;cursor:pointer;transition:background-color .16s,color .16s,border-color .16s}.ov-chip.on{border-color:var(--accent);color:var(--text);background:var(--card2)}.ov-hid{font-size:12px;color:var(--muted);margin:0 0 8px}.ov-lk{background:none;border:0;color:var(--accent);font-size:13px;min-height:44px;padding:0 8px;cursor:pointer}.ov-list{margin:0 0 12px}.ov-li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}.ov-li>div{flex:1 1 140px;min-width:0;display:flex;flex-direction:column;gap:2px}.ov-li b{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ov-li span{font-size:12px;color:var(--muted)}.ov-li em{font-style:normal;font-variant-numeric:tabular-nums;font-size:14px}.ov-acts{display:flex}.ov-h{font-size:14px;font-weight:500;margin-bottom:8px}.ov-sub{margin:-4px 0 8px}.ov-cat{padding:4px 0}.ov-cat-t{display:flex;justify-content:space-between;font-size:14px}.ov-cat-t b{font-weight:500;font-variant-numeric:tabular-nums}.ov-cat-t em{font-style:normal;color:var(--muted);font-size:12px;margin-left:4px}.ov-hi{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 44px;align-items:center;gap:12px;font-size:13px;padding:4px 0}.ov-hi .ov-bar{margin:0}.ov-hi b{text-align:right;font-weight:500;font-variant-numeric:tabular-nums}@media (prefers-reduced-motion:reduce){.ov-chip{transition:none}}
 </style>
 </head>
 <body>
@@ -977,12 +980,14 @@ body.theme-ice .stick-bar { background: #0f2230; }
   <div id="insightsPage">
     <div id="insightsSummary"></div>
     <div class="insights-subnav" id="insightsSubnav">
-      <button class="insights-subtab active" data-sub="compare" style="--tc:#8d6fe0">Compare</button>
+      <button class="insights-subtab active" data-sub="overview" style="--tc:#3a9bc4">Overview</button>
+      <button class="insights-subtab" data-sub="compare" style="--tc:#8d6fe0">Compare</button>
       <button class="insights-subtab" data-sub="splits" style="--tc:#2fa7a1">Links</button>
       <button class="insights-subtab" data-sub="commit" style="--tc:#3fae78">Commitments</button>
       <button class="insights-subtab" data-sub="budget" style="--tc:#d9894a">Budgets</button>
     </div>
 
+    <div id="overviewPage" style="display:none;"></div>
     <div id="comparePage">
       <div class="cmp-controls">
         <label class="cmp-label">What</label>
@@ -3442,10 +3447,57 @@ function renderApp() {
 // meant to summarize) — these three still toggle amongst themselves the
 // same way, just always visible within Main rather than behind a separate
 // page switch.
-let insightsSubPage = 'compare';
+let insightsSubPage = 'overview';
+(function(){
+var LS='ovState_v1',showHid=false;
+function st(){var s={fixed:0,oneoff:0,off:0,lab:{}};try{Object.assign(s,JSON.parse(localStorage.getItem(LS)||'{}'))}catch(e){}if(!s.lab)s.lab={};return s}
+function save(s){try{localStorage.setItem(LS,JSON.stringify(s))}catch(e){}}
+function fm(n){if(balanceHidden)return 'RM ••••';return (n<0?'-':'')+'RM '+Math.abs(n).toLocaleString('en-MY',{maximumFractionDigits:0})}
+function txt(t){return [t.merchant,t.remark,t.notes,t.subTag].join(' ')}
+function isSalary(t){return t.category==='Income'&&txnFlow(t)==='in'&&/salary/i.test(t.subTag||'')&&!/previous job|ng elevate/i.test((t.remark||'')+' '+(t.notes||''))}
+function auto1(t){var r=(t.remark||'')+' '+(t.notes||'');if(/vios|previous job/i.test(r))return 1;if((t.category==='Vehicle'||t.category==='Housing')&&/deposit/i.test(t.subTag||''))return 1;return 0}
+function fixed1(t){var cs=(typeof commitments!=='undefined'&&commitments)||[];for(var i=0;i<cs.length;i++){var c=cs[i];if(c.active===false||!c.match)continue;try{if(new RegExp(c.match,'i').test(txt(t)))return 1}catch(e){if(txt(t).toLowerCase().indexOf(String(c.match).toLowerCase())>=0)return 1}}return 0}
+function key(t){return t.row+'|'+t.amount}
+function bucket(t,s){var l=s.lab[key(t)];if(l==='everyday')return 'everyday';if(l==='oneoff')return 'oneoff';if(auto1(t))return 'oneoff';if(fixed1(t))return 'fixed';return 'everyday'}
+function spendOf(t){if(NON_SPEND_CATEGORIES.indexOf(t.category)>=0)return 0;var a=Number(t.amount||0);return txnFlow(t)==='in'?-a:a}
+function ck(iso){var y=+iso.slice(0,4),m=+iso.slice(5,7),d=+iso.slice(8,10);if(d<28){m--;if(m<1){m=12;y--}}return y+'-'+(m<10?'0':'')+m}
+function ad(k,n){var y=+k.slice(0,4),m=+k.slice(5,7)-1+n;y+=Math.floor(m/12);m=((m%12)+12)%12;return y+'-'+(m+1<10?'0':'')+(m+1)}
+var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function lbl(k){var n=ad(k,1);return '28 '+MN[+k.slice(5,7)-1]+' – 27 '+MN[+n.slice(5,7)-1]}
+function calc(k,s,all){var a=k+'-28',b=ad(k,1)+'-27',sal=0,tot=0,hid={fixed:0,oneoff:0},hn={fixed:0,oneoff:0},cat={},rows=[];
+all.forEach(function(t){var d=(t.date||'').slice(0,10);if(d<a||d>b)return;if(isSalary(t)){sal+=Number(t.amount);return}var v=spendOf(t);if(!v)return;var bk=bucket(t,s);if(bk==='everyday'||(bk==='fixed'&&s.fixed)||(bk==='oneoff'&&s.oneoff)){tot+=v;cat[t.category]=(cat[t.category]||0)+v;rows.push(t)}else{hid[bk]+=v;hn[bk]++}});
+return {k:k,a:a,b:b,sal:sal,spent:tot,saved:sal-tot,pct:sal>0?Math.round((sal-tot)/sal*100):null,cat:cat,hid:hid,hn:hn,rows:rows}}
+function med(a){a=a.slice().sort(function(x,y){return x-y});return a.length?a[Math.floor(a.length/2)]:0}
+window.renderOverview_=function(){var el=document.getElementById('overviewPage');if(!el)return;var s=st(),all=allTxns||[];
+var sk=all.filter(isSalary).map(function(t){return ck((t.date||'').slice(0,10))}).sort();
+var now=new Date(),iso=now.getFullYear()+'-'+('0'+(now.getMonth()+1)).slice(-2)+'-'+('0'+now.getDate()).slice(-2),cur=ck(iso);
+if(!sk.length){el.innerHTML='<div class="ov-empty"><b>No salary found yet</b><p>Overview looks for income rows tagged Income › Salary (not the previous job). Add one and your cycles appear here.</p></div>';return}
+var ks=[],k=sk[0];while(k<=cur){ks.push(k);k=ad(k,1)}
+var off=Math.min(Math.max(s.off||0,0),ks.length-1),sel=ks[ks.length-1-off],c=calc(sel,s,all),pk=ad(sel,-1),p=ks.indexOf(pk)>=0?calc(pk,s,all):null;
+var h='<div class="ov-card"><div class="ov-sw"><button class="ov-nav" data-ov="prev"'+(off>=ks.length-1?' disabled':'')+' aria-label="Earlier cycle">&#9664;</button><div class="ov-sw-t"><b>'+lbl(sel)+'</b><span>'+(sel===cur?'In progress':'Salary cycle')+'</span></div><button class="ov-nav" data-ov="next"'+(off<=0?' disabled':'')+' aria-label="Later cycle">&#9654;</button></div>';
+if(c.sal<=0){h+='<div class="ov-note">Salary not in yet for this cycle. Spending so far: <b>'+fm(c.spent)+'</b></div>'}
+else{h+='<div class="ov-big"><span class="ov-lab">'+(c.saved>=0?'Saved':'Overspent')+'</span><span class="ov-fig '+(c.saved>=0?'pos':'neg')+'">'+fm(Math.abs(c.saved))+'</span><span class="ov-pct">'+c.pct+'% of salary</span></div>';
+var w=Math.max(0,Math.min(100,c.sal?c.spent/c.sal*100:0));h+='<div class="ov-bar"><i style="width:'+w+'%"></i></div><div class="ov-row"><span>Salary</span><b>'+fm(c.sal)+'</b></div><div class="ov-row"><span>Spent</span><b>'+fm(c.spent)+'</b></div>';
+if(p&&p.sal>0){var dd=c.spent-p.spent;h+='<div class="ov-vs">'+(Math.abs(dd)<1?'Same spending as':fm(Math.abs(dd))+(dd<0?' less than':' more than'))+' previous cycle ('+(p.pct==null?'-':p.pct+'% saved')+')</div>'}}
+h+='</div>';
+h+='<div class="ov-chips"><span class="ov-chl">Also count</span><button class="ov-chip'+(s.fixed?' on':'')+'" data-ov="fixed">Fixed (commitments)</button><button class="ov-chip'+(s.oneoff?' on':'')+'" data-ov="oneoff">One-off</button></div>';
+var hn=c.hn.fixed+c.hn.oneoff;if(hn){h+='<div class="ov-hid">'+(s.fixed?'':'Fixed '+fm(c.hid.fixed)+' ('+c.hn.fixed+')')+(!s.fixed&&!s.oneoff?' · ':'')+(s.oneoff?'':'One-off '+fm(c.hid.oneoff)+' ('+c.hn.oneoff+')')+' left out <button class="ov-lk" data-ov="showhid">'+(showHid?'Hide list':'Show list')+'</button></div>';
+if(showHid){h+='<div class="ov-list">';all.forEach(function(t){var d=(t.date||'').slice(0,10);if(d<c.a||d>c.b||isSalary(t)||!spendOf(t))return;var bk=bucket(t,s);if(bk==='everyday')return;h+='<div class="ov-li"><div><b>'+escapeHtml(t.merchant||t.subTag||t.category)+'</b><span>'+fmtShortDate_(d)+' · '+bk+' · '+escapeHtml(t.category)+'</span></div><em>'+fm(spendOf(t))+'</em><button class="ov-lk" data-ov="eve" data-k="'+escapeHtml(key(t))+'">Count it</button></div>'});h+='</div>'}}
+var cats=Object.keys(c.cat).sort(function(x,y){return c.cat[y]-c.cat[x]});
+if(cats.length&&c.sal>0){h+='<div class="ov-card"><div class="ov-h">Where your salary went</div>';cats.forEach(function(n){var v=c.cat[n],pc=v/c.sal*100,pv=p&&p.cat[n]!=null?p.cat[n]:null;h+='<div class="ov-cat"><div class="ov-cat-t"><span>'+escapeHtml(n)+'</span><b>'+fm(v)+' <em>'+pc.toFixed(1)+'%</em></b></div><div class="ov-bar sm"><i style="width:'+Math.min(100,pc)+'%"></i></div>'+(pv!=null?'<div class="ov-cat-s">prev '+fm(pv)+'</div>':'')+'</div>'});h+='</div>'}
+var by={};all.forEach(function(t){var v=spendOf(t);if(v>0&&!isSalary(t))(by[t.category]=by[t.category]||[]).push(v)});
+var ch=c.rows.filter(function(t){var v=spendOf(t);if(v<100||s.lab[key(t)])return false;var a=by[t.category]||[];return a.length>=5?v>2.5*med(a):v>=200}).slice(0,5);
+if(ch.length){h+='<div class="ov-card"><div class="ov-h">Check these <span class="qm" title="Purchases much bigger than usual for their category. Mark one-offs to keep them out of your everyday figure.">?</span></div><div class="ov-sub">Bigger than usual for their category. Mark one-offs so they stay out of your everyday figure.</div>';ch.forEach(function(t){h+='<div class="ov-li"><div><b>'+escapeHtml(t.merchant||t.subTag||t.category)+'</b><span>'+fmtShortDate_((t.date||'').slice(0,10))+' · '+escapeHtml(t.category)+'</span></div><em>'+fm(spendOf(t))+'</em><span class="ov-acts"><button class="ov-lk" data-ov="one" data-k="'+escapeHtml(key(t))+'">One-off</button><button class="ov-lk" data-ov="eve" data-k="'+escapeHtml(key(t))+'">Everyday</button></span></div>'});h+='</div>'}
+h+='<div class="ov-card"><div class="ov-h">History</div>';ks.slice().reverse().slice(0,8).forEach(function(q){var x=calc(q,s,all);if(x.sal<=0)return;h+='<div class="ov-hi"><span>'+lbl(q)+'</span><div class="ov-bar sm"><i class="'+(x.saved<0?'neg':'')+'" style="width:'+Math.max(0,Math.min(100,x.pct))+'%"></i></div><b class="'+(x.saved>=0?'pos':'neg')+'">'+x.pct+'%</b></div>'});h+='</div>';
+el.innerHTML=h};
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('#overviewPage [data-ov]');if(!b)return;var s=st(),a=b.dataset.ov;
+if(a==='prev')s.off=(s.off||0)+1;else if(a==='next')s.off=Math.max(0,(s.off||0)-1);else if(a==='fixed')s.fixed=s.fixed?0:1;else if(a==='oneoff')s.oneoff=s.oneoff?0:1;else if(a==='showhid'){showHid=!showHid}else if(a==='one')s.lab[b.dataset.k]='oneoff';else if(a==='eve')s.lab[b.dataset.k]='everyday';
+save(s);renderOverview_()});
+})();
 function switchInsightsSub(sub) {
   insightsSubPage = sub;
   document.querySelectorAll('.insights-subtab').forEach(el => el.classList.toggle('active', el.dataset.sub === sub));
+  document.getElementById('overviewPage').style.display = sub === 'overview' ? '' : 'none';
   document.getElementById('comparePage').style.display = sub === 'compare' ? '' : 'none';
   document.getElementById('trendsPage').style.display = sub === 'charts' ? '' : 'none';
   document.getElementById('splitsInsightsPage').style.display = sub === 'splits' ? '' : 'none';
@@ -3454,6 +3506,7 @@ function switchInsightsSub(sub) {
   if (sub === 'budget') renderBudgets_();
   renderInsightsSummary_();
   if (sub === 'commit') { renderCommitments_(); renderSuggestions_(); }
+  if (sub === 'overview') renderOverview_();
   if (sub === 'compare') renderCompare();
   else if (sub === 'charts') renderTrends();
   else if (sub === 'splits') renderSplitsInsights(splitsFilterRemark);
