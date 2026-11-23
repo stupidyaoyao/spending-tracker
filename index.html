@@ -952,6 +952,9 @@ html,body{overflow-x:clip;max-width:100%}.cal-grid{grid-template-columns:repeat(
   .ng-nums span { display:block; font-size:12px; color:var(--muted); } .ng-nums b { font-size:18px; font-weight:500; color:var(--text); }
   .ng-card .lock-btn { margin-top:10px; }
   .txn2.acts-open .txn-extratag-select { min-height:36px; height:36px; border-radius:18px !important; padding:0 12px; margin-top:6px; font-size:13px; }
+  .pb-top { display:inline-flex; align-items:center; gap:8px; }
+  .pb-plus { width:44px; height:44px; margin:-10px -8px -10px 0; border-radius:50%; border:0; background:var(--text); color:var(--card); display:inline-flex; align-items:center; justify-content:center; flex:none; }
+  .pb-plus .ic { width:20px; height:20px; }
 </style>
 </head>
 <body>
@@ -7245,7 +7248,7 @@ function lockRowHtml_(g) {
   if (g.done) return `<div class="lock-row"><span>🔒 Settled</span><button class="lock-btn" data-unlock="${key}">${g.kind === 'note' ? 'Reopen' : 'Unlock'}</button></div>`;
   const owed = g.totalOut - g.totalIn;
   const ready = g.kind === 'note' ? true : (g.kind === 'claim' ? owed <= 0.005 : g.totalIn > 0);
-  return true ? `<div class="lock-row">${g.kind === 'claim' ? '<button class="lock-btn pay-btn" data-payback="' + key + '"><i class="ic ic-plus"></i>Add payback</button>' : ''}<button class="lock-btn lock-go" data-lock="${key}"><i class="ic ic-lock"></i>${g.kind === 'note' ? 'Mark settled' : 'Lock'}</button></div>` : '';
+  return true ? `<div class="lock-row"><button class="lock-btn lock-go" data-lock="${key}"><i class="ic ic-lock"></i>${g.kind === 'note' ? 'Mark settled' : 'Lock'}</button></div>` : '';
 }
 async function setGroupDone_(key, on) {
   const g = remarkGroups().find(x => splitGroupKey_(x.remark) === key);
@@ -7296,7 +7299,7 @@ function splitGroupCardHtml(g) {
   let statsHtml;
   if (g.kind === 'claim') {
     const pct = g.totalOut > 0 ? Math.min(100, Math.round(g.totalIn / g.totalOut * 100)) : 0;
-    statsHtml = `<div class="link-cost"><span class="link-cost-lbl">Still owed to you</span><span class="link-cost-val ${owed > 0 ? 'warn' : 'ok'}">RM${owed.toFixed(2)}</span></div><div class="link-bar"><div class="link-bar-fill" style="width:${pct}%"></div></div>
+    statsHtml = `<div class="link-cost"><span class="link-cost-lbl">Still owed to you</span>${owed > 0.005 ? '<span class="link-cost-val warn">RM' + owed.toFixed(2) + '</span>' : '<span class="link-cost-lbl">Paid in full</span>'}</div><div class="link-bar"><div class="link-bar-fill" style="width:${pct}%"></div></div>
       <div class="split-group-summary"><span>Paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Paid back <b>RM${g.totalIn.toFixed(2)}</b></span><span style="color:${owed > 0 ? '#d9894a' : '#3fae78'}">Owed <b>RM${owed.toFixed(2)}</b></span></div>`;
   } else if (g.kind === 'split') {
     statsHtml = `<div class="link-cost"><span class="link-cost-lbl">Your cost</span><span class="link-cost-val">RM${Math.max(0, g.totalOut - g.totalIn).toFixed(2)}</span></div><div class="split-group-summary"><span>Paid <b>RM${g.totalOut.toFixed(2)}</b></span><span>Paid back <b>RM${g.totalIn.toFixed(2)}</b></span></div>`;
@@ -7310,7 +7313,7 @@ function splitGroupCardHtml(g) {
           <div class="split-group-name">${g.done ? 'Locked · ' : ''}${escapeHtml(stripMark_(g.remark))}</div>
           <div class="split-group-daterange"><span class="link-kind" style="color:${color}">${LINK_LABELS[g.kind]}</span> · ${g.count} record${g.count === 1 ? '' : 's'} · ${dateRangeText}</div>
         </div>
-        <span class="link-chip link-chip-${st.cls}">${st.text}</span>
+        <span class="pb-top"><span class="link-chip link-chip-${st.cls}">${st.text}</span>${(g.kind === 'claim' && !g.done && !VIEW_ONLY) ? '<button type="button" class="pb-plus" data-payback="' + escapeHtml(splitGroupKey_(g.remark)) + '" aria-label="Add payback" title="Add payback"><i class="ic ic-plus"></i></button>' : ''}</span>
       </div>
       ${statsHtml}
       <details class="link-rows"><summary>Who paid and who paid back</summary><div class="split-group-rows">${rowsHtml}</div></details>
