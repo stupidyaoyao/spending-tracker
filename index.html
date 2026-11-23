@@ -854,6 +854,9 @@ html,body{overflow-x:clip;max-width:100%}.cal-grid{grid-template-columns:repeat(
 
 /* v17b import account check and grouped categories */
 .imp-acct{background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:16px;margin:0 0 12px}.imp-acct.ok{border-color:var(--line2)}.imp-acct.need{outline:2px solid #d4695c}.imp-l{font-size:12px;color:var(--muted)}.imp-n{font-size:20px;font-weight:500;margin:2px 0 10px;overflow-wrap:anywhere}.imp-warn{background:#2a2418;border:1px solid #6b5420;border-radius:10px;padding:12px;margin:0 0 12px;display:flex;flex-direction:column;gap:6px;font-size:13px}.imp-b{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line2);background:transparent;color:var(--text);cursor:pointer;font-size:14px}.imp-b.main{background:var(--accent);border-color:var(--accent);color:#0d1424;font-weight:500;width:100%}.imp-b:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* v18 import link dialog and topic chips */
+.imp-link{margin:8px 0 0;width:100%;text-align:left;overflow-wrap:anywhere}.imp-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100020;display:flex;align-items:center;justify-content:center;padding:14px}.imp-box{background:var(--card);color:var(--text);border:1px solid var(--line2);border-radius:14px;padding:16px;max-width:420px;width:100%;max-height:88vh;overflow:auto}.imp-in{width:100%;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--line2);background:var(--card2);color:var(--text);font-size:15px;margin:4px 0 6px}.nt-more{min-height:44px;padding:0 14px;border-radius:999px;border:1px dashed var(--line2);background:transparent;color:var(--accent);font-size:13px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -3541,6 +3544,84 @@ save(s);renderOverview_()});
       return out.innerHTML;
     } catch (e) { return h; }
   };
+})();
+
+async function applyImportLinks_(links) {
+  try {
+    await loadData();
+    for (const l of links) {
+      const t = l.target;
+      const hit = (allTxnsRaw || []).filter(function (x) { return x.date === t.date && Math.abs(Number(x.amount) - Number(t.amount)) < 0.005 && (x.merchant || '') === (t.merchant || '') && x.account === t.account && !x.remark; });
+      if (hit.length === 1) await callApi('updateRemark', { row: hit[0].row, remark: l.remark });
+    }
+    await loadData();
+  } catch (e) { /* best effort: the imported row already carries the link */ }
+}
+(function () {
+  function fmtD(iso) { return fmtShortDate_(iso); }
+  function nearby(r) {
+    const base = new Date(r.date + 'T00:00:00').getTime();
+    return (allTxnsRaw || []).filter(function (x) { return x.date && Math.abs((new Date(x.date + 'T00:00:00').getTime() - base) / 864e5) <= 4 && !(x.account === r.account && x.date === r.date && Math.abs(x.amount - r.amount) < 0.005 && (x.merchant || '') === (r.merchant || '')); })
+      .map(function (x) { return { x: x, d: Math.abs((new Date(x.date + 'T00:00:00').getTime() - base) / 864e5), opp: txnFlow(x) !== txnFlow(r) ? 0 : 1 }; })
+      .sort(function (a, b) { return (a.opp - b.opp) || (a.d - b.d) || (b.x.amount - a.x.amount); }).slice(0, 6).map(function (o) { return o.x; });
+  }
+  function pretty(s) { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > 28 ? s.slice(0, 28).trim() : s; }
+  function openImportLink_(idx) {
+    const r = pendingImportRows[idx]; if (!r) return;
+    const cands = nearby(r); let pick = -1, mode = 'split';
+    const ov = document.createElement('div');
+    ov.className = 'imp-ov';
+    function draw() {
+      const nm = ov.querySelector('#ilName') ? ov.querySelector('#ilName').value : '';
+      const settled = ov.querySelector('#ilSet') ? ov.querySelector('#ilSet').checked : true;
+      const modes = [['split', 'Shared with someone'], ['claim', 'Someone pays me back'], ['note', 'Just a label']];
+      ov.innerHTML = '<div class="imp-box"><div class="imp-n" style="margin:0 0 4px">Link this row</div><div class="imp-l" style="margin-bottom:10px">' + escapeHtml(pretty(r.merchant)) + ' · ' + fmtD(r.date) + ' · RM' + Number(r.amount).toFixed(2) + '</div>' +
+        '<div class="imp-l">What is it?</div><div style="margin:4px 0 10px">' + modes.map(function (m) { return '<button class="imp-b' + (mode === m[0] ? ' main' : '') + '" style="margin:0 6px 6px 0;width:auto" data-il-mode="' + m[0] + '">' + m[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="imp-l">Link with this record (optional)</div><div style="margin:4px 0 10px">' +
+        (cands.length ? cands.map(function (x, k) { const used = !!x.remark; return '<button class="imp-b" style="display:flex;justify-content:space-between;gap:8px;width:100%;margin:0 0 6px;text-align:left' + (pick === k ? ';border-color:var(--accent)' : '') + '" data-il-pick="' + k + '"' + (used ? ' title="Already linked"' : '') + '><span>' + escapeHtml(pretty(x.merchant || x.subTag || x.category)) + ' · ' + fmtD(x.date) + (used ? ' · linked' : '') + '</span><span>' + (txnFlow(x) === 'in' ? '+' : '-') + 'RM' + Number(x.amount).toFixed(2) + '</span></button>'; }).join('') : '<div class="imp-l">No records found within 4 days.</div>') + '</div>' +
+        '<div class="imp-l">Name</div><input id="ilName" class="imp-in" type="text" value="' + escapeHtml(nm) + '" placeholder="e.g. Thong Kee">' +
+        '<label class="imp-l" style="display:flex;gap:8px;align-items:center;min-height:44px"><input id="ilSet" type="checkbox"' + (settled ? ' checked' : '') + '> Already settled</label>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="imp-b" data-il="cancel">Cancel</button><button class="imp-b main" style="width:auto" data-il="save">Save link</button></div><div id="ilErr" class="imp-l" style="color:#d4695c;min-height:18px"></div></div>';
+    }
+    draw();
+    ov.addEventListener('click', function (e) {
+      const b = e.target.closest('button'); if (!b) { if (e.target === ov) ov.remove(); return; }
+      if (b.dataset.ilMode) { const n = ov.querySelector('#ilName').value; mode = b.dataset.ilMode; draw(); ov.querySelector('#ilName').value = n; return; }
+      if (b.dataset.ilPick !== undefined) { const k = Number(b.dataset.ilPick); if (cands[k].remark) { ov.querySelector('#ilErr').textContent = 'That record already has a link.'; return; } pick = k; const n = ov.querySelector('#ilName').value; draw(); ov.querySelector('#ilName').value = n || pretty(cands[k].merchant || cands[k].subTag || cands[k].category); return; }
+      if (b.dataset.il === 'cancel') { ov.remove(); return; }
+      if (b.dataset.il === 'save') {
+        const name = ov.querySelector('#ilName').value.trim();
+        if (!name) { ov.querySelector('#ilErr').textContent = 'Enter a name for this link.'; return; }
+        const settled = ov.querySelector('#ilSet').checked;
+        const dt = pick >= 0 ? cands[pick].date : r.date;
+        const remark = name + ' (' + fmtD(dt) + ')' + (mode === 'note' ? '' : ' ' + mode + (settled ? ' ✓' : ''));
+        r.remark = remark;
+        const tgt = pick >= 0 ? { date: cands[pick].date, amount: cands[pick].amount, merchant: cands[pick].merchant || '', account: cands[pick].account } : null;
+        Object.defineProperty(r, '__link', { value: tgt ? { target: tgt } : null, enumerable: false, writable: true, configurable: true });
+        ov.remove(); renderImportPreview();
+      }
+    });
+    document.body.appendChild(ov);
+  }
+  document.addEventListener('click', function (e) {
+    const b = e.target.closest && e.target.closest('[data-link-idx]');
+    if (b) openImportLink_(Number(b.dataset.linkIdx));
+  });
+  const nt = document.getElementById('noteTopics');
+  if (nt) {
+    let busy = false, expanded = false;
+    new MutationObserver(function () {
+      if (busy) return; busy = true;
+      try {
+        const kids = Array.prototype.slice.call(nt.children).filter(function (c) { return !c.classList.contains('nt-more'); });
+        const topics = kids.filter(function (c) { return !/new topic/i.test(c.textContent); });
+        let shown = 0, hidden = 0;
+        topics.forEach(function (c) { const keep = expanded || shown < 6 || c.classList.contains('active') || c.classList.contains('on'); c.style.display = keep ? '' : 'none'; if (keep) shown++; else hidden++; });
+        const old = nt.querySelector('.nt-more'); if (old) old.remove();
+        if (hidden) { const m = document.createElement('button'); m.type = 'button'; m.className = 'nt-more'; m.textContent = 'More topics (' + hidden + ')'; m.onclick = function () { expanded = true; busy = true; topics.forEach(function (c) { c.style.display = ''; }); m.remove(); busy = false; }; nt.appendChild(m); }
+      } finally { busy = false; }
+    }).observe(nt, { childList: true });
+  }
 })();
 function switchInsightsSub(sub) {
   insightsSubPage = sub;
@@ -9255,6 +9336,7 @@ function renderImportPreview() {
         <span class="preview-remove" data-idx="${i}">✕</span>
       </div>
       <select data-cat-idx="${i}">${categoryOptionsHtml(r.category, r.subTag, r.account)}</select>
+      <button class="imp-b imp-link" data-link-idx="${i}">${r.remark ? 'Linked: ' + escapeHtml(r.remark) : 'Link to another record'}</button>
       <label class="preview-remember">
         <input type="checkbox" data-remember-idx="${i}"${r.rememberMerchant ? ' checked' : ''}> Always categorize "${r.merchant}" this way
       </label>
@@ -9918,7 +10000,9 @@ importSubmitBtn.onclick = async () => {
   showImportLoading(`Importing ${pendingImportRows.length} transactions…`);
   importSubmitBtn.disabled = true;
   try {
+    const __impLinks = pendingImportRows.filter(r => r.__link).map(r => ({ target: r.__link.target, remark: r.remark }));
     await callApi('import', { rows: pendingImportRows });
+    if (__impLinks.length) setTimeout(function () { applyImportLinks_(__impLinks); }, 5000);
     // Snapshot this batch for the "Just imported" summary on the Review tab
     // — only the fields that summary needs, not full transaction objects.
     // Replaces whatever batch was captured last time, not appended to, so
