@@ -830,6 +830,12 @@ body.theme-ice .stick-bar { background: #0f2230; }
 .name-preview { font-size: 13px; color: var(--accent); margin-top: 6px; min-height: 18px; }
 .bud-row { border-left: 0 !important; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 18%, var(--card)), var(--card) 75%) !important; border: 0.5px solid var(--line2); }
 .bud-row .link-bar-fill { background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 55%, #ffffff)) !important; }
+
+.stick-bar { z-index: 15 !important; }
+.sheet-inner { border-top: 0 !important; border-radius: 0 !important; }
+.fab.secondary { border: 1px solid var(--line2); }
+
+.fab.secondary { color: var(--text) !important; }
 </style>
 </head>
 <body>
@@ -1095,7 +1101,7 @@ body.theme-ice .stick-bar { background: #0f2230; }
 </div>
 
 <div class="fab-row">
-  <button class="fab secondary" id="importBtn" title="Import">⇪</button>
+  <button class="fab secondary" id="importBtn" title="Import" aria-label="Import statement"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></button>
   <button class="fab" id="addBtn" title="Add">+</button>
 </div>
 
